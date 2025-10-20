@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打刻システム - トップページ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .recent-activity {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 30px;
+        }
+        
+        .recent-activity h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .activity-list {
+            list-style: none;
+        }
+        
+        .activity-item {
+            background: white;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .activity-idm {
+            font-weight: bold;
+            color: #667eea;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .activity-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔖 打刻システム</h1>
+        <p class="subtitle">Attendance Tracking System</p>
+        
+        <div class="stats-grid" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-records">-</div>
+                <div class="stat-label">総打刻数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="unique-idm">-</div>
+                <div class="stat-label">登録カード数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="unique-terminals">-</div>
+                <div class="stat-label">端末数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="today-count">-</div>
+                <div class="stat-label">今日の打刻</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <a href="/search" class="btn btn-primary">🔍 打刻データを検索</a>
+        </div>
+        
+        <div class="recent-activity">
+            <h2>📋 最新の打刻履歴</h2>
+            <ul class="activity-list" id="recent-activity">
+                <li class="loading">読み込み中...</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // 統計情報を取得
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const stats = data.stats;
+                    
+                    // 統計情報を表示
+                    document.getElementById('total-records').textContent = stats.total_records.toLocaleString();
+                    document.getElementById('unique-idm').textContent = stats.unique_idm.toLocaleString();
+                    document.getElementById('unique-terminals').textContent = stats.unique_terminals.toLocaleString();
+                    document.getElementById('today-count').textContent = stats.today_count.toLocaleString();
+                    
+                    // 最新の打刻履歴を表示
+                    const activityList = document.getElementById('recent-activity');
+                    if (stats.latest.length > 0) {
+                        activityList.innerHTML = '';
+                        stats.latest.forEach(item => {
+                            const li = document.createElement('li');
+                            li.className = 'activity-item';
+                            li.innerHTML = `
+                                <span class="activity-idm">${item.idm}</span>
+                                <span class="activity-time">${formatDateTime(item.timestamp)}</span>
+                            `;
+                            activityList.appendChild(li);
+                        });
+                    } else {
+                        activityList.innerHTML = '<li class="loading">まだ打刻データがありません</li>';
+                    }
+                }
+            } catch (error) {
+                console.error('統計情報の取得エラー:', error);
+            }
+        }
+        
+        // 日時をフォーマット
+        function formatDateTime(datetime) {
+            if (!datetime) return '';
+            const dt = new Date(datetime);
+            return dt.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // ページ読み込み時に統計情報を取得
+        loadStats();
+        
+        // 30秒ごとに自動更新
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>
+

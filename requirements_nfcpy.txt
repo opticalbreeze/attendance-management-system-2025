@@ -1,5 +1,0 @@
-# nfcpy版クライアント用依存関係
-nfcpy>=1.0.4
-requests>=2.28.0
-RPi.GPIO>=0.7.1
-

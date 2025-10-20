@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打刻データ検索</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .back-link {
+            display: inline-block;
+            color: #667eea;
+            text-decoration: none;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .search-form {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        .form-group input {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-search {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-search:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-clear {
+            background: #6c757d;
+            color: white;
+            margin-left: 10px;
+        }
+        
+        .btn-clear:hover {
+            background: #5a6268;
+        }
+        
+        .results-section {
+            margin-top: 30px;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .results-count {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .btn-export {
+            padding: 8px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+        
+        .btn-export:hover {
+            background: #218838;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .results-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .results-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .results-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .results-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .idm-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .loading, .no-results {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-size: 1.1em;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← トップページに戻る</a>
+        
+        <h1>🔍 打刻データ検索</h1>
+        
+        <div class="search-form">
+            <form id="search-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="idm">IDm（カードID）</label>
+                        <input type="text" id="idm" name="idm" placeholder="例: 012E447C1234ABCD">
+                    </div>
+                    <div class="form-group">
+                        <label for="start-date">開始日時</label>
+                        <input type="datetime-local" id="start-date" name="start_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="end-date">終了日時</label>
+                        <input type="datetime-local" id="end-date" name="end_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="terminal-id">端末ID（MACアドレス）</label>
+                        <input type="text" id="terminal-id" name="terminal_id" placeholder="例: AA:BB:CC:DD:EE:FF">
+                    </div>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-search">🔍 検索</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="error-message" style="display: none;" class="error"></div>
+        
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <div class="results-count" id="results-count">検索結果: 0 件</div>
+                <button class="btn-export" onclick="exportCSV()">📥 CSV出力</button>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>IDm（カードID）</th>
+                            <th>打刻時刻</th>
+                            <th>端末ID</th>
+                            <th>受信時刻</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            検索中...
+        </div>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            検索条件に一致するデータが見つかりませんでした。
+        </div>
+    </div>
+    
+    <script>
+        let searchResults = [];
+        
+        // フォーム送信
+        document.getElementById('search-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await performSearch();
+        });
+        
+        // 検索実行
+        async function performSearch() {
+            const idm = document.getElementById('idm').value.trim();
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const terminalId = document.getElementById('terminal-id').value.trim();
+            
+            // UIリセット
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            // クエリパラメータ構築
+            const params = new URLSearchParams();
+            if (idm) params.append('idm', idm);
+            if (startDate) params.append('start_date', startDate.replace('T', ' '));
+            if (endDate) params.append('end_date', endDate.replace('T', ' '));
+            if (terminalId) params.append('terminal_id', terminalId);
+            
+            try {
+                const response = await fetch(`/api/search?${params}`);
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.status === 'success') {
+                    searchResults = data.results;
+                    displayResults(data.results);
+                } else {
+                    showError(data.message || '検索エラーが発生しました');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーとの通信エラーが発生しました');
+                console.error('検索エラー:', error);
+            }
+        }
+        
+        // 検索結果を表示
+        function displayResults(results) {
+            if (results.length === 0) {
+                document.getElementById('no-results').style.display = 'block';
+                return;
+            }
+            
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = '';
+            
+            results.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.id}</td>
+                    <td class="idm-cell">${item.idm}</td>
+                    <td>${formatDateTime(item.timestamp)}</td>
+                    <td>${item.terminal_id}</td>
+                    <td>${formatDateTime(item.received_at)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            document.getElementById('results-count').textContent = `検索結果: ${results.length} 件`;
+            document.getElementById('results-section').style.display = 'block';
+        }
+        
+        // 日時フォーマット
+        function formatDateTime(datetime) {
+            if (!datetime) return '';
+            const dt = new Date(datetime);
+            return dt.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        // フォームクリア
+        function clearForm() {
+            document.getElementById('search-form').reset();
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // CSV出力
+        function exportCSV() {
+            if (searchResults.length === 0) {
+                alert('出力するデータがありません');
+                return;
+            }
+            
+            let csv = 'ID,IDm,打刻時刻,端末ID,受信時刻\n';
+            searchResults.forEach(item => {
+                csv += `${item.id},"${item.idm}","${item.timestamp}","${item.terminal_id}","${item.received_at}"\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `attendance_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
+

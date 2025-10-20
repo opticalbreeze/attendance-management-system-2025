@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  attendance-server:
+    build: .
+    container_name: attendance-server
+    ports:
+      - "5000:5000"
+    volumes:
+      # データベースを永続化
+      - ./data:/data
+      - ./attendance.db:/app/attendance.db
+    environment:
+      - TZ=Asia/Tokyo
+    restart: unless-stopped
+    networks:
+      - attendance-network
+
+networks:
+  attendance-network:
+    driver: bridge
+
