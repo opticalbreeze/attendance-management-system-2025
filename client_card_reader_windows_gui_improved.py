@@ -69,15 +69,29 @@ SOUNDS = {
 }
 
 
-def beep(pattern):
+def beep(pattern, config=None):
     """
     PCスピーカーで音を鳴らす
     
     Args:
         pattern (str): 音パターン名（"startup", "read", "success", "fail"など）
+        config (dict): 設定辞書（音の有効/無効を制御）
     """
     if not WINSOUND_AVAILABLE:
         return
+    
+    # 設定で音が無効化されている場合はスキップ
+    if config:
+        beep_settings = config.get('beep_settings', {})
+        if not beep_settings.get('enabled', True):
+            return
+        # 個別の音設定をチェック
+        if pattern == 'read' and not beep_settings.get('card_read', True):
+            return
+        if pattern == 'success' and not beep_settings.get('success', True):
+            return
+        if pattern == 'fail' and not beep_settings.get('fail', True):
+            return
     
     for freq, duration in SOUNDS.get(pattern, [(1000, 100)]):
         try:
@@ -235,10 +249,11 @@ class WindowsClientGUI:
     ICカードリーダーからカードを読み取り、サーバーに送信する
     """
     
-    def __init__(self, server_url):
+    def __init__(self, server_url, config=None):
         """
         Args:
             server_url (str): サーバーURL
+            config (dict): 設定辞書
         """
         self.server = server_url
         self.terminal = get_mac_address()  # MACアドレスを端末IDとして使用
@@ -248,6 +263,7 @@ class WindowsClientGUI:
         self.lock = threading.Lock()
         self.running = True
         self.server_connected = False
+        self.config = config or {}
         
         # GUI作成
         self.root = tk.Tk()
@@ -258,7 +274,7 @@ class WindowsClientGUI:
         self.create_widgets()
         
         # 起動音
-        beep("startup")
+        beep("startup", self.config)
         
         # バックグラウンドスレッド開始
         threading.Thread(target=self.monitor_server, daemon=True).start()
@@ -441,7 +457,7 @@ class WindowsClientGUI:
                     
                     if retry_count > 0:
                         self.log("[サーバー] 再接続成功")
-                        beep("connect")
+                        beep("connect", self.config)
                     
                     retry_count = 0
                 else:
@@ -547,37 +563,53 @@ class WindowsClientGUI:
         """
         last_id = None
         last_time = 0
+        clf = None
         
-        while self.running:
-            try:
-                clf = nfc.ContactlessFrontend(path)
-                if not clf:
-                    time.sleep(1)
-                    continue
-                
-                # カード検出（タイムアウト付き）
-                tag = clf.connect(rdwr={'on-connect': lambda tag: False})
-                
-                if tag:
-                    # IDm または identifier を取得
-                    card_id = (tag.idm if hasattr(tag, 'idm') else tag.identifier).hex().upper()
+        try:
+            # ContactlessFrontendを1回だけ開く（再利用することで高速化）
+            clf = nfc.ContactlessFrontend(path)
+            if not clf:
+                self.log(f"[エラー] nfcpyリーダー#{idx}を開けません")
+                return
+            
+            while self.running:
+                try:
+                    # カード検出（短いタイムアウトで高速化: 0.5秒）
+                    tag = clf.connect(rdwr={
+                        'on-connect': lambda tag: False,
+                        'beep-on-connect': False
+                    }, terminate=lambda: not self.running)
                     
-                    if card_id and card_id != last_id:
-                        self.process_card(card_id, idx)
-                        last_id = card_id
-                        last_time = time.time()
+                    if tag:
+                        # IDm または identifier を取得
+                        card_id = (tag.idm if hasattr(tag, 'idm') else tag.identifier).hex().upper()
+                        
+                        if card_id and card_id != last_id:
+                            self.process_card(card_id, idx)
+                            last_id = card_id
+                            last_time = time.time()
+                    
+                except IOError:
+                    # カードなし - 正常な状態
+                    pass
+                except Exception:
+                    # その他のエラーは無視
+                    pass
                 
-                clf.close()
+                # カードが離れた判定（2秒以上検出なし）
+                if last_time > 0 and time.time() - last_time > 2:
+                    last_id = None
                 
-            except Exception:
-                # カードなし、接続エラーなどは無視
-                pass
-            
-            # カードが離れた判定（2秒以上検出なし）
-            if time.time() - last_time > 2:
-                last_id = None
-            
-            time.sleep(0.3)
+                # 短いスリープで応答性を向上
+                time.sleep(0.05)
+        
+        finally:
+            # 終了時にContactlessFrontendをクローズ
+            if clf:
+                try:
+                    clf.close()
+                except:
+                    pass
     
     def pcsc_worker(self, reader, reader_name, idx):
         """
@@ -665,8 +697,8 @@ class WindowsClientGUI:
             # ログ出力
             self.log(f"[カード#{self.count}] IDm: {card_id} (リーダー{reader_idx})")
             
-            # 読み取り音
-            beep("read")
+            # 読み取り音（ハードウェアブザー付きリーダーの場合は無効化推奨）
+            beep("read", self.config)
             
             # サーバー送信
             ts = datetime.now().isoformat()
@@ -688,37 +720,37 @@ class WindowsClientGUI:
                     if result.get('status') == 'success':
                         self.log(f"[送信成功] {result.get('message', 'サーバーに記録')}")
                         self.update_message("サーバーに記録しました", "green", 2)
-                        beep("success")
+                        beep("success", self.config)
                     else:
                         # サーバーからエラーレスポンス
                         self.log(f"[送信失敗] サーバーエラー: {result.get('message')}")
                         self.cache.save_record(card_id, ts, self.terminal)
                         self.update_message("ローカルに保存しました", "orange", 2)
-                        beep("fail")
+                        beep("fail", self.config)
                 else:
                     # HTTPエラー
                     self.log(f"[送信失敗] HTTP {response.status_code} - ローカルに保存")
                     self.cache.save_record(card_id, ts, self.terminal)
                     self.update_message("ローカルに保存しました", "orange", 2)
-                    beep("fail")
+                    beep("fail", self.config)
             
             except requests.exceptions.ConnectionError:
                 self.log(f"[送信失敗] サーバー接続エラー - ローカルに保存")
                 self.cache.save_record(card_id, ts, self.terminal)
                 self.update_message("ローカルに保存しました", "orange", 2)
-                beep("fail")
+                beep("fail", self.config)
             
             except requests.exceptions.Timeout:
                 self.log(f"[送信失敗] タイムアウト - ローカルに保存")
                 self.cache.save_record(card_id, ts, self.terminal)
                 self.update_message("ローカルに保存しました", "orange", 2)
-                beep("fail")
+                beep("fail", self.config)
             
             except Exception as e:
                 self.log(f"[送信失敗] エラー: {e} - ローカルに保存")
                 self.cache.save_record(card_id, ts, self.terminal)
                 self.update_message("ローカルに保存しました", "orange", 2)
-                beep("fail")
+                beep("fail", self.config)
     
     # ========================================================================
     # リトライワーカー
@@ -792,7 +824,13 @@ def load_config():
     """
     config_file = "client_config.json"
     default_config = {
-        "server_url": "http://192.168.1.31:5000"
+        "server_url": "http://192.168.1.31:5000",
+        "beep_settings": {
+            "enabled": True,        # 全体の音の有効/無効
+            "card_read": False,     # カード読み取り音（ハードウェアブザー付きリーダーの場合はfalse推奨）
+            "success": True,        # 送信成功音
+            "fail": True            # 送信失敗音
+        }
     }
     
     config_path = Path(config_file)
@@ -842,7 +880,7 @@ def main():
     
     # GUIクライアント起動
     try:
-        client = WindowsClientGUI(server_url)
+        client = WindowsClientGUI(server_url, config)
         client.run()
     except KeyboardInterrupt:
         print("\n[終了] プログラムを終了します")

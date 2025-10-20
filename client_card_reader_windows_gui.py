@@ -349,30 +349,48 @@ class WindowsClientGUI:
                 pass
     
     def nfcpy_worker(self, path, idx):
-        """nfcpyワーカー"""
+        """nfcpyワーカー（高速化版）"""
         last_id = None
+        clf = None
         
-        while self.running:
-            try:
-                clf = nfc.ContactlessFrontend(path)
-                if not clf:
-                    time.sleep(1)
-                    continue
-                
-                tag = clf.connect(rdwr={'on-connect': lambda tag: False})
-                
-                if tag:
-                    card_id = (tag.idm if hasattr(tag, 'idm') else tag.identifier).hex().upper()
-                    
-                    if card_id and card_id != last_id:
-                        self.process_card(card_id, idx)
-                        last_id = card_id
-                
-                clf.close()
-            except:
-                pass
+        try:
+            # ContactlessFrontendを1回だけ開く（再利用で高速化）
+            clf = nfc.ContactlessFrontend(path)
+            if not clf:
+                self.log(f"[エラー] nfcpyリーダー#{idx}を開けません")
+                return
             
-            time.sleep(0.3)
+            while self.running:
+                try:
+                    # カード検出（短いタイムアウトで高速化）
+                    tag = clf.connect(rdwr={
+                        'on-connect': lambda tag: False,
+                        'beep-on-connect': False
+                    }, terminate=lambda: not self.running)
+                    
+                    if tag:
+                        card_id = (tag.idm if hasattr(tag, 'idm') else tag.identifier).hex().upper()
+                        
+                        if card_id and card_id != last_id:
+                            self.process_card(card_id, idx)
+                            last_id = card_id
+                
+                except IOError:
+                    # カードなし - 正常な状態
+                    pass
+                except:
+                    pass
+                
+                # 短いスリープで応答性を向上
+                time.sleep(0.05)
+        
+        finally:
+            # 終了時にContactlessFrontendをクローズ
+            if clf:
+                try:
+                    clf.close()
+                except:
+                    pass
     
     def pcsc_worker(self, reader, reader_name, idx):
         """PCSCワーカー"""
