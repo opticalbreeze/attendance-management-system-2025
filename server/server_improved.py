@@ -11,7 +11,7 @@
 - Webインターフェース
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, make_response
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +19,7 @@ import json
 import os
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # ============================================================================
 # 設定
@@ -55,6 +56,23 @@ def init_database():
         )
     """)
     
+    # 勤怠スケジュールテーブルの作成
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attend_schedule (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id TEXT NOT NULL,
+            work_date TEXT NOT NULL,
+            clock_in_time TEXT,
+            clock_out_time TEXT,
+            break_start_time TEXT,
+            break_end_time TEXT,
+            overtime_hours REAL DEFAULT 0,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    
     # インデックスの作成（パフォーマンス向上）
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_idm ON attendance(idm)
@@ -64,6 +82,12 @@ def init_database():
     """)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_terminal_id ON attendance(terminal_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_employee_id ON attend_schedule(employee_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_work_date ON attend_schedule(work_date)
     """)
     
     conn.commit()
@@ -91,12 +115,16 @@ def index():
 def search_page():
     """
     検索ページ
-    打刻データを検索するためのページを表示
+    勤怠スケジュールを検索するためのページを表示
     
     Returns:
         HTMLテンプレート
     """
-    return render_template('search.html')
+    response = make_response(render_template('search.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 
@@ -290,16 +318,15 @@ def check_duplicate_attendance(idm, timestamp, terminal_id, threshold_seconds=No
 
 
 @app.route('/api/search', methods=['GET'])
-def search_attendance():
+def search_schedule():
     """
-    打刻データ検索API
-    条件を指定して打刻データを検索
+    勤怠スケジュール検索API
+    employee_idと検索月を指定して勤怠スケジュールを検索
+    検索月はyyyy/mm形式で、前月16日から当月15日までの範囲で検索
     
     Query Parameters:
-        idm (str): カードID（部分一致）
-        start_date (str): 開始日（YYYY-MM-DD形式）
-        end_date (str): 終了日（YYYY-MM-DD形式）
-        terminal_id (str): 端末ID（部分一致）
+        employee_id (str): 従業員ID（必須）
+        search_month (str): 検索月（yyyy/mm形式、必須）
         limit (int): 取得件数（デフォルト: 100）
     
     Returns:
@@ -307,38 +334,71 @@ def search_attendance():
     """
     try:
         # クエリパラメータの取得
-        idm = request.args.get('idm', '').strip()
-        start_date = request.args.get('start_date', '').strip()
-        end_date = request.args.get('end_date', '').strip()
-        terminal_id = request.args.get('terminal_id', '').strip()
+        employee_id = request.args.get('employee_id', '').strip()
+        search_month = request.args.get('search_month', '').strip()
         limit = request.args.get('limit', '100')
+        
+        # バリデーション
+        if not employee_id:
+            return jsonify({
+                'status': 'error',
+                'message': '従業員IDが指定されていません'
+            }), 400
+            
+        if not search_month:
+            return jsonify({
+                'status': 'error',
+                'message': '検索月が指定されていません（yyyy/mm形式で入力してください）'
+            }), 400
+        
+        # 検索月の解析
+        try:
+            year, month = search_month.split('/')
+            year = int(year)
+            month = int(month)
+            
+            if month < 1 or month > 12:
+                raise ValueError("月は1-12の範囲で指定してください")
+                
+        except ValueError as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'検索月の形式が正しくありません: {str(e)}'
+            }), 400
+        
+        # 検索範囲の計算（前月16日から当月15日）
+        from datetime import date, timedelta
+        
+        # 前月の計算
+        if month == 1:
+            prev_year = year - 1
+            prev_month = 12
+        else:
+            prev_year = year
+            prev_month = month - 1
+        
+        # 検索範囲の開始日：前月16日
+        start_date = date(prev_year, prev_month, 16).strftime('%Y-%m-%d')
+        
+        # 検索範囲の終了日：当月15日
+        end_date = date(year, month, 15).strftime('%Y-%m-%d')
         
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
-        # クエリ構築（動的にWHERE句を追加）
-        query = "SELECT id, idm, timestamp, terminal_id, received_at FROM attendance WHERE 1=1"
-        params = []
-        
-        if idm:
-            query += " AND idm LIKE ?"
-            params.append(f"%{idm}%")
-        
-        if start_date:
-            query += " AND timestamp >= ?"
-            params.append(start_date)
-        
-        if end_date:
-            query += " AND timestamp <= ?"
-            params.append(end_date + " 23:59:59")
-        
-        if terminal_id:
-            query += " AND terminal_id LIKE ?"
-            params.append(f"%{terminal_id}%")
-        
-        # 並び替えと件数制限
-        query += " ORDER BY timestamp DESC LIMIT ?"
-        params.append(int(limit))
+        # クエリ構築
+        query = """
+            SELECT id, employee_id, work_date, clock_in_time, clock_out_time, 
+                   break_start_time, break_end_time, overtime_hours, notes,
+                   created_at, updated_at
+            FROM attend_schedule 
+            WHERE employee_id = ? 
+            AND work_date >= ? 
+            AND work_date <= ?
+            ORDER BY work_date DESC 
+            LIMIT ?
+        """
+        params = [employee_id, start_date, end_date, int(limit)]
         
         # クエリ実行
         cursor.execute(query, params)
@@ -349,10 +409,16 @@ def search_attendance():
         for row in rows:
             results.append({
                 'id': row[0],
-                'idm': row[1],
-                'timestamp': row[2],
-                'terminal_id': row[3],
-                'received_at': row[4]
+                'employee_id': row[1],
+                'work_date': row[2],
+                'clock_in_time': row[3],
+                'clock_out_time': row[4],
+                'break_start_time': row[5],
+                'break_end_time': row[6],
+                'overtime_hours': row[7],
+                'notes': row[8],
+                'created_at': row[9],
+                'updated_at': row[10]
             })
         
         conn.close()
@@ -360,6 +426,14 @@ def search_attendance():
         return jsonify({
             'status': 'success',
             'count': len(results),
+            'search_params': {
+                'employee_id': employee_id,
+                'search_month': search_month,
+                'date_range': {
+                    'start_date': start_date,
+                    'end_date': end_date
+                }
+            },
             'results': results
         })
     
@@ -552,6 +626,125 @@ def cleanup_duplicates():
         }), 500
 
 
+@app.route('/api/sample_data', methods=['POST'])
+def add_sample_data():
+    """
+    サンプルデータ追加API
+    テスト用のサンプル勤怠スケジュールデータを追加する
+    
+    Returns:
+        JSON: 追加結果
+    """
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # サンプルデータ
+        from datetime import date, timedelta
+        now = datetime.now()
+        
+        sample_data = [
+            # 従業員ID: EMP001
+            {
+                'employee_id': 'EMP001',
+                'work_date': (date.today() - timedelta(days=5)).strftime('%Y-%m-%d'),
+                'clock_in_time': '09:00',
+                'clock_out_time': '18:00',
+                'break_start_time': '12:00',
+                'break_end_time': '13:00',
+                'overtime_hours': 0,
+                'notes': 'テストデータ1'
+            },
+            {
+                'employee_id': 'EMP001',
+                'work_date': (date.today() - timedelta(days=4)).strftime('%Y-%m-%d'),
+                'clock_in_time': '09:15',
+                'clock_out_time': '18:30',
+                'break_start_time': '12:00',
+                'break_end_time': '13:00',
+                'overtime_hours': 0.5,
+                'notes': 'テストデータ2'
+            },
+            {
+                'employee_id': 'EMP001',
+                'work_date': (date.today() - timedelta(days=3)).strftime('%Y-%m-%d'),
+                'clock_in_time': '08:45',
+                'clock_out_time': '17:45',
+                'break_start_time': '12:00',
+                'break_end_time': '13:00',
+                'overtime_hours': 0,
+                'notes': 'テストデータ3'
+            },
+            # 従業員ID: EMP002
+            {
+                'employee_id': 'EMP002',
+                'work_date': (date.today() - timedelta(days=5)).strftime('%Y-%m-%d'),
+                'clock_in_time': '10:00',
+                'clock_out_time': '19:00',
+                'break_start_time': '12:30',
+                'break_end_time': '13:30',
+                'overtime_hours': 1,
+                'notes': 'テストデータ4'
+            },
+            {
+                'employee_id': 'EMP002',
+                'work_date': (date.today() - timedelta(days=4)).strftime('%Y-%m-%d'),
+                'clock_in_time': '09:30',
+                'clock_out_time': '18:15',
+                'break_start_time': '12:30',
+                'break_end_time': '13:30',
+                'overtime_hours': 0,
+                'notes': 'テストデータ5'
+            },
+        ]
+        
+        # データを挿入
+        inserted_count = 0
+        for data in sample_data:
+            cursor.execute("""
+                INSERT INTO attend_schedule 
+                (employee_id, work_date, clock_in_time, clock_out_time, 
+                 break_start_time, break_end_time, overtime_hours, notes, 
+                 created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                data['employee_id'],
+                data['work_date'],
+                data['clock_in_time'],
+                data['clock_out_time'],
+                data['break_start_time'],
+                data['break_end_time'],
+                data['overtime_hours'],
+                data['notes'],
+                now.isoformat(),
+                now.isoformat()
+            ))
+            inserted_count += 1
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{inserted_count}件のサンプルデータを追加しました',
+            'inserted_count': inserted_count
+        })
+    
+    except sqlite3.Error as e:
+        print(f"[エラー] データベースエラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'データベースエラー: {str(e)}'
+        }), 500
+    
+    except Exception as e:
+        print(f"[エラー] サンプルデータ追加エラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'エラー: {str(e)}'
+        }), 500
+
+
 # ============================================================================
 # エントリーポイント
 # ============================================================================
@@ -585,6 +778,7 @@ def main():
     print("  - データ検索:     GET  /api/search")
     print("  - 統計情報:       GET  /api/stats")
     print("  - 重複削除:       POST /api/cleanup_duplicates")
+    print("  - サンプルデータ: POST /api/sample_data")
     print("="*70)
     print()
     

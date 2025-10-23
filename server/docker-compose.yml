@@ -9,6 +9,10 @@ services:
     volumes:
       # データベースを永続化
       - ./data:/data
+      # テンプレートファイルを最新に保つ
+      - ./templates:/app/templates
+      # サーバーコードを最新に保つ
+      - ./server_improved.py:/app/server_improved.py
     environment:
       - TZ=Asia/Tokyo
     restart: unless-stopped

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>打刻データ検索</title>
+    <title>勤怠スケジュール検索</title>
     <style>
         * {
             margin: 0;
@@ -199,26 +199,21 @@
     <div class="container">
         <a href="/" class="back-link">← トップページに戻る</a>
         
-        <h1>🔍 打刻データ検索</h1>
+        <h1>🔍 勤怠スケジュール検索</h1>
         
         <div class="search-form">
             <form id="search-form">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="idm">IDm（カードID）</label>
-                        <input type="text" id="idm" name="idm" placeholder="例: 012E447C1234ABCD">
+                        <label for="employee-id">従業員ID（必須）</label>
+                        <input type="text" id="employee-id" name="employee_id" placeholder="例: EMP001" required>
                     </div>
                     <div class="form-group">
-                        <label for="start-date">開始日時</label>
-                        <input type="datetime-local" id="start-date" name="start_date">
-                    </div>
-                    <div class="form-group">
-                        <label for="end-date">終了日時</label>
-                        <input type="datetime-local" id="end-date" name="end_date">
-                    </div>
-                    <div class="form-group">
-                        <label for="terminal-id">端末ID（MACアドレス）</label>
-                        <input type="text" id="terminal-id" name="terminal_id" placeholder="例: AA:BB:CC:DD:EE:FF">
+                        <label for="search-month">検索月（必須）</label>
+                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/10" pattern="[0-9]{4}/[0-9]{1,2}" required>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            yyyy/mm形式で入力（前月16日〜当月15日を検索）
+                        </small>
                     </div>
                 </div>
                 <div>
@@ -241,10 +236,14 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>IDm（カードID）</th>
-                            <th>打刻時刻</th>
-                            <th>端末ID</th>
-                            <th>受信時刻</th>
+                            <th>従業員ID</th>
+                            <th>勤務日</th>
+                            <th>出勤時刻</th>
+                            <th>退勤時刻</th>
+                            <th>休憩開始</th>
+                            <th>休憩終了</th>
+                            <th>残業時間</th>
+                            <th>備考</th>
                         </tr>
                     </thead>
                     <tbody id="results-body">
@@ -265,6 +264,13 @@
     <script>
         let searchResults = [];
         
+        // ページ読み込み時に現在の月をデフォルト値に設定
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+            document.getElementById('search-month').value = currentMonth;
+        });
+        
         // フォーム送信
         document.getElementById('search-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -273,10 +279,26 @@
         
         // 検索実行
         async function performSearch() {
-            const idm = document.getElementById('idm').value.trim();
-            const startDate = document.getElementById('start-date').value;
-            const endDate = document.getElementById('end-date').value;
-            const terminalId = document.getElementById('terminal-id').value.trim();
+            const employeeId = document.getElementById('employee-id').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            // バリデーション
+            if (!employeeId) {
+                showError('従業員IDを入力してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（yyyy/mm形式）');
+                return;
+            }
+            
+            // 検索月の形式チェック
+            const monthPattern = /^[0-9]{4}\/[0-9]{1,2}$/;
+            if (!monthPattern.test(searchMonth)) {
+                showError('検索月はyyyy/mm形式で入力してください（例: 2025/10）');
+                return;
+            }
             
             // UIリセット
             document.getElementById('results-section').style.display = 'none';
@@ -286,10 +308,8 @@
             
             // クエリパラメータ構築
             const params = new URLSearchParams();
-            if (idm) params.append('idm', idm);
-            if (startDate) params.append('start_date', startDate.replace('T', ' '));
-            if (endDate) params.append('end_date', endDate.replace('T', ' '));
-            if (terminalId) params.append('terminal_id', terminalId);
+            params.append('employee_id', employeeId);
+            params.append('search_month', searchMonth);
             
             try {
                 const response = await fetch(`/api/search?${params}`);
@@ -299,7 +319,7 @@
                 
                 if (data.status === 'success') {
                     searchResults = data.results;
-                    displayResults(data.results);
+                    displayResults(data.results, data.search_params);
                 } else {
                     showError(data.message || '検索エラーが発生しました');
                 }
@@ -311,7 +331,7 @@
         }
         
         // 検索結果を表示
-        function displayResults(results) {
+        function displayResults(results, searchParams) {
             if (results.length === 0) {
                 document.getElementById('no-results').style.display = 'block';
                 return;
@@ -324,19 +344,55 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${item.id}</td>
-                    <td class="idm-cell">${item.idm}</td>
-                    <td>${formatDateTime(item.timestamp)}</td>
-                    <td>${item.terminal_id}</td>
-                    <td>${formatDateTime(item.received_at)}</td>
+                    <td class="idm-cell">${item.employee_id}</td>
+                    <td>${formatDate(item.work_date)}</td>
+                    <td>${formatTime(item.clock_in_time)}</td>
+                    <td>${formatTime(item.clock_out_time)}</td>
+                    <td>${formatTime(item.break_start_time)}</td>
+                    <td>${formatTime(item.break_end_time)}</td>
+                    <td>${item.overtime_hours || 0}時間</td>
+                    <td>${item.notes || ''}</td>
                 `;
                 tbody.appendChild(tr);
             });
             
-            document.getElementById('results-count').textContent = `検索結果: ${results.length} 件`;
+            // 検索範囲の情報を表示
+            let rangeInfo = '';
+            if (searchParams && searchParams.date_range) {
+                rangeInfo = ` (${searchParams.date_range.start_date} 〜 ${searchParams.date_range.end_date})`;
+            }
+            
+            document.getElementById('results-count').textContent = `検索結果: ${results.length} 件${rangeInfo}`;
             document.getElementById('results-section').style.display = 'block';
         }
         
-        // 日時フォーマット
+        // 日付フォーマット
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const dt = new Date(dateStr);
+            return dt.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+        
+        // 時刻フォーマット
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            // ISO時刻文字列の場合
+            if (timeStr.includes('T') || timeStr.includes(' ')) {
+                const dt = new Date(timeStr);
+                return dt.toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            // HH:MM形式の場合はそのまま返す
+            return timeStr;
+        }
+        
+        // 日時フォーマット（下位互換用）
         function formatDateTime(datetime) {
             if (!datetime) return '';
             const dt = new Date(datetime);
@@ -372,18 +428,17 @@
                 return;
             }
             
-            let csv = 'ID,IDm,打刻時刻,端末ID,受信時刻\n';
+            let csv = 'ID,従業員ID,勤務日,出勤時刻,退勤時刻,休憩開始,休憩終了,残業時間,備考\n';
             searchResults.forEach(item => {
-                csv += `${item.id},"${item.idm}","${item.timestamp}","${item.terminal_id}","${item.received_at}"\n`;
+                csv += `${item.id},"${item.employee_id}","${item.work_date}","${item.clock_in_time || ''}","${item.clock_out_time || ''}","${item.break_start_time || ''}","${item.break_end_time || ''}","${item.overtime_hours || 0}","${item.notes || ''}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `attendance_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.download = `schedule_${new Date().toISOString().slice(0, 10)}.csv`;
             link.click();
         }
     </script>
 </body>
 </html>
-

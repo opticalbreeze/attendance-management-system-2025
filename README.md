@@ -379,6 +379,19 @@ conn.close()
 "
 ```
 
-## 📄 ライセンス
+## � ドキュメント
+
+### 開発者向けドキュメント
+- 📋 **[トラブルシューティング履歴](./TROUBLESHOOTING_HISTORY.md)** - 過去の問題と解決策の詳細記録
+- 🤖 **[AI向け開発ガイド](./AI_DEVELOPMENT_GUIDE.md)** - AIアシスタント用の開発指針とベストプラクティス
+- 🐳 **[Docker設定ガイド](./DOCKER_SETUP_GUIDE.md)** - 開発・本番環境でのDocker設定の詳細
+
+### システム仕様
+- 🔧 **[API仕様書](./API_SPECIFICATION.md)** - RESTful APIの詳細仕様
+- 🗄️ **[データベース設計](./DATABASE_SCHEMA.md)** - テーブル構造と関係性
+
+これらのドキュメントは実際の開発で発生した問題をベースに作成されており、同様の問題を避けるための貴重な情報源となります。
+
+## �📄 ライセンス
 
 MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照してください。
