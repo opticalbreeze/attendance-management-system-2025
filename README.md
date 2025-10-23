@@ -1,195 +1,384 @@
-# ICカード打刻システム
+# 勤怠打刻システム - サーバー# 勤怠打刻システム - サーバー
 
-ICカードリーダーを使った勤怠打刻システムです。WindowsとRaspberry Piの両方に対応しています。
 
-## 🎯 システム概要
 
-このシステムは、ICカードリーダーでカードを読み取り、サーバーに打刻データを送信する勤怠管理システムです。
+ICカード打刻システムのサーバー側プログラムです。クライアントからの打刻データを受信・保存し、Web画面で管理できます。ICカード打刻システムのサーバー側プログラムです。クライアントからの打刻データを受信・保存し、Web画面で管理できます。
 
-### 主な機能
 
-- ✅ ICカードの読み取り（Mifare、FeliCa等に対応）
-- ✅ サーバーへの打刻データ送信
-- ✅ 送信失敗時のローカルキャッシュ保存
-- ✅ 自動リトライ機能（10分間隔）
-- ✅ Web画面での検索・CSV出力
-- ✅ マルチリーダー対応
 
-### Windows版の機能
-- 🔊 PCスピーカーで音声フィードバック
-- 🖥️ GUIで状態表示（GUI版のみ）
-- 📊 リアルタイム統計表示
+## 🎯 システム概要## 🎯 システム概要
 
-### Raspberry Pi版の機能
-- 💡 RGB LED（赤・緑・青）で状態表示
-- 🔔 圧電ブザーで音声フィードバック
-- 📺 LCD（I2C 1602）でメッセージ表示
-- 🔌 GPIO制御による拡張性
 
-## 📁 プロジェクト構成
 
-```
-simple_card_reader-main/
-├── client_card_reader.py              # Windowsクライアント（CUI版）
-├── client_card_reader_windows_gui.py  # Windowsクライアント（GUI版）
-├── client_card_reader_unified.py      # ラズパイ統合版
-├── client_config_gui.py               # 設定GUI
-├── gpio_config.py                     # GPIO設定（ラズパイ用）
-├── lcd_i2c.py                         # LCD制御（ラズパイ用）
-├── start_client.bat                   # Windows CUI版起動
-├── start_windows_gui.bat              # Windows GUI版起動
-├── start_unified.sh                   # ラズパイ統合版起動
-├── start_client_config.bat            # 設定GUI起動
-├── requirements_windows.txt           # Windows依存パッケージ
-├── requirements_unified.txt           # ラズパイ依存パッケージ
-├── server/                            # サーバー側プログラム
-│   ├── server.py                      # Flaskサーバー
-│   ├── start_server.bat               # サーバー起動
-│   ├── requirements_server.txt        # サーバー依存パッケージ
+打刻データの受信・保存・検索・統計機能を提供するFlaskベースのWebサーバーです。打刻データの受信・保存・検索・統計機能を提供するFlaskベースのWebサーバーです。
+
+
+
+### 主な機能### 主な機能
+
+
+
+- ✅ 打刻データの受信・保存（REST API）- ✅ 打刻データの受信・保存（REST API）
+
+- ✅ チャタリング防止機能（重複打刻の自動除外）- ✅ チャタリング防止機能（重複打刻の自動除外）
+
+- ✅ Web画面での検索・CSV出力- ✅ Web画面での検索・CSV出力
+
+- ✅ リアルタイム統計情報表示- ✅ リアルタイム統計情報表示
+
+- ✅ 重複データクリーンアップ機能- ✅ 重複データクリーンアップ機能
+
+- ✅ Docker対応で簡単デプロイ- ✅ Docker対応で簡単デプロイ
+
+
+
+## 📁 プロジェクト構成## 📁 プロジェクト構成
+
+
+
+``````
+
+card_reader_improved/simple_card_reader-main/
+
+├── server/                            # サーバー側プログラム├── client_card_reader.py              # Windowsクライアント（CUI版）
+
+│   ├── server_improved.py             # Flaskサーバー（改善版）├── client_card_reader_windows_gui.py  # Windowsクライアント（GUI版）
+
+│   ├── templates/                     # HTMLテンプレート├── client_card_reader_unified.py      # ラズパイ統合版
+
+│   │   ├── index.html                 # トップページ├── client_config_gui.py               # 設定GUI
+
+│   │   └── search.html                # 検索ページ├── gpio_config.py                     # GPIO設定（ラズパイ用）
+
+│   ├── start_server.bat               # サーバー起動├── lcd_i2c.py                         # LCD制御（ラズパイ用）
+
+│   ├── start_docker.bat               # Docker起動├── start_client.bat                   # Windows CUI版起動
+
+│   ├── stop_docker.bat                # Docker停止├── start_windows_gui.bat              # Windows GUI版起動
+
+│   ├── requirements_server.txt        # サーバー依存パッケージ├── start_unified.sh                   # ラズパイ統合版起動
+
+│   ├── docker-compose.yml             # Docker構成├── start_client_config.bat            # 設定GUI起動
+
+│   ├── Dockerfile                     # Dockerイメージ├── requirements_windows.txt           # Windows依存パッケージ
+
+│   └── data/                          # データ保存ディレクトリ├── requirements_unified.txt           # ラズパイ依存パッケージ
+
+├── README.md                          # このファイル├── server/                            # サーバー側プログラム
+
+├── SYSTEM_OVERVIEW.md                 # システム概要│   ├── server.py                      # Flaskサーバー
+
+└── LICENSE                            # ライセンス│   ├── start_server.bat               # サーバー起動
+
+```│   ├── requirements_server.txt        # サーバー依存パッケージ
+
 │   ├── docker-compose.yml             # Docker構成
-│   ├── Dockerfile                     # Dockerイメージ
+
+## 🚀 クイックスタート│   ├── Dockerfile                     # Dockerイメージ
+
 │   └── templates/                     # HTMLテンプレート
-├── SETUP_GUIDE.md                     # セットアップガイド
-├── SYSTEM_OVERVIEW.md                 # システム概要
-└── README_ATTENDANCE.md               # 詳細説明
+
+### Docker起動（推奨）├── SETUP_GUIDE.md                     # セットアップガイド
+
+```bash├── SYSTEM_OVERVIEW.md                 # システム概要
+
+cd server└── README_ATTENDANCE.md               # 詳細説明
+
+docker-compose up -d```
+
 ```
 
 ## 🚀 クイックスタート
 
-### 1. サーバー側のセットアップ
+### 通常起動
 
-#### 通常起動
-```bash
+```bash### 1. サーバー側のセットアップ
+
 cd server
+
+pip install -r requirements_server.txt#### 通常起動
+
+python server_improved.py```bash
+
+```cd server
+
 pip install -r requirements_server.txt
-python server.py
+
+サーバーは `http://localhost:5000` で起動します。python server.py
+
 ```
+
+## 🌐 アクセス方法
 
 #### Docker起動（推奨）
-```bash
-cd server
-docker-compose up -d
-```
 
-サーバーは `http://サーバーIP:5000` で起動します。
+- **トップページ**: http://localhost:5000```bash
 
-### 2. クライアント側のセットアップ
+- **検索ページ**: http://localhost:5000/searchcd server
 
-#### Windows（CUI版）
+- **API エンドポイント**:docker-compose up -d
+
+  - ヘルスチェック: `GET /api/health````
+
+  - 打刻データ受信: `POST /api/attendance`
+
+  - データ検索: `GET /api/search`サーバーは `http://サーバーIP:5000` で起動します。
+
+  - 統計情報: `GET /api/stats`
+
+  - 重複削除: `POST /api/cleanup_duplicates`### 2. クライアント側のセットアップ
+
+
+
+## ⚡ チャタリング防止機能#### Windows（CUI版）
+
 ```cmd
-pip install -r requirements_windows.txt
+
+同じカードからの短時間での連続打刻を自動的に検出・除外します。pip install -r requirements_windows.txt
+
 start_client_config.bat  # 設定（初回のみ）
-start_client.bat         # クライアント起動
-```
+
+- **デフォルト閾値**: 10秒start_client.bat         # クライアント起動
+
+- **設定変更**: 環境変数 `CHATTERING_THRESHOLD` で調整可能```
+
+- **ログ出力**: チャタリング検出時は詳細ログを出力
 
 #### Windows（GUI版）
-```cmd
-pip install -r requirements_windows.txt
-start_client_config.bat  # 設定（初回のみ）
-start_windows_gui.bat    # GUI版起動
+
+### 環境変数設定例```cmd
+
+```bashpip install -r requirements_windows.txt
+
+# チャタリング防止の閾値を15秒に設定start_client_config.bat  # 設定（初回のみ）
+
+export CHATTERING_THRESHOLD=15start_windows_gui.bat    # GUI版起動
+
+docker-compose up -d```
+
 ```
 
 #### Raspberry Pi（統合版）
-```bash
+
+## 🗂️ データベース```bash
+
 pip3 install -r requirements_unified.txt
-./start_client_config.bat  # 設定（初回のみ）
-./start_unified.sh         # 統合版起動
-```
 
-## 🔧 対応カードリーダー
+- **形式**: SQLite3./start_client_config.bat  # 設定（初回のみ）
 
-### 動作確認済み
-- **Sony RC-S380** (PaSoRi) - FeliCa対応
+- **場所**: `server/data/attendance.db`./start_unified.sh         # 統合版起動
+
+- **テーブル**: `attendance````
+
+  - `id`: レコードID
+
+  - `idm`: カードID## 🔧 対応カードリーダー
+
+  - `timestamp`: 打刻日時
+
+  - `terminal_id`: 端末ID### 動作確認済み
+
+  - `received_at`: 受信日時- **Sony RC-S380** (PaSoRi) - FeliCa対応
+
 - **Sony RC-S330** (PaSoRi)
-- **Circle CIR315 CL** - USB NFC Reader
+
+## 🔧 重複データクリーンアップ- **Circle CIR315 CL** - USB NFC Reader
+
 - **ACS ACR122U**
 
+既存の重複データをクリーンアップできます。
+
 ### 動作予想
-- Identiv uTrust 3700 F
-- SCM SCL3711
 
-## 📱 対応ICカード
+### プレビュー（削除前確認）- Identiv uTrust 3700 F
 
-- **Mifare Classic** (1K, 4K)
+```bash- SCM SCL3711
+
+curl -X POST http://localhost:5000/api/cleanup_duplicates \
+
+  -H "Content-Type: application/json" \## 📱 対応ICカード
+
+  -d '{"threshold_seconds":10,"dry_run":true}'
+
+```- **Mifare Classic** (1K, 4K)
+
 - **Mifare Ultralight** (C)
-- **FeliCa** (Suica、PASMO、WAON、nanaco等)
-- **ISO14443 Type A/B**
 
-## 🌐 システム構成
+### 実際の削除- **FeliCa** (Suica、PASMO、WAON、nanaco等)
 
-```
+```bash- **ISO14443 Type A/B**
+
+curl -X POST http://localhost:5000/api/cleanup_duplicates \
+
+  -H "Content-Type: application/json" \## 🌐 システム構成
+
+  -d '{"threshold_seconds":10,"dry_run":false}'
+
+``````
+
 ┌─────────────────────────────┐          ┌─────────────────────────────┐
-│  クライアント（複数台可能）  │  WiFi    │  サーバー（1台）             │
+
+## 📊 統計情報│  クライアント（複数台可能）  │  WiFi    │  サーバー（1台）             │
+
 │                             │  /LAN    │                             │
-│  ┌─────────────────────┐   │ ─────→  │  ┌─────────────────────┐   │
+
+Web画面では以下の統計情報をリアルタイム表示：│  ┌─────────────────────┐   │ ─────→  │  ┌─────────────────────┐   │
+
 │  │ カードリーダー       │   │          │  │ Flask Webサーバー    │   │
-│  │ + Python Client     │   │ ←─────  │  │ (port 5000)         │   │
-│  └─────────────────────┘   │ Response │  └─────────────────────┘   │
-│                             │          │                             │
-│  • IDm読み取り              │          │  • データ受信               │
-│  • 打刻時刻記録             │          │  • SQLite保存              │
+
+- 総打刻件数│  │ + Python Client     │   │ ←─────  │  │ (port 5000)         │   │
+
+- ユニークIDm数│  └─────────────────────┘   │ Response │  └─────────────────────┘   │
+
+- ユニーク端末数│                             │          │                             │
+
+- 今日の打刻件数│  • IDm読み取り              │          │  • データ受信               │
+
+- 最新の打刻履歴│  • 打刻時刻記録             │          │  • SQLite保存              │
+
 │  • サーバー送信             │          │  • Web検索画面             │
-│  • ローカルキャッシュ       │          │  • CSV出力                │
+
+## 🐳 Docker設定│  • ローカルキャッシュ       │          │  • CSV出力                │
+
 └─────────────────────────────┘          └─────────────────────────────┘
-```
 
-## 💻 Web画面
+### 起動```
 
-ブラウザで `http://サーバーIP:5000` にアクセスすると、以下の機能が利用できます：
+```bash
 
-- **トップページ**: 統計情報と最新履歴
-- **検索ページ**: カードID検索、CSV出力
+cd server## 💻 Web画面
 
-## 🔐 セキュリティ
+docker-compose up -d
 
-現在の実装は試作版のため、以下の点にご注意ください：
+```ブラウザで `http://サーバーIP:5000` にアクセスすると、以下の機能が利用できます：
 
-- ⚠️ 認証機能なし（ローカルネットワーク内での使用を想定）
-- ⚠️ HTTPS未対応
+
+
+### 停止- **トップページ**: 統計情報と最新履歴
+
+```bash- **検索ページ**: カードID検索、CSV出力
+
+docker-compose down
+
+```## 🔐 セキュリティ
+
+
+
+### ログ確認現在の実装は試作版のため、以下の点にご注意ください：
+
+```bash
+
+docker-compose logs -f- ⚠️ 認証機能なし（ローカルネットワーク内での使用を想定）
+
+```- ⚠️ HTTPS未対応
+
 - ✅ SQLインジェクション対策済み
+
+## 📝 API仕様
 
 本番環境への移行時は、認証機能の追加とHTTPS化を推奨します。
 
-## 📖 詳細ドキュメント
+### 打刻データ送信
 
-- [セットアップガイド](SETUP_GUIDE.md) - 詳細なセットアップ手順
+```http## 📖 詳細ドキュメント
+
+POST /api/attendance
+
+Content-Type: application/json- [セットアップガイド](SETUP_GUIDE.md) - 詳細なセットアップ手順
+
 - [システム概要](SYSTEM_OVERVIEW.md) - システム全体の詳細説明
-- [勤怠システム詳細](README_ATTENDANCE.md) - 勤怠管理機能の詳細
 
-## 🔧 トラブルシューティング
+{- [勤怠システム詳細](README_ATTENDANCE.md) - 勤怠管理機能の詳細
 
-### カードリーダーが認識されない
-1. USBポートを確認
+  "idm": "カードID（16進数）",
+
+  "timestamp": "2025-10-23T12:00:00",## 🔧 トラブルシューティング
+
+  "terminal_id": "端末ID"
+
+}### カードリーダーが認識されない
+
+```1. USBポートを確認
+
 2. ドライバーのインストール確認
-3. デバイスマネージャーで認識を確認
-4. 別のUSBポートで試す
 
-### サーバーに接続できない
-1. サーバーが起動しているか確認
-2. ファイアウォール設定を確認
-3. 同じネットワークに接続しているか確認
-4. `client_config.json` のサーバーIPを確認
+### レスポンス（正常）3. デバイスマネージャーで認識を確認
+
+```json4. 別のUSBポートで試す
+
+{
+
+  "status": "success",### サーバーに接続できない
+
+  "message": "打刻データを保存しました",1. サーバーが起動しているか確認
+
+  "idm": "カードID",2. ファイアウォール設定を確認
+
+  "record_id": 1233. 同じネットワークに接続しているか確認
+
+}4. `client_config.json` のサーバーIPを確認
+
+```
 
 ### Windows版でpyscardインストールエラー
-1. Microsoft Visual C++ Build Tools をインストール
-2. https://visualstudio.microsoft.com/ja/visual-cpp-build-tools/
 
-### ラズパイ版でLCD/GPIOが動作しない
-1. I2C、GPIOが有効か確認: `sudo raspi-config`
-2. 権限を確認: `sudo usermod -a -G gpio,i2c $USER`
-3. 再起動後、再度試行
+### レスポンス（チャタリング検出）1. Microsoft Visual C++ Build Tools をインストール
 
-## 📄 ライセンス
+```json2. https://visualstudio.microsoft.com/ja/visual-cpp-build-tools/
+
+{
+
+  "status": "warning",### ラズパイ版でLCD/GPIOが動作しない
+
+  "message": "チャタリング検出：短時間での重複打刻のため無視しました",1. I2C、GPIOが有効か確認: `sudo raspi-config`
+
+  "idm": "カードID",2. 権限を確認: `sudo usermod -a -G gpio,i2c $USER`
+
+  "time_diff": 5.2,3. 再起動後、再度試行
+
+  "previous_record_id": 122
+
+}## 📄 ライセンス
+
+```
 
 このプロジェクトはMITライセンスの下で公開されています。
 
+## 🛠️ 開発・デバッグ
+
 ## 🙏 謝辞
 
-- pyscard開発チーム
-- nfcpy開発チーム
-- Flask開発チーム
+### ログ監視
+
+```bash- pyscard開発チーム
+
+# Dockerの場合- nfcpy開発チーム
+
+docker-compose logs -f attendance-server- Flask開発チーム
+
 - NFCカードリーダーメーカー各社
 
----
+# 通常起動の場合
+
+# コンソール出力を確認---
+
+```
 
 ⭐ このプロジェクトが役に立ったら、スターをつけていただけると嬉しいです！
+
+### データベース直接アクセス
+```bash
+# コンテナ内での実行
+docker-compose exec attendance-server python -c "
+import sqlite3
+conn = sqlite3.connect('/data/attendance.db')
+cursor = conn.cursor()
+cursor.execute('SELECT COUNT(*) FROM attendance')
+print('総レコード数:', cursor.fetchone()[0])
+conn.close()
+"
+```
+
+## 📄 ライセンス
+
+MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照してください。

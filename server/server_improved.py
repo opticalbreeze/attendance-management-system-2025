@@ -16,6 +16,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 import json
+import os
 
 app = Flask(__name__)
 
@@ -23,7 +24,11 @@ app = Flask(__name__)
 # 設定
 # ============================================================================
 
-DB_FILE = "attendance.db"  # データベースファイル名
+# Docker環境では /data/attendance.db を使用、ローカル環境では attendance.db を使用
+DB_FILE = os.environ.get('DATABASE_PATH', '/data/attendance.db' if os.path.exists('/data') else 'attendance.db')
+
+# チャタリング防止設定
+CHATTERING_THRESHOLD_SECONDS = int(os.environ.get('CHATTERING_THRESHOLD', '10'))  # 重複判定の閾値（秒）
 
 
 # ============================================================================
@@ -94,6 +99,9 @@ def search_page():
     return render_template('search.html')
 
 
+
+
+
 # ============================================================================
 # API エンドポイント
 # ============================================================================
@@ -119,8 +127,9 @@ def health_check():
 @app.route('/api/attendance', methods=['POST'])
 def receive_attendance():
     """
-    打刻データ受信API
+    打刻データ受信API（チャタリング防止機能付き）
     クライアントから送信された打刻データをデータベースに保存
+    同じIDmからの短時間での連続打刻を検出して重複を防ぐ
     
     Request Body (JSON):
         {
@@ -156,6 +165,18 @@ def receive_attendance():
                 'message': '必須フィールドが不足しています（idm, timestamp, terminal_id）'
             }), 400
         
+        # チャタリング防止チェック
+        duplicate_check = check_duplicate_attendance(idm, timestamp, terminal_id)
+        if duplicate_check['is_duplicate']:
+            print(f"[チャタリング検出] IDm:{idm} | 端末:{terminal_id} | 前回との差:{duplicate_check['time_diff']:.1f}秒")
+            return jsonify({
+                'status': 'warning',
+                'message': 'チャタリング検出：短時間での重複打刻のため無視しました',
+                'idm': idm,
+                'time_diff': duplicate_check['time_diff'],
+                'previous_record_id': duplicate_check['previous_record_id']
+            })
+        
         # データベースに保存
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -190,6 +211,82 @@ def receive_attendance():
             'status': 'error',
             'message': f'サーバーエラー: {str(e)}'
         }), 500
+
+
+def check_duplicate_attendance(idm, timestamp, terminal_id, threshold_seconds=None):
+    """
+    チャタリング（重複打刻）をチェック
+    
+    Args:
+        idm (str): カードID
+        timestamp (str): 打刻日時
+        terminal_id (str): 端末ID
+        threshold_seconds (int): 重複判定の閾値（秒）、Noneの場合は設定値を使用
+        
+    Returns:
+        dict: チェック結果
+            - is_duplicate (bool): 重複かどうか
+            - time_diff (float): 前回打刻との時間差（秒）
+            - previous_record_id (int): 前回の記録ID
+    """
+    if threshold_seconds is None:
+        threshold_seconds = CHATTERING_THRESHOLD_SECONDS
+        
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 同じIDmの最新の打刻データを取得（同じ端末からのもの）
+        cursor.execute("""
+            SELECT id, timestamp, received_at
+            FROM attendance
+            WHERE idm = ? AND terminal_id = ?
+            ORDER BY received_at DESC
+            LIMIT 1
+        """, (idm, terminal_id))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            # 初回打刻
+            return {
+                'is_duplicate': False,
+                'time_diff': 0,
+                'previous_record_id': None
+            }
+        
+        previous_id, previous_timestamp, previous_received = result
+        
+        # 時刻の解析と比較
+        from datetime import datetime
+        try:
+            current_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            previous_time = datetime.fromisoformat(previous_timestamp.replace('Z', '+00:00'))
+        except:
+            # ISO形式でない場合の対応
+            current_time = datetime.now()
+            previous_time = datetime.fromisoformat(previous_received)
+        
+        time_diff = abs((current_time - previous_time).total_seconds())
+        
+        # 閾値以内の場合は重複と判定
+        is_duplicate = time_diff <= threshold_seconds
+        
+        return {
+            'is_duplicate': is_duplicate,
+            'time_diff': time_diff,
+            'previous_record_id': previous_id
+        }
+        
+    except Exception as e:
+        print(f"[エラー] 重複チェックエラー: {e}")
+        # エラーの場合は重複ではないとして処理続行
+        return {
+            'is_duplicate': False,
+            'time_diff': 0,
+            'previous_record_id': None
+        }
 
 
 @app.route('/api/search', methods=['GET'])
@@ -361,6 +458,100 @@ def get_stats():
         }), 500
 
 
+@app.route('/api/cleanup_duplicates', methods=['POST'])
+def cleanup_duplicates():
+    """
+    重複データクリーンアップAPI
+    指定した時間閾値内の重複打刻データを削除する
+    管理者用機能
+    
+    Request Body (JSON):
+        {
+            "threshold_seconds": 重複判定の閾値（秒）,
+            "dry_run": true/false (実際の削除を行うかどうか)
+        }
+    
+    Returns:
+        JSON: クリーンアップ結果
+    """
+    try:
+        # JSONデータを取得
+        data = request.get_json() or {}
+        threshold_seconds = data.get('threshold_seconds', CHATTERING_THRESHOLD_SECONDS)
+        dry_run = data.get('dry_run', True)
+        
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 重複データを検出
+        cursor.execute("""
+            SELECT 
+                a1.id, a1.idm, a1.timestamp, a1.terminal_id,
+                a2.id as prev_id, a2.timestamp as prev_timestamp,
+                (julianday(a1.received_at) - julianday(a2.received_at)) * 86400 as time_diff_seconds
+            FROM attendance a1
+            JOIN attendance a2 ON (
+                a1.idm = a2.idm 
+                AND a1.terminal_id = a2.terminal_id 
+                AND a1.id > a2.id
+                AND (julianday(a1.received_at) - julianday(a2.received_at)) * 86400 <= ?
+            )
+            ORDER BY a1.idm, a1.received_at
+        """, (threshold_seconds,))
+        
+        duplicates = cursor.fetchall()
+        
+        if not dry_run and duplicates:
+            # 実際の削除を実行
+            duplicate_ids = [str(d[0]) for d in duplicates]
+            placeholders = ','.join(['?'] * len(duplicate_ids))
+            cursor.execute(f"DELETE FROM attendance WHERE id IN ({placeholders})", duplicate_ids)
+            deleted_count = cursor.rowcount
+            conn.commit()
+            print(f"[クリーンアップ] {deleted_count}件の重複データを削除しました")
+        else:
+            deleted_count = 0
+        
+        conn.close()
+        
+        # 結果の整形
+        duplicate_info = []
+        for d in duplicates:
+            duplicate_info.append({
+                'id': d[0],
+                'idm': d[1],
+                'timestamp': d[2],
+                'terminal_id': d[3],
+                'previous_id': d[4],
+                'previous_timestamp': d[5],
+                'time_diff_seconds': round(d[6], 1)
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'dry_run': dry_run,
+            'threshold_seconds': threshold_seconds,
+            'duplicates_found': len(duplicates),
+            'deleted_count': deleted_count if not dry_run else 0,
+            'duplicates': duplicate_info[:10],  # 最初の10件のみ表示
+            'message': f"{'[プレビュー] ' if dry_run else ''}重複データ{len(duplicates)}件を{'検出' if dry_run else '削除'}しました"
+        })
+    
+    except sqlite3.Error as e:
+        print(f"[エラー] データベースエラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'データベースエラー: {str(e)}'
+        }), 500
+    
+    except Exception as e:
+        print(f"[エラー] クリーンアップエラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'エラー: {str(e)}'
+        }), 500
+
+
 # ============================================================================
 # エントリーポイント
 # ============================================================================
@@ -382,6 +573,7 @@ def main():
     db_path = Path(DB_FILE).absolute()
     print(f"📁 データベース: {db_path}")
     print(f"🌐 サーバー起動: http://0.0.0.0:5000")
+    print(f"⚡ チャタリング防止: {CHATTERING_THRESHOLD_SECONDS}秒以内の重複を除外")
     print()
     print("[アクセス方法]")
     print("  - ローカル: http://localhost:5000")
@@ -392,6 +584,7 @@ def main():
     print("  - 打刻データ受信: POST /api/attendance")
     print("  - データ検索:     GET  /api/search")
     print("  - 統計情報:       GET  /api/stats")
+    print("  - 重複削除:       POST /api/cleanup_duplicates")
     print("="*70)
     print()
     

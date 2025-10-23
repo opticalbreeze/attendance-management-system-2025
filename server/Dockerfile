@@ -9,19 +9,20 @@ COPY requirements_server.txt .
 RUN pip install --no-cache-dir -r requirements_server.txt
 
 # アプリケーションファイルをコピー
-COPY server.py .
+COPY server_improved.py .
 COPY templates/ templates/
 
 # データベースディレクトリの作成（永続化用）
-RUN mkdir -p /data
+RUN mkdir -p /data && chmod 777 /data
 
 # ポート5000を公開
 EXPOSE 5000
 
 # 環境変数
-ENV FLASK_APP=server.py
+ENV FLASK_APP=server_improved.py
 ENV PYTHONUNBUFFERED=1
+ENV DATABASE_PATH=/data/attendance.db
 
 # サーバー起動
-CMD ["python", "server.py"]
+CMD ["python", "server_improved.py"]
 

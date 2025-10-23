@@ -9,7 +9,6 @@ services:
     volumes:
       # データベースを永続化
       - ./data:/data
-      - ./attendance.db:/app/attendance.db
     environment:
       - TZ=Asia/Tokyo
     restart: unless-stopped
