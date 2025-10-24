@@ -11,8 +11,11 @@ services:
       - ./data:/data
       # テンプレートファイルを最新に保つ
       - ./templates:/app/templates
-      # サーバーコードを最新に保つ
-      - ./server_improved.py:/app/server_improved.py
+      # サーバーコード（リファクタリング版）を最新に保つ
+      - ./server.py:/app/server.py
+      - ./database.py:/app/database.py
+      - ./api.py:/app/api.py
+      - ./utils.py:/app/utils.py
     environment:
       - TZ=Asia/Tokyo
     restart: unless-stopped

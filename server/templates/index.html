@@ -166,6 +166,14 @@
                 <div class="stat-label">登録カード数</div>
             </div>
             <div class="stat-card">
+                <div class="stat-number" id="schedule-records">-</div>
+                <div class="stat-label">スケジュール数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="unique-employees">-</div>
+                <div class="stat-label">従業員数</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-number" id="unique-terminals">-</div>
                 <div class="stat-label">端末数</div>
             </div>
@@ -199,7 +207,9 @@
                     
                     // 統計情報を表示
                     document.getElementById('total-records').textContent = stats.total_records.toLocaleString();
-                    document.getElementById('unique-idm').textContent = stats.unique_idm.toLocaleString();
+                    document.getElementById('unique-idm').textContent = stats.unique_cards.toLocaleString();
+                    document.getElementById('schedule-records').textContent = stats.schedule_records.toLocaleString();
+                    document.getElementById('unique-employees').textContent = stats.unique_employees.toLocaleString();
                     document.getElementById('unique-terminals').textContent = stats.unique_terminals.toLocaleString();
                     document.getElementById('today-count').textContent = stats.today_count.toLocaleString();
                     

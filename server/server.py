@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+打刻システム - メインサーバー（リファクタリング版）
+簡潔で保守しやすい構造
+"""
+
+from flask import Flask, render_template, make_response
+import os
+
+# カスタムモジュール
+from database import init_database
+from api import register_api_routes
+
+def create_app():
+    """Flaskアプリケーションを作成・設定"""
+    app = Flask(__name__)
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    
+    return app
+
+def register_web_routes(app):
+    """Webページのルートを登録"""
+    
+    @app.route('/')
+    def index():
+        """トップページ"""
+        return render_template('index.html')
+
+    @app.route('/search')
+    def search_page():
+        """検索ページ"""
+        # キャッシュ制御ヘッダーを追加（開発時のブラウザキャッシュ問題対策）
+        response = make_response(render_template('search.html'))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+
+def print_startup_info():
+    """起動時の情報を表示"""
+    print("=" * 79)
+    print("🔖 打刻システム - サーバー（改善版）")
+    print("=" * 79)
+    print()
+    
+    # データベース情報
+    db_path = os.environ.get('DATABASE_PATH', '/data/attendance.db' if os.path.exists('/data') else 'attendance.db')
+    print(f"📁 データベース: {db_path}")
+    
+    # サーバー情報
+    print("🌐 サーバー起動: http://0.0.0.0:5000")
+    
+    # チャタリング設定
+    threshold = int(os.environ.get('CHATTERING_THRESHOLD', '10'))
+    print(f"⚡ チャタリング防止: {threshold}秒以内の重複を除外")
+    print()
+    
+    print("[アクセス方法]")
+    print("  - ローカル: http://localhost:5000")
+    print("  - ネットワーク: http://<サーバーのIPアドレス>:5000")
+    print()
+    
+    print("[API エンドポイント]")
+    print("  - ヘルスチェック: GET  /api/health")
+    print("  - 打刻データ受信: POST /api/attendance")
+    print("  - データ検索:     GET  /api/search")
+    print("  - 統計情報:       GET  /api/stats")
+    print("  - 重複削除:       POST /api/cleanup_duplicates")
+    print("  - サンプルデータ: POST /api/sample_data")
+    print("=" * 79)
+    print()
+
+def main():
+    """メイン関数"""
+    # アプリケーション作成
+    app = create_app()
+    
+    # データベース初期化
+    init_database()
+    
+    # ルート登録
+    register_web_routes(app)
+    register_api_routes(app)
+    
+    # 起動情報表示
+    print_startup_info()
+    
+    # サーバー起動
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=False,  # 本番環境ではFalse
+        threaded=True
+    )
+
+if __name__ == '__main__':
+    main()

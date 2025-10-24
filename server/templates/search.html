@@ -71,15 +71,19 @@
             font-size: 0.9em;
         }
         
-        .form-group input {
+        .form-group input,
+        .form-group select {
             padding: 10px 15px;
             border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 1em;
             transition: border-color 0.3s;
+            background-color: white;
+            width: 100%;
         }
         
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -179,6 +183,74 @@
             color: #667eea;
         }
         
+        .work-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .work-type.shift-24 {
+            background: #dc3545;
+            border: 2px solid #c82333;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        
+        .work-type.day-shift {
+            background: #28a745;
+        }
+        
+        .work-type.night-shift {
+            background: #6f42c1;
+        }
+        
+        .work-type.office {
+            background: #fd7e14;
+        }
+        
+        .work-type.off-day {
+            background: #6c757d;
+        }
+        
+        .work-type.holiday {
+            background: #17a2b8;
+        }
+        
+        .work-type.paid-leave {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        
+        .attendance-times {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .attendance-time {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 1px;
+            font-weight: bold;
+            cursor: help;
+        }
+        
+        .no-attendance {
+            color: #999;
+            font-style: italic;
+        }
+        
         .loading, .no-results {
             text-align: center;
             color: #666;
@@ -206,11 +278,16 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="employee-id">従業員ID（必須）</label>
-                        <input type="text" id="employee-id" name="employee_id" placeholder="例: EMP001" required>
+                        <select id="employee-id" name="employee_id" required>
+                            <option value="">▼ 従業員を読み込み中...</option>
+                        </select>
+                        <small id="employee-hint" style="color: #666; font-size: 0.8em; margin-top: 3px; display: none;">
+                            選択した従業員の詳細情報が表示されます
+                        </small>
                     </div>
                     <div class="form-group">
                         <label for="search-month">検索月（必須）</label>
-                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/10" pattern="[0-9]{4}/[0-9]{1,2}" required>
+                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/10" value="2025/10" pattern="[0-9]{4}/[0-9]{1,2}" required>
                         <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
                             yyyy/mm形式で入力（前月16日〜当月15日を検索）
                         </small>
@@ -235,15 +312,13 @@
                 <table class="results-table">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>従業員ID</th>
-                            <th>勤務日</th>
-                            <th>出勤時刻</th>
-                            <th>退勤時刻</th>
-                            <th>休憩開始</th>
-                            <th>休憩終了</th>
-                            <th>残業時間</th>
-                            <th>備考</th>
+                            <th>従業員名</th>
+                            <th>勤務日 📅↑</th>
+                            <th>勤務タイプ</th>
+                            <th>開始時刻</th>
+                            <th>終了時刻</th>
+                            <th>実際の打刻時間 🕐</th>
                         </tr>
                     </thead>
                     <tbody id="results-body">
@@ -259,17 +334,74 @@
         <div id="no-results" class="no-results" style="display: none;">
             検索条件に一致するデータが見つかりませんでした。
         </div>
+
+
     </div>
     
     <script>
         let searchResults = [];
         
-        // ページ読み込み時に現在の月をデフォルト値に設定
-        document.addEventListener('DOMContentLoaded', function() {
-            const now = new Date();
-            const currentMonth = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
-            document.getElementById('search-month').value = currentMonth;
+        // ページ読み込み時の初期化処理
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 従業員情報を動的に読み込み
+            await loadEmployees();
+            
+            // データが存在する期間：2025-09-16 から 2025-10-15（10月度検索が必要）
+            document.getElementById('search-month').value = '2025/10';
+            
+
         });
+        
+        // 従業員情報を動的に読み込む
+        async function loadEmployees() {
+            const employeeSelect = document.getElementById('employee-id');
+            const employeeHint = document.getElementById('employee-hint');
+            
+            try {
+                const response = await fetch('/api/employees');
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    // 既存のオプションをクリア
+                    employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+                    
+                    // 従業員データでオプションを構築
+                    result.data.forEach(employee => {
+                        const option = document.createElement('option');
+                        option.value = employee.employee_num;
+                        
+                        // 表示名を構築（24勤シフトがある場合は明示）
+                        let displayName = `${employee.employee_num} - ${employee.name}`;
+                        if (employee.has_24hour_shifts) {
+                            displayName += ' (24勤あり)';
+                        }
+                        if (employee.total_schedules > 0) {
+                            displayName += ` [${employee.total_schedules}件]`;
+                        }
+                        
+                        option.textContent = displayName;
+                        
+                        // デフォルト選択（3252023を優先）
+                        if (employee.employee_num === '3252023') {
+                            option.selected = true;
+                        }
+                        
+                        employeeSelect.appendChild(option);
+                    });
+                    
+                    // ヒント表示を有効化
+                    employeeHint.style.display = 'block';
+                    employeeHint.textContent = `${result.data.length}名の従業員が読み込まれました`;
+                } else {
+                    throw new Error(result.message || '従業員データの読み込みに失敗');
+                }
+            } catch (error) {
+                employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
+                employeeHint.style.display = 'block';
+                employeeHint.textContent = '従業員データの読み込みに失敗しました';
+                employeeHint.style.color = '#e74c3c';
+            }
+        }
         
         // フォーム送信
         document.getElementById('search-form').addEventListener('submit', async (e) => {
@@ -311,12 +443,14 @@
             params.append('employee_id', employeeId);
             params.append('search_month', searchMonth);
             
+            const searchUrl = `/api/search?${params}`;
+
             try {
-                const response = await fetch(`/api/search?${params}`);
+                const response = await fetch(searchUrl);
                 const data = await response.json();
-                
+
                 document.getElementById('loading').style.display = 'none';
-                
+
                 if (data.status === 'success') {
                     searchResults = data.results;
                     displayResults(data.results, data.search_params);
@@ -326,33 +460,46 @@
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 showError('サーバーとの通信エラーが発生しました');
-                console.error('検索エラー:', error);
             }
         }
         
         // 検索結果を表示
         function displayResults(results, searchParams) {
+
+
             if (results.length === 0) {
                 document.getElementById('no-results').style.display = 'block';
                 return;
             }
-            
-            const tbody = document.getElementById('results-body');
+
+            // 日付順でソート（古い順）
+            results.sort((a, b) => {
+                const dateA = new Date(a.work_date);
+                const dateB = new Date(b.work_date);
+                return dateA - dateB;
+            });
+
+            // 24勤の退勤時刻を翌日の明に移動するための前処理
+            results = processNightShiftEndTimes(results);            const tbody = document.getElementById('results-body');
             tbody.innerHTML = '';
             
             results.forEach(item => {
                 const tr = document.createElement('tr');
+                // 打刻時間を整形
+                const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || []);
+                
+                // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
                 tr.innerHTML = `
-                    <td>${item.id}</td>
                     <td class="idm-cell">${item.employee_id}</td>
+                    <td><strong>${item.employee_name || ''}</strong></td>
                     <td>${formatDate(item.work_date)}</td>
-                    <td>${formatTime(item.clock_in_time)}</td>
-                    <td>${formatTime(item.clock_out_time)}</td>
-                    <td>${formatTime(item.break_start_time)}</td>
-                    <td>${formatTime(item.break_end_time)}</td>
-                    <td>${item.overtime_hours || 0}時間</td>
-                    <td>${item.notes || ''}</td>
+                    <td><span class="work-type ${getWorkTypeClass(item.work_type)}">${item.work_type || ''}</span></td>
+                    <td>${formatTime(item.start_time)}</td>
+                    <td>${formatEndTime(item)}</td>
+                    <td class="attendance-times">${attendanceTimesHtml}</td>
                 `;
+                // 全データを行要素に保存（後で使用可能）
+                tr.dataset.fullData = JSON.stringify(item);
                 tbody.appendChild(tr);
             });
             
@@ -391,6 +538,98 @@
             // HH:MM形式の場合はそのまま返す
             return timeStr;
         }
+
+        // 24勤の退勤時刻を翌日の明に移動する処理
+        function processNightShiftEndTimes(results) {
+            const processedResults = [...results];
+            
+            for (let i = 0; i < processedResults.length; i++) {
+                const currentItem = processedResults[i];
+                
+                // 24勤の場合
+                if (currentItem.work_type && currentItem.work_type.includes('24勤')) {
+                    // 翌日の明を探す
+                    const currentDate = new Date(currentItem.work_date);
+                    const nextDay = new Date(currentDate);
+                    nextDay.setDate(currentDate.getDate() + 1);
+                    const nextDateStr = nextDay.toISOString().split('T')[0];
+                    
+                    const nextDayOffItem = processedResults.find(item => 
+                        item.work_date === nextDateStr && item.work_type === '明'
+                    );
+                    
+                    if (nextDayOffItem && currentItem.end_time) {
+                        // 24勤の退勤時刻を翌日の明に移動
+                        nextDayOffItem.night_shift_end_time = currentItem.end_time;
+                        nextDayOffItem.night_shift_work_type = currentItem.work_type;
+                        
+                        // 24勤の退勤時刻をクリア
+                        currentItem.end_time = null;
+                    }
+                }
+            }
+            
+            return processedResults;
+        }
+
+        // 退勤時刻表示（24勤の場合は翌日明に表示）
+        function formatEndTime(item) {
+            // 明の行で、前日24勤の退勤時刻がある場合
+            if (item.work_type === '明' && item.night_shift_end_time) {
+                const timeStr = formatTime(item.night_shift_end_time);
+                return `${timeStr} <span style="color: #dc3545; font-size: 0.8em;">(${item.night_shift_work_type}退勤)</span>`;
+            }
+            
+            // 24勤の場合は退勤時刻を表示しない（翌日明に移動済み）
+            if (item.work_type && item.work_type.includes('24勤')) {
+                return '<span style="color: #999; font-style: italic;">翌日明に表示</span>';
+            }
+            
+            // 通常勤務の場合はそのまま
+            return formatTime(item.end_time);
+        }
+        
+        // 勤務タイプに応じたCSSクラスを返す
+        function getWorkTypeClass(workType) {
+            if (!workType) return '';
+            if (workType.includes('24勤')) return 'shift-24';
+            if (workType.includes('日勤')) return 'day-shift';
+            if (workType.includes('夜勤')) return 'night-shift';
+            if (workType.includes('所')) return 'office';
+            if (workType.includes('明')) return 'off-day';
+            if (workType.includes('法')) return 'holiday';
+            if (workType.includes('有')) return 'paid-leave';
+            return '';
+        }
+        
+        // 行データから完全なデータを取得するヘルパー関数
+        function getFullDataFromRow(row) {
+            try {
+                return JSON.parse(row.dataset.fullData);
+            } catch (e) {
+                console.warn('行データの解析に失敗:', e);
+                return null;
+            }
+        }
+        
+        // 全ての行データを取得するヘルパー関数
+        function getAllRowData() {
+            const rows = document.querySelectorAll('#results-body tr');
+            return Array.from(rows).map(row => getFullDataFromRow(row)).filter(data => data !== null);
+        }
+        
+        // 打刻時間を整形する関数
+        function formatAttendanceTimes(attendanceRecords) {
+            if (!attendanceRecords || attendanceRecords.length === 0) {
+                return '<span class="no-attendance">打刻なし</span>';
+            }
+            
+            const timeSpans = attendanceRecords.map(record => {
+                return `<span class="attendance-time" title="端末: ${record.terminal_id}">${record.time_only}</span>`;
+            });
+            
+            return timeSpans.join(' ');
+        }
         
         // 日時フォーマット（下位互換用）
         function formatDateTime(datetime) {
@@ -428,9 +667,24 @@
                 return;
             }
             
-            let csv = 'ID,従業員ID,勤務日,出勤時刻,退勤時刻,休憩開始,休憩終了,残業時間,備考\n';
+            let csv = '従業員ID,従業員名,勤務日,勤務タイプ,開始時刻,終了時刻,実際の打刻時間\n';
             searchResults.forEach(item => {
-                csv += `${item.id},"${item.employee_id}","${item.work_date}","${item.clock_in_time || ''}","${item.clock_out_time || ''}","${item.break_start_time || ''}","${item.break_end_time || ''}","${item.overtime_hours || 0}","${item.notes || ''}"\n`;
+                const attendanceTimes = (item.attendance_records || []).map(record => record.time_only).join(' ');
+                
+                // 退勤時刻の処理（24勤は翌日明に表示、明は前日24勤の退勤時刻を表示）
+                let endTimeForCSV = '';
+                if (item.work_type === '明' && item.night_shift_end_time) {
+                    // 明の行で、前日24勤の退勤時刻がある場合
+                    endTimeForCSV = `${item.night_shift_end_time} (${item.night_shift_work_type}退勤)`;
+                } else if (item.work_type && item.work_type.includes('24勤')) {
+                    // 24勤の場合は退勤時刻を表示しない
+                    endTimeForCSV = '翌日明に表示';
+                } else {
+                    // 通常勤務
+                    endTimeForCSV = item.end_time || '';
+                }
+                
+                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${item.work_type || ''}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}"\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

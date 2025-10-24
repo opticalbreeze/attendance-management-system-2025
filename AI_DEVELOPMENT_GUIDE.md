@@ -35,7 +35,55 @@ COPY server.py .           # ← 開発時は更新されない
 
 ---
 
-### 2. 🗄️ データベーススキーマ変更の手順
+### 2. � Docker環境でのファイルパス管理
+
+#### 🚨 よくある失敗パターン（実例）
+```python
+# ❌ 間違い: ローカル環境のパスをそのまま使用
+DATABASE_PATH = 'data/attendance.db'           # ローカルでは動作
+DATABASE_PATH = '/app/data/attendance.db'      # Docker内に存在しない
+
+# ✅ 正解: docker-compose.ymlのvolume設定を確認
+DATABASE_PATH = '/data/attendance.db'          # volume: ./data:/data
+```
+
+#### 🔍 パス確認の手順
+1. **docker-compose.ymlのvolume設定を確認**
+```yaml
+volumes:
+  - ./data:/data                    # ローカル:コンテナ内
+  - ./templates:/app/templates
+```
+
+2. **コンテナ内のファイル構造を確認**
+```bash
+docker exec -it container_name ls -la /
+docker exec -it container_name find / -name "*.db" -type f
+```
+
+3. **環境変数での動的パス設定**
+```python
+# 推奨: 環境に応じて自動調整
+DB_FILE = os.environ.get('DATABASE_PATH', 
+    '/data/attendance.db' if os.path.exists('/data') else 'attendance.db')
+```
+
+#### 💡 スクリプト作成時のベストプラクティス
+```python
+# ✅ 開発・本番環境両対応のパス設定
+def get_database_path():
+    """環境に応じたデータベースパスを取得"""
+    if os.path.exists('/data'):          # Docker環境
+        return '/data/attendance.db'
+    elif os.path.exists('./data'):       # ローカル開発環境
+        return './data/attendance.db'
+    else:                                # フォールバック
+        return 'attendance.db'
+```
+
+---
+
+### 3. �🗄️ データベーススキーマ変更の手順
 
 #### ⚠️ 必須チェック項目
 1. **既存データの確認**
@@ -308,6 +356,59 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
 
 ---
 
+## 🤖 AI開発時の定期チェックポイント
+
+### 🔄 開発開始時の必読項目
+> **これらの項目は毎回の開発セッション開始時に確認してください**
+
+#### 1. 環境構成の確認
+```bash
+# Docker環境の状態確認
+docker-compose ps
+docker exec -it container_name env | grep -E "(PATH|DATABASE)"
+```
+
+#### 2. ファイルパス設定の確認
+```python
+# database.py でのパス設定を確認
+print(f"DB_FILE: {DB_FILE}")
+print(f"File exists: {os.path.exists(DB_FILE)}")
+```
+
+#### 3. 既存データの整合性確認
+```python
+# テーブル構造と件数を必ず確認
+def check_database_status():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    # テーブル一覧
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = cursor.fetchall()
+    
+    for table in tables:
+        cursor.execute(f"SELECT COUNT(*) FROM {table[0]}")
+        count = cursor.fetchone()[0]
+        print(f"Table {table[0]}: {count} records")
+    
+    conn.close()
+```
+
+### 🎯 作業前の必須確認事項
+- [ ] Docker環境が正常に起動している
+- [ ] Volume mountが正しく設定されている  
+- [ ] データベースファイルの場所を特定済み
+- [ ] 既存データのバックアップを作成済み
+- [ ] テーブル構造を把握済み
+
+### ⚠️ よくある間違いの回避策
+1. **パス推測の禁止**: 必ずコンテナ内で `find` コマンドで確認
+2. **段階的修正**: 一度に多くの変更を加えない
+3. **バックアップ必須**: データベース変更前は必ずバックアップ
+4. **テスト実行**: 変更後は必ず動作確認
+
+---
+
 ## 🚀 パフォーマンス最適化
 
 ### データベース
@@ -335,7 +436,56 @@ COPY --from=builder /root/.local /root/.local
 
 ---
 
-## 📚 参考資料
+## � 実際のトラブルシューティング履歴
+
+### 🐳 Docker環境でのデータベースパス問題（2025-10-24）
+
+#### **問題**
+`database_cleanup.py` でデータベースファイルが見つからず、複数回パス修正が必要だった
+
+#### **試行錯誤の経緯**
+```python
+# 試行1: ローカル環境の想定
+DATABASE_PATH = 'data/attendance.db'           # ❌ ファイルが見つからない
+
+# 試行2: アプリディレクトリ内の推測  
+DATABASE_PATH = '/app/data/attendance.db'      # ❌ ディレクトリが存在しない
+
+# 試行3: volume設定の確認後
+DATABASE_PATH = '/data/attendance.db'          # ✅ 正解
+```
+
+#### **根本原因**
+- `docker-compose.yml` の volume 設定: `./data:/data`
+- Docker内では `/data` にマウントされているのに `/app/data` だと推測した
+- コンテナ内のファイル構造を事前確認していなかった
+
+#### **今後の対策**
+1. **開発開始時**: 必ず `docker exec -it container ls -la /` でファイル構造確認
+2. **volume設定**: `docker-compose.yml` を最初に確認
+3. **パス設定**: 推測せず、実際の構造をベースに設定
+
+#### **修正版のベストプラクティス**
+```python
+# 環境検出ロジック
+def get_database_path():
+    """Docker/ローカル環境を自動判定してパス取得"""
+    if os.path.exists('/data'):              # Docker環境（volume mount）
+        return '/data/attendance.db'
+    elif os.path.exists('./data'):           # ローカル開発環境
+        return './data/attendance.db'
+    else:                                    # フォールバック
+        return 'attendance.db'
+```
+
+### 📊 学習ポイント
+- **推測より確認**: Docker環境では必ず実際の構造を確認
+- **volume理解**: docker-compose.yml の volume 設定の重要性
+- **環境の違い**: ローカルとDocker環境のファイルパス違いの認識
+
+---
+
+## �📚 参考資料
 
 ### 公式ドキュメント
 - [Flask Documentation](https://flask.palletsprojects.com/)

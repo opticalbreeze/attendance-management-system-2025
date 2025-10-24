@@ -8,8 +8,11 @@ WORKDIR /app
 COPY requirements_server.txt .
 RUN pip install --no-cache-dir -r requirements_server.txt
 
-# アプリケーションファイルをコピー
-COPY server_improved.py .
+# アプリケーションファイルをコピー（リファクタリング版）
+COPY server.py .
+COPY database.py .
+COPY api.py .
+COPY utils.py .
 COPY templates/ templates/
 
 # データベースディレクトリの作成（永続化用）
@@ -19,10 +22,10 @@ RUN mkdir -p /data && chmod 777 /data
 EXPOSE 5000
 
 # 環境変数
-ENV FLASK_APP=server_improved.py
+ENV FLASK_APP=server.py
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/data/attendance.db
 
 # サーバー起動
-CMD ["python", "server_improved.py"]
+CMD ["python", "server.py"]
 

@@ -32,21 +32,28 @@ ICカード打刻システムのサーバー側プログラムです。クライ
 
 
 
-## 📁 プロジェクト構成## 📁 プロジェクト構成
+## 🤖 AI開発者向けドキュメント
 
+**AI開発アシスタント（GitHub Copilot等）はこちらを必ず確認してください:**
 
+- **[� AI_DEVELOPMENT_GUIDE.md](./AI_DEVELOPMENT_GUIDE.md)** - 開発方針・ベストプラクティス・トラブルシューティング履歴
+- **[✅ AI_DEVELOPMENT_CHECKLIST.md](./AI_DEVELOPMENT_CHECKLIST.md)** - 開発開始時のチェックリスト
 
-``````
+> **重要**: 新しい開発セッション開始時は必ずチェックリストを確認し、過去の問題を繰り返さないようにしてください。
 
-card_reader_improved/simple_card_reader-main/
+---
 
-├── server/                            # サーバー側プログラム├── client_card_reader.py              # Windowsクライアント（CUI版）
+## 📁 プロジェクト構成
 
-│   ├── server_improved.py             # Flaskサーバー（改善版）├── client_card_reader_windows_gui.py  # Windowsクライアント（GUI版）
-
-│   ├── templates/                     # HTMLテンプレート├── client_card_reader_unified.py      # ラズパイ統合版
-
-│   │   ├── index.html                 # トップページ├── client_config_gui.py               # 設定GUI
+```
+card_reader_improved/
+├── server/                            # サーバー側プログラム
+│   ├── server.py                      # Flaskサーバー（リファクタリング版）
+│   ├── database.py                    # データベース管理
+│   ├── api.py                         # REST API エンドポイント
+│   ├── utils.py                       # ユーティリティ関数
+│   ├── templates/                     # HTMLテンプレート
+│   │   ├── index.html                 # トップページ
 
 │   │   └── search.html                # 検索ページ├── gpio_config.py                     # GPIO設定（ラズパイ用）
 
