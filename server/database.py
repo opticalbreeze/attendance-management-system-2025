@@ -138,71 +138,126 @@ def search_schedule(employee_id, start_date, end_date, limit=100):
         raise e
 
 def get_stats():
-    """統計情報を取得"""
+    """
+    統計情報を取得
+    AI_DEVELOPMENT_GUIDE.mdに従い、エラーハンドリングと
+    環境適応性を強化した実装
+    """
+    conn = None
     try:
+        # データベース接続状態の事前確認
+        if not os.path.exists(DB_FILE):
+            return {
+                'status': 'error',
+                'message': f'Database file not found: {DB_FILE}',
+                'latest': []
+            }
+        
         conn = get_database_connection()
         cursor = conn.cursor()
         
-        # 基本統計
+        # テーブル存在確認（AI_DEVELOPMENT_GUIDEの推奨事項）
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        existing_tables = [row[0] for row in cursor.fetchall()]
+        
+        required_tables = ['attendance', 'attend_schedule', 'employee_master']
+        missing_tables = [table for table in required_tables if table not in existing_tables]
+        
+        if missing_tables:
+            return {
+                'status': 'error',
+                'message': f'Missing tables: {", ".join(missing_tables)}',
+                'latest': []
+            }
+        
+        # 基本統計（安全なフィールドアクセス）
+        stats = {}
+        
+        # 打刻データ統計
         cursor.execute("SELECT COUNT(*) FROM attendance")
-        total_records = cursor.fetchone()[0]
+        stats['total_records'] = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(DISTINCT idm) FROM attendance")
-        unique_cards = cursor.fetchone()[0]
+        stats['unique_cards'] = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(DISTINCT terminal_id) FROM attendance")
-        unique_terminals = cursor.fetchone()[0]
+        stats['unique_terminals'] = cursor.fetchone()[0]
         
         # スケジュール統計
         cursor.execute("SELECT COUNT(*) FROM attend_schedule")
-        schedule_records = cursor.fetchone()[0]
+        stats['schedule_records'] = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(DISTINCT employee_id) FROM attend_schedule")
-        unique_employees = cursor.fetchone()[0]
+        stats['unique_employees'] = cursor.fetchone()[0]
         
         # 従業員マスタ統計
         cursor.execute("SELECT COUNT(*) FROM employee_master")
-        employee_master_records = cursor.fetchone()[0]
+        stats['employee_master_records'] = cursor.fetchone()[0]
         
-        # 最新の打刻
+        # 最新の打刻履歴（パラメータバインディング使用）
         cursor.execute("""
             SELECT idm, timestamp, terminal_id, received_at 
             FROM attendance 
             ORDER BY received_at DESC 
-            LIMIT 1
-        """)
-        latest_record = cursor.fetchone()
+            LIMIT ?
+        """, (10,))
+        latest_records = cursor.fetchall()
         
-        # 今日の打刻件数
+        # 今日の打刻件数（安全な日付処理）
         today = datetime.now().strftime('%Y-%m-%d')
         cursor.execute("""
             SELECT COUNT(*) FROM attendance 
-            WHERE received_at LIKE ?
-        """, (f"{today}%",))
-        today_count = cursor.fetchone()[0]
+            WHERE DATE(received_at) = ?
+        """, (today,))
+        stats['today_count'] = cursor.fetchone()[0]
         
-        conn.close()
+        # 安全な最新打刻履歴整形（AIガイドの推奨パターン）
+        latest_list = []
+        if latest_records:
+            for record in latest_records:
+                try:
+                    latest_list.append({
+                        'idm': record[0] if record[0] is not None else '',
+                        'timestamp': record[1] if record[1] is not None else '',
+                        'terminal_id': record[2] if record[2] is not None else '',
+                        'received_at': record[3] if record[3] is not None else ''
+                    })
+                except (IndexError, TypeError) as e:
+                    print(f"Warning: Failed to process record: {record}, Error: {e}")
+                    continue
         
-        return {
-            'total_records': total_records,
-            'unique_cards': unique_cards, 
-            'unique_terminals': unique_terminals,
-            'schedule_records': schedule_records,
-            'unique_employees': unique_employees,
-            'employee_master_records': employee_master_records,
-            'today_count': today_count,
-            'latest_record': {
-                'idm': latest_record[0] if latest_record else None,
-                'timestamp': latest_record[1] if latest_record else None,
-                'terminal_id': latest_record[2] if latest_record else None,
-                'received_at': latest_record[3] if latest_record else None
-            } if latest_record else None
+        # 統一されたレスポンス形式
+        result = {
+            'status': 'success',
+            'total_records': stats['total_records'],
+            'unique_cards': stats['unique_cards'], 
+            'unique_terminals': stats['unique_terminals'],
+            'schedule_records': stats['schedule_records'],
+            'unique_employees': stats['unique_employees'],
+            'employee_master_records': stats['employee_master_records'],
+            'today_count': stats['today_count'],
+            'latest': latest_list
         }
         
+        return result
+        
     except sqlite3.Error as e:
+        print(f"Database error in get_stats(): {e}")
+        return {
+            'status': 'error',
+            'message': f'Database error: {str(e)}',
+            'latest': []
+        }
+    except Exception as e:
+        print(f"Unexpected error in get_stats(): {e}")
+        return {
+            'status': 'error',
+            'message': f'Unexpected error: {str(e)}',
+            'latest': []
+        }
+    finally:
         if conn:
             conn.close()
-        raise e
 
 def cleanup_duplicates(threshold_seconds=10):
     """重複データのクリーンアップ"""

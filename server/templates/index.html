@@ -199,40 +199,103 @@
         // 統計情報を取得
         async function loadStats() {
             try {
-                const response = await fetch('/api/stats');
+                // キャッシュ制御ヘッダー設定（AI_DEVELOPMENT_GUIDE推奨）
+                const response = await fetch('/api/stats', {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                // HTTPエラーレスポンスの確認
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
                 
+                // レスポンス構造の確認（AI_DEVELOPMENT_GUIDE推奨）
                 if (data.status === 'success') {
-                    const stats = data.stats;
+                    // 直接dataプロパティを使用（stats.statsではなくdata）
+                    const stats = data;
                     
-                    // 統計情報を表示
-                    document.getElementById('total-records').textContent = stats.total_records.toLocaleString();
-                    document.getElementById('unique-idm').textContent = stats.unique_cards.toLocaleString();
-                    document.getElementById('schedule-records').textContent = stats.schedule_records.toLocaleString();
-                    document.getElementById('unique-employees').textContent = stats.unique_employees.toLocaleString();
-                    document.getElementById('unique-terminals').textContent = stats.unique_terminals.toLocaleString();
-                    document.getElementById('today-count').textContent = stats.today_count.toLocaleString();
+                    // 安全なフィールドアクセス（AI_DEVELOPMENT_GUIDE推奨パターン）
+                    const safeUpdate = (elementId, value, defaultValue = '0') => {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            element.textContent = (value || defaultValue).toLocaleString();
+                        } else {
+                            console.warn(`Element not found: ${elementId}`);
+                        }
+                    };
                     
-                    // 最新の打刻履歴を表示
+                    // 統計情報を安全に表示
+                    safeUpdate('total-records', stats.total_records);
+                    safeUpdate('unique-idm', stats.unique_cards);
+                    safeUpdate('schedule-records', stats.schedule_records);
+                    safeUpdate('unique-employees', stats.unique_employees);
+                    safeUpdate('unique-terminals', stats.unique_terminals);
+                    safeUpdate('today-count', stats.today_count);
+                    
+                    // 最新の打刻履歴を安全に表示
                     const activityList = document.getElementById('recent-activity');
-                    if (stats.latest.length > 0) {
+                    if (!activityList) {
+                        console.warn('Recent activity list element not found');
+                        return;
+                    }
+                    
+                    if (stats.latest && Array.isArray(stats.latest) && stats.latest.length > 0) {
                         activityList.innerHTML = '';
-                        stats.latest.forEach(item => {
-                            const li = document.createElement('li');
-                            li.className = 'activity-item';
-                            li.innerHTML = `
-                                <span class="activity-idm">${item.idm}</span>
-                                <span class="activity-time">${formatDateTime(item.timestamp)}</span>
-                            `;
-                            activityList.appendChild(li);
+                        stats.latest.forEach((item, index) => {
+                            try {
+                                const li = document.createElement('li');
+                                li.className = 'activity-item';
+                                li.innerHTML = `
+                                    <span class="activity-idm">${item.idm || 'N/A'}</span>
+                                    <span class="activity-time">${formatDateTime(item.timestamp)}</span>
+                                `;
+                                activityList.appendChild(li);
+                            } catch (itemError) {
+                                console.warn(`Failed to process activity item ${index}:`, itemError);
+                            }
                         });
                     } else {
                         activityList.innerHTML = '<li class="loading">まだ打刻データがありません</li>';
                     }
+                    
+                } else if (data.status === 'error') {
+                    // サーバーサイドエラーの表示
+                    showError(data.message || 'サーバーエラーが発生しました');
+                } else {
+                    // 予期しないレスポンス形式
+                    console.warn('Unexpected response format:', data);
+                    showError('予期しないレスポンス形式です');
                 }
+                
             } catch (error) {
                 console.error('統計情報の取得エラー:', error);
+                showError(`統計情報の取得に失敗しました: ${error.message}`);
             }
+        }
+        
+        // エラー表示関数（AI_DEVELOPMENT_GUIDE推奨）
+        function showError(message) {
+            const activityList = document.getElementById('recent-activity');
+            if (activityList) {
+                activityList.innerHTML = `<li class="error" style="color: #ff6b6b;">${message}</li>`;
+            }
+            
+            // 統計値をエラー状態に設定
+            const errorElements = ['total-records', 'unique-idm', 'schedule-records', 
+                                  'unique-employees', 'unique-terminals', 'today-count'];
+            errorElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = 'エラー';
+                    element.style.color = '#ff6b6b';
+                }
+            });
         }
         
         // 日時をフォーマット

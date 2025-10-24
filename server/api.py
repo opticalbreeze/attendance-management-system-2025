@@ -141,7 +141,8 @@ def register_api_routes(app):
         """統計情報API"""
         try:
             stats = get_stats()
-            return jsonify(format_response('success', **stats))
+            # get_stats()は既にstatusを含む完全なレスポンスを返すので、そのまま返す
+            return jsonify(stats)
             
         except Exception as e:
             print(f"[エラー] 統計情報取得エラー: {e}")
