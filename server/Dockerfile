@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements_server.txt .
 RUN pip install --no-cache-dir -r requirements_server.txt
 
-# アプリケーションファイルをコピー（リファクタリング版）
+# アプリケーションファイルをコピー
 COPY server.py .
 COPY database.py .
 COPY api.py .
