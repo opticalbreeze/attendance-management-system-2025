@@ -9,6 +9,7 @@ from flask import request, jsonify
 from datetime import datetime
 import json
 
+from config import Config
 from database import insert_attendance, search_schedule, get_stats, cleanup_duplicates, get_employees
 from utils import (
     check_duplicate_attendance, calculate_date_range, 
@@ -25,7 +26,7 @@ def register_api_routes(app):
             'status': 'ok',
             'message': 'サーバーは正常に動作しています',
             'timestamp': datetime.now().isoformat(),
-            'version': '1.0.0'
+            'version': Config.API_VERSION
         })
 
     @app.route('/api/attendance', methods=['POST'])
@@ -93,7 +94,7 @@ def register_api_routes(app):
             # クエリパラメータの取得
             employee_id = request.args.get('employee_id', '').strip()
             search_month = request.args.get('search_month', '').strip()
-            limit = safe_int(request.args.get('limit', '100'), 100)
+            limit = safe_int(request.args.get('limit', str(Config.DEFAULT_SEARCH_LIMIT)), Config.DEFAULT_SEARCH_LIMIT)
             
             # バリデーション
             valid, employee_id_or_error = validate_employee_id(employee_id)
@@ -157,7 +158,7 @@ def register_api_routes(app):
         try:
             # リクエストパラメータ
             data = request.get_json() or {}
-            threshold = safe_int(data.get('threshold_seconds', 10), 10)
+            threshold = safe_int(data.get('threshold_seconds', Config.CHATTERING_THRESHOLD_SECONDS), Config.CHATTERING_THRESHOLD_SECONDS)
             
             # クリーンアップ実行
             removed_count = cleanup_duplicates(threshold)

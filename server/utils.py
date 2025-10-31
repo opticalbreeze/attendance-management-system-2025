@@ -7,11 +7,8 @@
 
 import sqlite3
 from datetime import datetime, date, timedelta
-import os
 
-# 設定
-CHATTERING_THRESHOLD_SECONDS = int(os.environ.get('CHATTERING_THRESHOLD', '10'))
-DB_FILE = os.environ.get('DATABASE_PATH', '/data/attendance.db' if os.path.exists('/data') else 'attendance.db')
+from config import Config
 
 def check_duplicate_attendance(idm, timestamp, terminal_id, threshold_seconds=None):
     """
@@ -19,10 +16,10 @@ def check_duplicate_attendance(idm, timestamp, terminal_id, threshold_seconds=No
     同じIDm、端末で指定秒数以内の打刻は重複と判定
     """
     if threshold_seconds is None:
-        threshold_seconds = CHATTERING_THRESHOLD_SECONDS
+        threshold_seconds = Config.CHATTERING_THRESHOLD_SECONDS
     
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(Config.DATABASE_PATH)
         cursor = conn.cursor()
         
         # 同じIDm、端末での最新の打刻を取得
@@ -92,11 +89,11 @@ def calculate_date_range(search_month):
             prev_year = year
             prev_month = month - 1
         
-        # 検索範囲の開始日：前月16日
-        start_date = date(prev_year, prev_month, 16).strftime('%Y-%m-%d')
+        # 検索範囲の開始日：前月16日（設定から取得）
+        start_date = date(prev_year, prev_month, Config.PAYROLL_START_DAY).strftime('%Y-%m-%d')
         
-        # 検索範囲の終了日：当月15日
-        end_date = date(year, month, 15).strftime('%Y-%m-%d')
+        # 検索範囲の終了日：当月15日（設定から取得）
+        end_date = date(year, month, Config.PAYROLL_END_DAY).strftime('%Y-%m-%d')
         
         return start_date, end_date
         
@@ -108,10 +105,13 @@ def validate_employee_id(employee_id):
     if not employee_id or not employee_id.strip():
         return False, "従業員IDが指定されていません"
     
-    # 基本的なフォーマットチェック（必要に応じて調整）
+    # 基本的なフォーマットチェック（設定から取得）
     employee_id = employee_id.strip()
-    if len(employee_id) < 3:
-        return False, "従業員IDは3文字以上で入力してください"
+    if len(employee_id) < Config.EMPLOYEE_ID_MIN_LENGTH:
+        return False, f"従業員IDは{Config.EMPLOYEE_ID_MIN_LENGTH}文字以上で入力してください"
+    
+    if len(employee_id) > Config.EMPLOYEE_ID_MAX_LENGTH:
+        return False, f"従業員IDは{Config.EMPLOYEE_ID_MAX_LENGTH}文字以下で入力してください"
     
     return True, employee_id
 
@@ -131,8 +131,8 @@ def validate_search_month(search_month):
         year = int(year)
         month = int(month)
         
-        if year < 2000 or year > 2100:
-            return False, "年は2000-2100の範囲で入力してください"
+        if year < Config.YEAR_MIN or year > Config.YEAR_MAX:
+            return False, f"年は{Config.YEAR_MIN}-{Config.YEAR_MAX}の範囲で入力してください"
             
         if month < 1 or month > 12:
             return False, "月は1-12の範囲で入力してください"
@@ -164,12 +164,5 @@ def safe_int(value, default=0):
     """安全に整数に変換"""
     try:
         return int(value)
-    except (TypeError, ValueError):
-        return default
-
-def safe_float(value, default=0.0):
-    """安全に浮動小数点数に変換"""
-    try:
-        return float(value)
     except (TypeError, ValueError):
         return default

@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo 🔖 打刻システム - Docker起動
+echo 🔖 打刻システム - Docker起動（ルート版）
 echo ========================================
 echo.
 
@@ -43,3 +43,4 @@ echo   停止:     docker-compose down
 echo   再起動:   docker-compose restart
 echo.
 pause
+

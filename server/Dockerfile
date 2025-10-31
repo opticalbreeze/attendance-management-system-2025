@@ -13,6 +13,7 @@ COPY server.py .
 COPY database.py .
 COPY api.py .
 COPY utils.py .
+COPY config.py .
 COPY templates/ templates/
 
 # データベースディレクトリの作成（永続化用）

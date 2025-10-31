@@ -9,26 +9,10 @@ import sqlite3
 import os
 from datetime import datetime
 
-# データベースファイルのパス（環境自動判定）
-def get_database_path():
-    """環境に応じたデータベースパスを取得"""
-    # 環境変数での指定を最優先
-    if 'DATABASE_PATH' in os.environ:
-        return os.environ['DATABASE_PATH']
-    
-    # Docker環境（volume mount: ./data:/data）
-    if os.path.exists('/data'):
-        return '/data/attendance.db'
-    
-    # ローカル開発環境
-    elif os.path.exists('./data'):
-        return './data/attendance.db'
-    
-    # フォールバック（カレントディレクトリ）
-    else:
-        return 'attendance.db'
+from config import Config
 
-DB_FILE = get_database_path()
+# データベースファイルのパス（config.pyから取得）
+DB_FILE = Config.DATABASE_PATH
 
 # デバッグ情報（開発時のみ）
 if os.environ.get('DEBUG', '').lower() in ('true', '1', 'yes'):
@@ -89,8 +73,10 @@ def insert_attendance(idm, timestamp, terminal_id):
             conn.close()
         raise e
 
-def search_schedule(employee_id, start_date, end_date, limit=100):
+def search_schedule(employee_id, start_date, end_date, limit=None):
     """勤怠スケジュールを検索（打刻データ付き）"""
+    if limit is None:
+        limit = Config.DEFAULT_SEARCH_LIMIT
     try:
         conn = get_database_connection()
         cursor = conn.cursor()
@@ -200,7 +186,7 @@ def get_stats():
             FROM attendance 
             ORDER BY received_at DESC 
             LIMIT ?
-        """, (10,))
+        """, (Config.STATS_LATEST_RECORDS,))
         latest_records = cursor.fetchall()
         
         # 今日の打刻件数（安全な日付処理）
@@ -259,8 +245,10 @@ def get_stats():
         if conn:
             conn.close()
 
-def cleanup_duplicates(threshold_seconds=10):
+def cleanup_duplicates(threshold_seconds=None):
     """重複データのクリーンアップ"""
+    if threshold_seconds is None:
+        threshold_seconds = Config.CHATTERING_THRESHOLD_SECONDS
     try:
         conn = get_database_connection()
         cursor = conn.cursor()

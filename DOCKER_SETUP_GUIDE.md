@@ -15,7 +15,7 @@
 │  │        Docker Container         ││
 │  │  ┌─────────────────────────────┐││
 │  │  │      Flask Application      │││
-│  │  │   - server_improved.py      │││
+│  │  │   - server.py                │││
 │  │  │   - templates/              │││
 │  │  │   - Port: 5000             │││
 │  │  └─────────────────────────────┘││
@@ -48,8 +48,9 @@ COPY requirements_server.txt .
 RUN pip install --no-cache-dir -r requirements_server.txt
 
 # 🚨 重要: 開発時はCOPYではなくマウントを使用
-# COPY server_improved.py .     # ← 開発時は❌
+# COPY server.py .              # ← 開発時は❌
 # COPY templates/ templates/    # ← 開発時は❌
+# COPY config.py .              # ← 開発時は❌
 
 # データベースディレクトリの作成（永続化用）
 RUN mkdir -p /data && chmod 777 /data
@@ -58,12 +59,12 @@ RUN mkdir -p /data && chmod 777 /data
 EXPOSE 5000
 
 # 環境変数
-ENV FLASK_APP=server_improved.py
+ENV FLASK_APP=server.py
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/data/attendance.db
 
 # サーバー起動
-CMD ["python", "server_improved.py"]
+CMD ["python", "server.py"]
 ```
 
 ### 2. docker-compose.yml（開発環境）
@@ -81,7 +82,11 @@ services:
       # 🎯 重要: 開発時のファイル同期設定
       - ./data:/data                                    # データ永続化
       - ./templates:/app/templates                      # テンプレート同期
-      - ./server_improved.py:/app/server_improved.py   # サーバーコード同期
+      - ./server.py:/app/server.py                      # サーバーコード同期
+      - ./database.py:/app/database.py                 # データベースモジュール同期
+      - ./api.py:/app/api.py                           # APIモジュール同期
+      - ./utils.py:/app/utils.py                       # ユーティリティモジュール同期
+      - ./config.py:/app/config.py                     # 設定モジュール同期
       
       # 🚨 注意: requirements.txtは変更頻度が低いためCOPYのまま
       # - ./requirements_server.txt:/app/requirements_server.txt  # 通常は不要
@@ -388,7 +393,11 @@ COPY requirements_server.txt .
 RUN pip install --no-cache-dir -r requirements_server.txt
 
 # アプリケーションファイルのコピー
-COPY --chown=appuser:appuser server_improved.py .
+COPY --chown=appuser:appuser server.py .
+COPY --chown=appuser:appuser database.py .
+COPY --chown=appuser:appuser api.py .
+COPY --chown=appuser:appuser utils.py .
+COPY --chown=appuser:appuser config.py .
 COPY --chown=appuser:appuser templates/ templates/
 
 # データディレクトリの作成
@@ -398,7 +407,7 @@ RUN mkdir -p /data && chown appuser:appuser /data
 USER appuser
 
 EXPOSE 5000
-CMD ["python", "server_improved.py"]
+CMD ["python", "server.py"]
 ```
 
 ### 環境変数の管理

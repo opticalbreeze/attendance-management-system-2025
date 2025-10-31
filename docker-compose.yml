@@ -1,20 +1,22 @@
 services:
   attendance-server:
-    build: .
+    build:
+      context: ./server
+      dockerfile: Dockerfile
     container_name: attendance-server
     ports:
       - "5000:5000"
     volumes:
       # データベースを永続化
-      - ./data:/data
+      - ./server/data:/data
       # テンプレートファイルを最新に保つ
-      - ./templates:/app/templates
+      - ./server/templates:/app/templates
       # サーバーコード（リファクタリング版）を最新に保つ
-      - ./server.py:/app/server.py
-      - ./database.py:/app/database.py
-      - ./api.py:/app/api.py
-      - ./utils.py:/app/utils.py
-      - ./config.py:/app/config.py
+      - ./server/server.py:/app/server.py
+      - ./server/database.py:/app/database.py
+      - ./server/api.py:/app/api.py
+      - ./server/utils.py:/app/utils.py
+      - ./server/config.py:/app/config.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

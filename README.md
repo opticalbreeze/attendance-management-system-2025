@@ -52,10 +52,15 @@ card_reader_improved/
 │   ├── database.py                    # データベース管理
 │   ├── api.py                         # REST API エンドポイント
 │   ├── utils.py                       # ユーティリティ関数
+│   ├── config.py                      # 設定管理モジュール
 │   ├── templates/                     # HTMLテンプレート
 │   │   ├── index.html                 # トップページ
-
-│   │   └── search.html                # 検索ページ├── gpio_config.py                     # GPIO設定（ラズパイ用）
+│   │   └── search.html                # 検索ページ
+│   ├── docker-compose.yml             # Docker構成（serverディレクトリ版）
+│   ├── Dockerfile                     # Dockerイメージ
+│   └── data/                          # データ保存ディレクトリ
+├── docker-compose.yml                 # Docker構成（ルートディレクトリ版）
+├── start_docker.bat                   # Docker起動（ルート版）
 
 │   ├── start_server.bat               # サーバー起動├── lcd_i2c.py                         # LCD制御（ラズパイ用）
 
@@ -95,25 +100,15 @@ docker-compose up -d```
 
 ```
 
-## 🚀 クイックスタート
-
 ### 通常起動
 
-```bash### 1. サーバー側のセットアップ
-
+```bash
 cd server
-
-pip install -r requirements_server.txt#### 通常起動
-
-python server_improved.py```bash
-
-```cd server
-
 pip install -r requirements_server.txt
-
-サーバーは `http://localhost:5000` で起動します。python server.py
-
+python server.py
 ```
+
+サーバーは `http://localhost:5000` で起動します。
 
 ## 🌐 アクセス方法
 

@@ -6,16 +6,17 @@
 """
 
 from flask import Flask, render_template, make_response
-import os
 
 # カスタムモジュール
+from config import Config
 from database import init_database
 from api import register_api_routes
 
 def create_app():
     """Flaskアプリケーションを作成・設定"""
     app = Flask(__name__)
-    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['TEMPLATES_AUTO_RELOAD'] = Config.TEMPLATES_AUTO_RELOAD
+    app.config['JSON_AS_ASCII'] = Config.JSON_AS_ASCII
     
     return app
 
@@ -45,20 +46,18 @@ def print_startup_info():
     print()
     
     # データベース情報
-    db_path = os.environ.get('DATABASE_PATH', '/data/attendance.db' if os.path.exists('/data') else 'attendance.db')
-    print(f"📁 データベース: {db_path}")
+    print(f"📁 データベース: {Config.DATABASE_PATH}")
     
     # サーバー情報
-    print("🌐 サーバー起動: http://0.0.0.0:5000")
+    print(f"🌐 サーバー起動: http://{Config.HOST}:{Config.PORT}")
     
     # チャタリング設定
-    threshold = int(os.environ.get('CHATTERING_THRESHOLD', '10'))
-    print(f"⚡ チャタリング防止: {threshold}秒以内の重複を除外")
+    print(f"⚡ チャタリング防止: {Config.CHATTERING_THRESHOLD_SECONDS}秒以内の重複を除外")
     print()
     
     print("[アクセス方法]")
-    print("  - ローカル: http://localhost:5000")
-    print("  - ネットワーク: http://<サーバーのIPアドレス>:5000")
+    print(f"  - ローカル: http://localhost:{Config.PORT}")
+    print(f"  - ネットワーク: http://<サーバーのIPアドレス>:{Config.PORT}")
     print()
     
     print("[API エンドポイント]")
@@ -88,10 +87,10 @@ def main():
     
     # サーバー起動
     app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=False,  # 本番環境ではFalse
-        threaded=True
+        host=Config.HOST,
+        port=Config.PORT,
+        debug=Config.DEBUG,
+        threaded=Config.THREADED
     )
 
 if __name__ == '__main__':

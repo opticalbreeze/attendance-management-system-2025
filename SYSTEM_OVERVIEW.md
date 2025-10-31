@@ -68,31 +68,45 @@
 ### サーバー側ファイル
 
 ```
-C:\Users\take_me_hospital\Desktop\N100\
+attend_server/
 │
-├─ server.py                       ★ Flaskサーバー
-│   ├─ API: /api/health           (ヘルスチェック)
-│   ├─ API: /api/attendance       (打刻データ受信)
-│   ├─ API: /api/search           (データ検索)
-│   ├─ API: /api/stats            (統計情報)
-│   └─ Web: /, /search            (Web画面)
+├─ server/                          # サーバー側プログラム
+│   ├─ server.py                    ★ Flaskサーバー
+│   │   ├─ API: /api/health         (ヘルスチェック)
+│   │   ├─ API: /api/attendance     (打刻データ受信)
+│   │   ├─ API: /api/search         (データ検索)
+│   │   ├─ API: /api/stats          (統計情報)
+│   │   └─ Web: /, /search          (Web画面)
+│   │
+│   ├─ database.py                  # データベース管理
+│   ├─ api.py                       # REST API エンドポイント
+│   ├─ utils.py                     # ユーティリティ関数
+│   ├─ config.py                    # 設定管理モジュール
+│   │
+│   ├─ start_server.bat             # 起動バッチファイル
+│   ├─ start_docker.bat             # Docker起動バッチファイル
+│   │
+│   ├─ requirements_server.txt      # 依存パッケージ
+│   │   └─ flask>=2.0.0
+│   │
+│   ├─ docker-compose.yml           # Docker構成
+│   ├─ Dockerfile                   # Dockerイメージ
+│   │
+│   ├─ templates/                   # HTMLテンプレート
+│   │   ├─ index.html               (トップページ)
+│   │   └─ search.html              (検索ページ)
+│   │
+│   └─ data/                        # データ保存ディレクトリ
+│       └─ attendance.db            # SQLiteデータベース（自動生成）
+│           └─ テーブル: attendance
+│               ├─ id (主キー)
+│               ├─ idm (カードID)
+│               ├─ timestamp (打刻時刻)
+│               ├─ terminal_id (端末ID/MACアドレス)
+│               └─ received_at (受信時刻)
 │
-├─ start_server.bat                起動バッチファイル
-│
-├─ requirements_server.txt         依存パッケージ
-│   └─ flask>=2.0.0
-│
-├─ templates/                      HTMLテンプレート
-│   ├─ index.html                 (トップページ)
-│   └─ search.html                (検索ページ)
-│
-└─ attendance.db                   SQLiteデータベース（自動生成）
-    └─ テーブル: attendance
-        ├─ id (主キー)
-        ├─ idm (カードID)
-        ├─ timestamp (打刻時刻)
-        ├─ terminal_id (端末ID/MACアドレス)
-        └─ received_at (受信時刻)
+├─ docker-compose.yml               # Docker構成（ルート版）
+└─ start_docker.bat                 # Docker起動（ルート版）
 ```
 
 ### ドキュメント
