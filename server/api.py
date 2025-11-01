@@ -10,7 +10,7 @@ from datetime import datetime
 import json
 
 from config import Config
-from database import insert_attendance, search_schedule, get_stats, cleanup_duplicates, get_employees
+from database import insert_attendance, search_schedule, get_stats, cleanup_duplicates, get_employees, check_attendance_vs_schedule
 from utils import (
     check_duplicate_attendance, calculate_date_range, 
     validate_employee_id, validate_search_month, format_response, safe_int
@@ -237,4 +237,70 @@ def register_api_routes(app):
             return jsonify(format_response(
                 'error',
                 message=f'従業員情報取得エラー: {str(e)}'
+            )), 500
+
+    @app.route('/api/attendance_check', methods=['GET'])
+    def attendance_check_api():
+        """
+        勤怠チェックAPI
+        従業員IDと日付を指定して、スケジュールと打刻実績の差異をチェック
+        """
+        try:
+            # デバッグ出力：リクエスト詳細
+            print(f"[DEBUG] attendance_check_api called")
+            print(f"[DEBUG] Request args: {dict(request.args)}")
+            print(f"[DEBUG] Request method: {request.method}")
+            print(f"[DEBUG] Request URL: {request.url}")
+            
+            # クエリパラメータの取得
+            employee_id = request.args.get('employee_id', '').strip()
+            check_date = request.args.get('check_date', '').strip()
+            
+            print(f"[DEBUG] Raw employee_id: '{employee_id}'")
+            print(f"[DEBUG] Raw check_date: '{check_date}'")
+            
+            # バリデーション
+            valid, employee_id_or_error = validate_employee_id(employee_id)
+            if not valid:
+                print(f"[DEBUG] Employee ID validation failed: {employee_id_or_error}")
+                return jsonify(format_response('error', message=employee_id_or_error)), 400
+            employee_id = employee_id_or_error
+            
+            if not check_date:
+                print(f"[DEBUG] Check date is empty")
+                return jsonify(format_response('error', message='チェック日付が指定されていません（YYYY-MM-DD形式）')), 400
+            
+            # 日付形式の検証
+            try:
+                from datetime import datetime
+                datetime.strptime(check_date, '%Y-%m-%d')
+                print(f"[DEBUG] Date validation passed: {check_date}")
+            except ValueError as e:
+                print(f"[DEBUG] Date validation failed: {e}")
+                return jsonify(format_response('error', message='日付形式が正しくありません（YYYY-MM-DD形式で入力してください）')), 400
+            
+            # チェック実行
+            print(f"[DEBUG] Calling check_attendance_vs_schedule with employee_id='{employee_id}', check_date='{check_date}'")
+            result = check_attendance_vs_schedule(employee_id, check_date)
+            print(f"[DEBUG] check_attendance_vs_schedule result: {result}")
+            
+            if result['status'] == 'error':
+                print(f"[DEBUG] Check failed with error: {result['message']}")
+                return jsonify(format_response('error', message=result['message'])), 400
+            
+            print(f"[DEBUG] Check completed successfully")
+            return jsonify(format_response(
+                'success',
+                message='勤怠チェックが完了しました',
+                data=result['data']
+            ))
+            
+        except Exception as e:
+            print(f"[DEBUG] Exception occurred in attendance_check_api: {e}")
+            print(f"[DEBUG] Exception type: {type(e)}")
+            import traceback
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+            return jsonify(format_response(
+                'error',
+                message=f'勤怠チェックエラー: {str(e)}'
             )), 500

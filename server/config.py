@@ -15,7 +15,7 @@ class Config:
     # ==================== サーバー設定 ====================
     HOST = os.environ.get('SERVER_HOST', '0.0.0.0')
     PORT = int(os.environ.get('SERVER_PORT', '5000'))
-    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() in ('true', '1', 'yes')  # 開発環境ではデフォルト有効
     THREADED = True
     
     # ==================== データベース設定 ====================

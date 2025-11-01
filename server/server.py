@@ -38,6 +38,16 @@ def register_web_routes(app):
         response.headers['Expires'] = '0'
         return response
 
+    @app.route('/check')
+    def check_page():
+        """勤怠チェックページ"""
+        # キャッシュ制御ヘッダーを追加（開発時のブラウザキャッシュ問題対策）
+        response = make_response(render_template('check.html'))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+
 def print_startup_info():
     """起動時の情報を表示"""
     print("=" * 79)
@@ -60,6 +70,11 @@ def print_startup_info():
     print(f"  - ネットワーク: http://<サーバーのIPアドレス>:{Config.PORT}")
     print()
     
+    print("[Web ページ]")
+    print("  - トップページ:   GET  /")
+    print("  - 検索ページ:     GET  /search")
+    print("  - 勤怠チェック:   GET  /check")
+    print()
     print("[API エンドポイント]")
     print("  - ヘルスチェック: GET  /api/health")
     print("  - 打刻データ受信: POST /api/attendance")
@@ -67,6 +82,7 @@ def print_startup_info():
     print("  - 統計情報:       GET  /api/stats")
     print("  - 重複削除:       POST /api/cleanup_duplicates")
     print("  - サンプルデータ: POST /api/sample_data")
+    print("  - 勤怠チェック:   GET  /api/attendance_check")
     print("=" * 79)
     print()
 

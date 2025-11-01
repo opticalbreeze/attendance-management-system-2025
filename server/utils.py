@@ -102,17 +102,28 @@ def calculate_date_range(search_month):
 
 def validate_employee_id(employee_id):
     """従業員IDのバリデーション"""
+    print(f"[DEBUG] validate_employee_id called with: '{employee_id}'")
+    
     if not employee_id or not employee_id.strip():
+        print(f"[DEBUG] Employee ID is empty or whitespace")
         return False, "従業員IDが指定されていません"
     
     # 基本的なフォーマットチェック（設定から取得）
     employee_id = employee_id.strip()
+    print(f"[DEBUG] Employee ID after strip: '{employee_id}'")
+    print(f"[DEBUG] Employee ID length: {len(employee_id)}")
+    print(f"[DEBUG] Min length: {Config.EMPLOYEE_ID_MIN_LENGTH}")
+    print(f"[DEBUG] Max length: {Config.EMPLOYEE_ID_MAX_LENGTH}")
+    
     if len(employee_id) < Config.EMPLOYEE_ID_MIN_LENGTH:
+        print(f"[DEBUG] Employee ID too short")
         return False, f"従業員IDは{Config.EMPLOYEE_ID_MIN_LENGTH}文字以上で入力してください"
     
     if len(employee_id) > Config.EMPLOYEE_ID_MAX_LENGTH:
+        print(f"[DEBUG] Employee ID too long")
         return False, f"従業員IDは{Config.EMPLOYEE_ID_MAX_LENGTH}文字以下で入力してください"
     
+    print(f"[DEBUG] Employee ID validation passed")
     return True, employee_id
 
 def validate_search_month(search_month):

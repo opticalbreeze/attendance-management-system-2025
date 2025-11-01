@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>勤怠チェック</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .back-link {
+            display: inline-block;
+            color: #667eea;
+            text-decoration: none;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .check-form {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        .form-group input,
+        .form-group select {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+            background-color: white;
+            width: 100%;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-check {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-check:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-clear {
+            background: #6c757d;
+            color: white;
+            margin-left: 10px;
+        }
+        
+        .btn-clear:hover {
+            background: #5a6268;
+        }
+        
+        .results-section {
+            margin-top: 30px;
+        }
+        
+        .employee-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .employee-info h2 {
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .info-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .info-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .schedule-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .schedule-table th,
+        .schedule-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .schedule-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .alerts-section {
+            margin-top: 30px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .alert-icon {
+            font-size: 1.5em;
+        }
+        
+        .alert-content {
+            flex: 1;
+        }
+        
+        .alert-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .alert-details {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .attendance-times {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .attendance-time {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 2px;
+            font-weight: bold;
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-style: italic;
+        }
+        
+        .loading, .no-results {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-size: 1.1em;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .work-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .work-type.shift-24 {
+            background: #dc3545;
+        }
+        
+        .work-type.day-shift {
+            background: #28a745;
+        }
+        
+        .work-type.night-shift {
+            background: #6f42c1;
+        }
+        
+        .work-type.office {
+            background: #fd7e14;
+        }
+        
+        .work-type.off-day {
+            background: #6c757d;
+        }
+        
+        .work-type.holiday {
+            background: #17a2b8;
+        }
+        
+        .work-type.paid-leave {
+            background: #ffc107;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/" class="back-link">← トップページに戻る</a>
+            <a href="/search" class="back-link" style="margin-left: 20px;">🔍 勤怠スケジュール検索</a>
+        </div>
+        
+        <h1>✅ 勤怠チェック</h1>
+        
+        <div class="check-form">
+            <form id="check-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="employee-id">従業員（必須）</label>
+                        <select id="employee-id" name="employee_id" required>
+                            <option value="">▼ 従業員を読み込み中...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="check-date">チェック日付（必須）</label>
+                        <input type="date" id="check-date" name="check_date" required>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            YYYY-MM-DD形式で選択
+                        </small>
+                    </div>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-check">🔍 チェック実行</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="error-message" style="display: none;" class="error"></div>
+        
+        <div id="results-section" style="display: none;">
+            <div class="employee-info" id="employee-info">
+                <h2 id="employee-name">-</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">従業員ID</div>
+                        <div class="info-value" id="employee-id-display">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">チェック日付</div>
+                        <div class="info-value" id="check-date-display">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <table class="schedule-table">
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>スケジュール</th>
+                        <th>実際の打刻</th>
+                        <th>差異</th>
+                    </tr>
+                </thead>
+                <tbody id="schedule-body">
+                </tbody>
+            </table>
+            
+            <div class="alerts-section" id="alerts-section">
+                <h2 style="margin-bottom: 15px; color: #333;">⚠️ アラート</h2>
+                <div id="alerts-container"></div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            チェック中...
+        </div>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            チェックを実行してください。
+        </div>
+    </div>
+    
+    <script>
+        // ページ読み込み時の初期化処理
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('==============================================');
+            console.log('[DEBUG] 🚀 勤怠チェックページが読み込まれました');
+            console.log('[DEBUG] DOMContentLoaded triggered');
+            console.log('[DEBUG] 現在時刻:', new Date().toISOString());
+            console.log('==============================================');
+            
+            // フォーム要素の存在確認
+            const employeeSelect = document.getElementById('employee-id');
+            const checkDateInput = document.getElementById('check-date');
+            console.log('[DEBUG] Employee select element:', employeeSelect);
+            console.log('[DEBUG] Check date input element:', checkDateInput);
+            
+            // 従業員情報を動的に読み込み
+            await loadEmployees();
+
+            // 今日の日付をデフォルトに設定
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('check-date').value = today;
+            console.log('[DEBUG] Default date set to:', today);
+            console.log('==============================================');
+            console.log('[DEBUG] 🎯 初期化完了 - ページ準備OK');
+            console.log('==============================================');
+        });        // 従業員情報を動的に読み込む
+        async function loadEmployees() {
+            console.log('[DEBUG] loadEmployees called');
+            const employeeSelect = document.getElementById('employee-id');
+
+            try {
+                console.log('[DEBUG] Fetching employees from /api/employees');
+                const response = await fetch('/api/employees');
+                const result = await response.json();
+                
+                console.log('[DEBUG] Employee API response:', result);
+
+                if (result.status === 'success' && result.data) {
+                    employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+
+                    result.data.forEach(employee => {
+                        const option = document.createElement('option');
+                        option.value = employee.employee_num;
+                        option.textContent = `${employee.employee_num} - ${employee.name}`;
+                        employeeSelect.appendChild(option);
+                    });
+                    console.log('[DEBUG] Employee options added:', result.data.length);
+                } else {
+                    throw new Error(result.message || '従業員データの読み込みに失敗');
+                }
+            } catch (error) {
+                console.error('[DEBUG] Employee loading error:', error);
+                employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
+            }
+        }
+        
+        // フォーム送信
+        document.getElementById('check-form').addEventListener('submit', async (e) => {
+            console.log('[DEBUG] Form submit event triggered');
+            e.preventDefault();
+            await performCheck();
+        });
+        
+        // チェック実行
+        async function performCheck() {
+            console.log('💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥');
+            console.log('[DEBUG] 🔥 performCheck関数が呼び出されました！');
+            console.log('[DEBUG] 時刻:', new Date().toISOString());
+            console.log('💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥');
+            
+            const employeeId = document.getElementById('employee-id').value.trim();
+            const checkDate = document.getElementById('check-date').value.trim();
+            
+            // デバッグ出力を追加
+            console.log('[DEBUG] performCheck called');
+            console.log('[DEBUG] employeeId:', employeeId);
+            console.log('[DEBUG] checkDate:', checkDate);
+            console.log('[DEBUG] employee-id element:', document.getElementById('employee-id'));
+            console.log('[DEBUG] check-date element:', document.getElementById('check-date'));
+            
+            // バリデーション
+            if (!employeeId) {
+                console.log('[DEBUG] Employee ID validation failed');
+                showError('従業員を選択してください');
+                return;
+            }
+            
+            if (!checkDate) {
+                console.log('[DEBUG] Check date validation failed');
+                showError('チェック日付を選択してください');
+                return;
+            }
+            
+            console.log('[DEBUG] Validation passed, proceeding with API call');
+            
+            // ネットワーク接続の事前チェック
+            try {
+                console.log('[DEBUG] Testing basic connectivity...');
+                const healthResponse = await fetch('/api/health');
+                console.log('[DEBUG] Health check status:', healthResponse.status);
+                if (!healthResponse.ok) {
+                    throw new Error('サーバーへの基本接続に失敗しました');
+                }
+            } catch (healthError) {
+                console.error('[DEBUG] Health check failed:', healthError);
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーに接続できません。ネットワーク接続を確認してください。');
+                return;
+            }
+            
+            // UIリセット
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            // クエリパラメータ構築
+            const params = new URLSearchParams();
+            params.append('employee_id', employeeId);
+            params.append('check_date', checkDate);
+            
+            const checkUrl = `/api/attendance_check?${params}`;
+            
+            console.log('[DEBUG] API URL:', checkUrl);
+            console.log('[DEBUG] Params:', params.toString());
+
+            try {
+                console.log('[DEBUG] Making fetch request to:', checkUrl);
+                const response = await fetch(checkUrl);
+                console.log('[DEBUG] Response status:', response.status);
+                console.log('[DEBUG] Response ok:', response.ok);
+                
+                // HTTPステータスコードに関係なく、レスポンスをJSONとして解析を試行
+                let data;
+                try {
+                    data = await response.json();
+                    console.log('[DEBUG] Response data:', data);
+                } catch (jsonError) {
+                    console.error('[DEBUG] Failed to parse JSON:', jsonError);
+                    throw new Error(`HTTP ${response.status}: JSONの解析に失敗しました`);
+                }
+
+                document.getElementById('loading').style.display = 'none';
+
+                // ステータスコードとレスポンス内容の両方をチェック
+                if (response.ok && data.status === 'success') {
+                    console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
+                    console.log('[DEBUG] ✅ Success response, calling displayResults');
+                    console.log('[DEBUG] Data to be passed to displayResults:', data);
+                    console.log('[DEBUG] typeof data:', typeof data);
+                    console.log('[DEBUG] data.employee_name:', data.employee_name);
+                    console.log('[DEBUG] About to call displayResults...');
+                    console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
+                    
+                    displayResults(data);  // data.data ではなく data を渡す
+                    
+                    console.log('[DEBUG] ✅ displayResults 呼び出し完了');
+                } else {
+                    // 400エラーや500エラーでも、サーバーからのエラーメッセージを表示
+                    console.log('[DEBUG] Server returned error (HTTP:', response.status, '):', data.message);
+                    const errorMessage = data.message || `サーバーエラーが発生しました (HTTP ${response.status})`;
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                console.error('[DEBUG] Fetch error occurred:', error);
+                console.error('[DEBUG] Error type:', error.constructor.name);
+                console.error('[DEBUG] Error message:', error.message);
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // 結果を表示
+        function displayResults(data) {
+            console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+            console.log('[DEBUG] ✨ displayResults関数が呼び出されました！');
+            console.log('[DEBUG] 受信データ:', data);
+            console.log('[DEBUG] employee_name:', data.employee_name);
+            console.log('[DEBUG] schedule:', data.schedule);
+            console.log('[DEBUG] attendance_records:', data.attendance_records);
+            console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+            
+            try {
+                // 従業員情報を表示
+                console.log('[DEBUG] Setting employee name...');
+                const employeeNameElement = document.getElementById('employee-name');
+                console.log('[DEBUG] employee-name element:', employeeNameElement);
+                if (employeeNameElement) {
+                    employeeNameElement.textContent = `${data.employee_name} さんの勤怠チェック結果`;
+                    console.log('[DEBUG] Employee name set successfully');
+                } else {
+                    console.error('[DEBUG] employee-name element not found!');
+                }
+                
+                document.getElementById('employee-id-display').textContent = data.employee_id;
+                document.getElementById('check-date-display').textContent = formatDate(data.check_date);
+                console.log('[DEBUG] Basic info set successfully');
+            
+            // スケジュール情報を表示
+            const scheduleBody = document.getElementById('schedule-body');
+            scheduleBody.innerHTML = '';
+            
+            if (data.schedule) {
+                const schedule = data.schedule;
+                const workTypeClass = getWorkTypeClass(schedule.work_type);
+                
+                // 出勤時刻行
+                const row1 = document.createElement('tr');
+                row1.innerHTML = `
+                    <td><strong>勤務タイプ</strong></td>
+                    <td><span class="work-type ${workTypeClass}">${schedule.work_type || '-'}</span></td>
+                    <td>-</td>
+                    <td>-</td>
+                `;
+                scheduleBody.appendChild(row1);
+                
+                // 出勤時刻行
+                const row2 = document.createElement('tr');
+                const startDiff = calculateTimeDiff(data.schedule.start_time, data.actual_clock_in);
+                row2.innerHTML = `
+                    <td><strong>出勤時刻</strong></td>
+                    <td>${formatTime(data.schedule.start_time) || '-'}</td>
+                    <td>${formatTime(data.actual_clock_in) || '-'}</td>
+                    <td>${startDiff ? `<span style="color: ${Math.abs(startDiff) >= 30 ? '#dc3545' : '#28a745'}">${startDiff > 0 ? '+' : ''}${startDiff}分</span>` : '-'}</td>
+                `;
+                scheduleBody.appendChild(row2);
+                
+                // 退勤時刻行
+                const row3 = document.createElement('tr');
+                const endDiff = calculateTimeDiff(data.schedule.end_time, data.actual_clock_out);
+                row3.innerHTML = `
+                    <td><strong>退勤時刻</strong></td>
+                    <td>${formatTime(data.schedule.end_time) || '-'}</td>
+                    <td>${formatTime(data.actual_clock_out) || '-'}</td>
+                    <td>${endDiff ? `<span style="color: ${Math.abs(endDiff) >= 30 ? '#dc3545' : '#28a745'}">${endDiff > 0 ? '+' : ''}${endDiff}分</span>` : '-'}</td>
+                `;
+                scheduleBody.appendChild(row3);
+                
+                // 打刻記録行
+                const row4 = document.createElement('tr');
+                const attendanceTimesHtml = formatAttendanceTimes(data.attendance_records);
+                row4.innerHTML = `
+                    <td><strong>打刻記録</strong></td>
+                    <td>-</td>
+                    <td class="attendance-times">${attendanceTimesHtml}</td>
+                    <td>${data.attendance_records.length}回</td>
+                `;
+                scheduleBody.appendChild(row4);
+            } else {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="4" class="no-data">スケジュールが登録されていません</td>
+                `;
+                scheduleBody.appendChild(row);
+            }
+            
+            // アラートを表示
+            const alertsContainer = document.getElementById('alerts-container');
+            alertsContainer.innerHTML = '';
+            
+            if (data.alerts && data.alerts.length > 0) {
+                data.alerts.forEach(alert => {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = `alert alert-${alert.type === 'error' ? 'error' : 'warning'}`;
+                    alertDiv.innerHTML = `
+                        <div class="alert-icon">${alert.type === 'error' ? '❌' : '⚠️'}</div>
+                        <div class="alert-content">
+                            <div class="alert-title">${alert.message}</div>
+                            <div class="alert-details">${alert.details || ''}</div>
+                        </div>
+                    `;
+                    alertsContainer.appendChild(alertDiv);
+                });
+            } else {
+                const noAlertDiv = document.createElement('div');
+                noAlertDiv.className = 'no-data';
+                noAlertDiv.textContent = 'アラートはありません。正常です。';
+                alertsContainer.appendChild(noAlertDiv);
+            }
+            
+            console.log('[DEBUG] 🌟 results-section を表示します');
+            document.getElementById('results-section').style.display = 'block';
+            console.log('[DEBUG] ✅ displayResults関数が正常に完了しました');
+            
+            } catch (error) {
+                console.error('[DEBUG] ❌ displayResults関数でエラーが発生:', error);
+                console.error('[DEBUG] エラーの詳細:', error.message);
+                console.error('[DEBUG] スタックトレース:', error.stack);
+                
+                // エラーが発生した場合でも結果セクションを表示
+                document.getElementById('results-section').style.display = 'block';
+                
+                // エラーメッセージを表示
+                const employeeNameElement = document.getElementById('employee-name');
+                if (employeeNameElement) {
+                    employeeNameElement.textContent = `データ表示エラー: ${error.message}`;
+                }
+            }
+        }
+        
+        // 時刻の差異を計算（分単位）
+        function calculateTimeDiff(scheduleTime, actualTime) {
+            if (!scheduleTime || !actualTime) return null;
+            
+            try {
+                const scheduleParts = scheduleTime.split(':');
+                const actualParts = actualTime.split(':');
+                
+                if (scheduleParts.length < 2 || actualParts.length < 2) return null;
+                
+                const scheduleMinutes = parseInt(scheduleParts[0]) * 60 + parseInt(scheduleParts[1]);
+                const actualMinutes = parseInt(actualParts[0]) * 60 + parseInt(actualParts[1]);
+                
+                return actualMinutes - scheduleMinutes;
+            } catch {
+                return null;
+            }
+        }
+        
+        // 日付フォーマット
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const dt = new Date(dateStr);
+            return dt.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'short'
+            });
+        }
+        
+        // 時刻フォーマット
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            // HH:MM形式の場合はそのまま返す
+            if (timeStr.match(/^\d{2}:\d{2}$/)) {
+                return timeStr;
+            }
+            // ISO時刻文字列の場合
+            if (timeStr.includes('T') || timeStr.includes(' ')) {
+                const dt = new Date(timeStr);
+                return dt.toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            return timeStr;
+        }
+        
+        // 勤務タイプに応じたCSSクラスを返す
+        function getWorkTypeClass(workType) {
+            if (!workType) return '';
+            if (workType.includes('24勤')) return 'shift-24';
+            if (workType.includes('日勤')) return 'day-shift';
+            if (workType.includes('夜勤')) return 'night-shift';
+            if (workType.includes('所')) return 'office';
+            if (workType.includes('明')) return 'off-day';
+            if (workType.includes('法')) return 'holiday';
+            if (workType.includes('有')) return 'paid-leave';
+            return '';
+        }
+        
+        // 打刻時間を整形する関数
+        function formatAttendanceTimes(attendanceRecords) {
+            if (!attendanceRecords || attendanceRecords.length === 0) {
+                return '<span class="no-data">打刻なし</span>';
+            }
+            
+            const timeSpans = attendanceRecords.map(record => {
+                return `<span class="attendance-time" title="端末: ${record.terminal_id || 'N/A'}">${record.time || record.time_only || ''}</span>`;
+            });
+            
+            return timeSpans.join(' ');
+        }
+        
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        // フォームクリア
+        function clearForm() {
+            document.getElementById('check-form').reset();
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            
+            // 今日の日付をデフォルトに設定
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('check-date').value = today;
+        }
+    </script>
+</body>
+</html>
+

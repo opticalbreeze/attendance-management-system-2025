@@ -382,3 +382,255 @@ def get_employees():
         if conn:
             conn.close()
         raise e
+
+def check_attendance_vs_schedule(employee_id, check_date):
+    """
+    勤怠スケジュールと打刻実績の差異をチェック
+    
+    Args:
+        employee_id: 従業員ID
+        check_date: チェック日付 (YYYY-MM-DD形式)
+    
+    Returns:
+        チェック結果のリスト（日付ごとのスケジュールと打刻実績、アラート情報）
+    """
+    from datetime import datetime, timedelta
+    
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        # 従業員情報を取得
+        cursor.execute("""
+            SELECT employee_num, name, idm FROM employee_master 
+            WHERE employee_num = ?
+        """, (employee_id,))
+        
+        emp_result = cursor.fetchone()
+        if not emp_result:
+            return {
+                'status': 'error',
+                'message': f'従業員ID {employee_id} が見つかりません'
+            }
+        
+        employee_num, employee_name, idm = emp_result
+        
+        # チェック日付のスケジュールを取得
+        cursor.execute("""
+            SELECT id, work_date, work_type, start_time, end_time
+            FROM attend_schedule
+            WHERE employee_id = ? AND work_date = ?
+        """, (employee_id, check_date))
+        
+        schedule_row = cursor.fetchone()
+        
+        # チェック日付の打刻データを取得
+        cursor.execute("""
+            SELECT id, timestamp, terminal_id
+            FROM attendance
+            WHERE idm = ? AND date(timestamp) = ?
+            ORDER BY timestamp ASC
+        """, (idm, check_date))
+        
+        attendance_rows = cursor.fetchall()
+        
+        # 翌日の「明」勤務のスケジュールを取得（24勤A/B、夜勤用）
+        next_date = (datetime.strptime(check_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+        cursor.execute("""
+            SELECT work_date, work_type, end_time
+            FROM attend_schedule
+            WHERE employee_id = ? AND work_date = ? AND work_type = '明'
+        """, (employee_id, next_date))
+        
+        next_day_off_schedule = cursor.fetchone()
+        
+        # 翌日の打刻データを取得（24勤A/B、夜勤の退勤時刻用）
+        cursor.execute("""
+            SELECT id, timestamp, terminal_id
+            FROM attendance
+            WHERE idm = ? AND date(timestamp) = ?
+            ORDER BY timestamp ASC
+        """, (idm, next_date))
+        
+        next_day_attendance_rows = cursor.fetchall()
+        
+        # 結果を構築
+        result = {
+            'employee_id': employee_num,
+            'employee_name': employee_name,
+            'check_date': check_date,
+            'schedule': None,
+            'attendance_records': [],
+            'actual_clock_in': None,
+            'actual_clock_out': None,
+            'alerts': []
+        }
+        
+        # スケジュール情報
+        if schedule_row:
+            result['schedule'] = {
+                'id': schedule_row[0],
+                'work_date': schedule_row[1],
+                'work_type': schedule_row[2],
+                'start_time': schedule_row[3],
+                'end_time': schedule_row[4]
+            }
+        
+        # 打刻データを整形
+        for att_row in attendance_rows:
+            timestamp_str = att_row[1]
+            try:
+                if 'T' in timestamp_str:
+                    time_part = timestamp_str.split('T')[1].split('.')[0]
+                else:
+                    time_part = timestamp_str.split(' ')[1].split('.')[0] if ' ' in timestamp_str else timestamp_str
+                time_only = ':'.join(time_part.split(':')[:2])
+            except:
+                time_only = timestamp_str
+            
+            result['attendance_records'].append({
+                'id': att_row[0],
+                'time': time_only,
+                'timestamp': timestamp_str,
+                'terminal_id': att_row[2]
+            })
+        
+        # 打刻時間の判定
+        work_type = result['schedule']['work_type'] if result['schedule'] else None
+        
+        if result['attendance_records']:
+            if work_type and ('24勤' in work_type or '夜勤' in work_type):
+                # 24勤A/B、夜勤: 一番早い時間が出勤、翌日の「明」の日の一番遅い時間が退勤
+                result['actual_clock_in'] = result['attendance_records'][0]['time']
+                
+                if next_day_attendance_rows:
+                    # 翌日の打刻データから時刻を抽出
+                    next_day_times = []
+                    for att_row in next_day_attendance_rows:
+                        timestamp_str = att_row[1]
+                        try:
+                            if 'T' in timestamp_str:
+                                time_part = timestamp_str.split('T')[1].split('.')[0]
+                            else:
+                                time_part = timestamp_str.split(' ')[1].split('.')[0] if ' ' in timestamp_str else timestamp_str
+                            time_only = ':'.join(time_part.split(':')[:2])
+                            next_day_times.append(time_only)
+                        except:
+                            pass
+                    
+                    if next_day_times:
+                        result['actual_clock_out'] = next_day_times[-1]  # 一番遅い時間
+            else:
+                # 日勤: 一番早い時間が出勤、一番遅い時間が退勤
+                if len(result['attendance_records']) > 0:
+                    result['actual_clock_in'] = result['attendance_records'][0]['time']
+                    result['actual_clock_out'] = result['attendance_records'][-1]['time']
+        
+        # アラートチェック
+        alerts = []
+        
+        # 1. 休みの日に打刻があるかチェック
+        if result['schedule']:
+            work_type = result['schedule']['work_type']
+            if work_type and ('有' in work_type or '所' in work_type or '法' in work_type):
+                if result['attendance_records']:
+                    alerts.append({
+                        'type': 'error',
+                        'message': '休日なのに打刻',
+                        'details': f'勤務タイプ: {work_type}、打刻回数: {len(result["attendance_records"])}回'
+                    })
+        
+        # 2. スケジュールがあるのに打刻がないかチェック
+        if result['schedule']:
+            work_type = result['schedule']['work_type']
+            # 休み以外で、出退勤スケジュールがあるのに打刻がない
+            if work_type and '有' not in work_type and '所' not in work_type and '法' not in work_type and '明' not in work_type:
+                if result['schedule']['start_time'] or result['schedule']['end_time']:
+                    if not result['attendance_records']:
+                        alerts.append({
+                            'type': 'error',
+                            'message': '打刻なし',
+                            'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
+                        })
+        
+        # 3. 出退勤時刻の差異チェック（30分以上）
+        if result['schedule'] and result['attendance_records']:
+            schedule_start = result['schedule']['start_time']
+            schedule_end = result['schedule']['end_time']
+            actual_start = result['actual_clock_in']
+            actual_end = result['actual_clock_out']
+            
+            if schedule_start and actual_start:
+                diff_start = calculate_time_diff_minutes(schedule_start, actual_start)
+                if diff_start is not None and abs(diff_start) >= 30:
+                    alerts.append({
+                        'type': 'warning',
+                        'message': '出退勤時刻に差異あり',
+                        'details': f'出勤時刻: スケジュール {schedule_start} / 実際 {actual_start} (差異: {diff_start:+d}分)'
+                    })
+            
+            if schedule_end and actual_end:
+                diff_end = calculate_time_diff_minutes(schedule_end, actual_end)
+                if diff_end is not None and abs(diff_end) >= 30:
+                    alerts.append({
+                        'type': 'warning',
+                        'message': '出退勤時刻に差異あり',
+                        'details': f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分)'
+                    })
+            elif schedule_end and not actual_end:
+                # 退勤スケジュールがあるのに退勤打刻がない
+                if work_type and ('24勤' not in work_type and '夜勤' not in work_type):
+                    alerts.append({
+                        'type': 'warning',
+                        'message': '出退勤時刻に差異あり',
+                        'details': f'退勤時刻: スケジュール {schedule_end} / 実際 打刻なし'
+                    })
+        
+        result['alerts'] = alerts
+        
+        conn.close()
+        return {
+            'status': 'success',
+            'data': result
+        }
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        return {
+            'status': 'error',
+            'message': f'チェックエラー: {str(e)}'
+        }
+
+def calculate_time_diff_minutes(time1_str, time2_str):
+    """
+    2つの時刻（HH:MM形式）の差異を分単位で計算
+    
+    Args:
+        time1_str: 時刻1 (HH:MM形式)
+        time2_str: 時刻2 (HH:MM形式)
+    
+    Returns:
+        差異（分）、time1が早い場合は負の値、time2が早い場合は正の値
+    """
+    try:
+        if not time1_str or not time2_str:
+            return None
+        
+        # HH:MM形式を分に変換
+        def time_to_minutes(time_str):
+            parts = time_str.split(':')
+            if len(parts) >= 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            return None
+        
+        minutes1 = time_to_minutes(time1_str)
+        minutes2 = time_to_minutes(time2_str)
+        
+        if minutes1 is None or minutes2 is None:
+            return None
+        
+        return minutes2 - minutes1
+        
+    except:
+        return None
