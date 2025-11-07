@@ -6,7 +6,6 @@
 """
 
 import os
-from pathlib import Path
 
 
 class Config:
@@ -19,26 +18,16 @@ class Config:
     THREADED = True
     
     # ==================== データベース設定 ====================
-    # データベースパス（環境に応じて自動判定）
-    @staticmethod
-    def _get_database_path():
-        """環境に応じたデータベースパスを取得（内部関数）"""
-        if 'DATABASE_PATH' in os.environ:
-            return os.environ['DATABASE_PATH']
-        
-        # Docker環境（volume mount: ./data:/data）
-        if os.path.exists('/data'):
-            return '/data/attendance.db'
-        
-        # ローカル開発環境
-        elif os.path.exists('./data'):
-            return './data/attendance.db'
-        
-        # フォールバック（カレントディレクトリ）
-        else:
-            return 'attendance.db'
+    # データベースパス（Dockerの外、attendance/dataフォルダに配置）
+    # ローカル開発: ../../data/attendance.db (work_attend_server/server/ から見て)
+    # Docker環境: /app/data/attendance.db（ホストの attendance/data にマウント）
+    DATABASE_PATH = os.environ.get('DATABASE_PATH', '../../data/attendance.db')
     
-    DATABASE_PATH = _get_database_path()
+    # ==================== PDF保存設定 ====================
+    # PDF保存先パス
+    # ローカル開発: C:\Users\take_me_hospital\attendance\data\PDF
+    # Docker環境: /app/data/PDF（ホストの attendance/data/PDF にマウント）
+    PDF_SAVE_DIR = os.environ.get('PDF_SAVE_DIR', r'C:\Users\take_me_hospital\attendance\data\PDF')
     
     # ==================== チャタリング防止設定 ====================
     CHATTERING_THRESHOLD_SECONDS = int(os.environ.get('CHATTERING_THRESHOLD', '10'))
@@ -91,21 +80,20 @@ class DockerConfig(Config):
     """Docker環境設定"""
     # Docker環境では環境変数から読み込む
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
-    DATABASE_PATH = '/data/attendance.db'  # Docker volume mount パス
 
 
 # 環境に応じた設定を自動選択
 def get_config():
     """
     環境変数から設定クラスを選択
-    優先順位: DOCKER > PRODUCTION > DEVELOPMENT
+    優先順位: PRODUCTION > DOCKER > DEVELOPMENT
     """
     env = os.environ.get('FLASK_ENV', '').lower()
     
-    if os.path.exists('/data') or env == 'docker':
-        return DockerConfig
-    elif env == 'production':
+    if env == 'production':
         return ProductionConfig
+    elif env == 'docker':
+        return DockerConfig
     else:
         return DevelopmentConfig
 

@@ -7,16 +7,20 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      # データベースを永続化
-      - ./server/data:/data
+      # データベースを永続化（親ディレクトリのdataをマウント）
+      - ../data:/data
       # テンプレートファイルを最新に保つ
       - ./server/templates:/app/templates
       # サーバーコード（リファクタリング版）を最新に保つ
       - ./server/server.py:/app/server.py
       - ./server/database.py:/app/database.py
-      - ./server/api.py:/app/api.py
       - ./server/utils.py:/app/utils.py
       - ./server/config.py:/app/config.py
+      - ./server/overtime.py:/app/overtime.py
+      - ./server/leave_request.py:/app/leave_request.py
+      - ./server/api_attendance.py:/app/api_attendance.py
+      - ./server/api_overtime.py:/app/api_overtime.py
+      - ./server/api_leave.py:/app/api_leave.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

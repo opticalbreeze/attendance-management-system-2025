@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時間外申告一覧 - 打刻システム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .search-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .search-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input, select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .summary-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .summary-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .type-inner {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .type-outer {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .time-info {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 16px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← トップページに戻る</a>
+        
+        <h1>📋 時間外申告一覧</h1>
+        <p class="subtitle">月度別の時間外申告を確認・承認できます</p>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- 検索フォーム -->
+        <div class="search-section">
+            <div class="search-form">
+                <div class="form-group">
+                    <label for="searchMonth">月度（給与計算期間）</label>
+                    <input type="month" id="searchMonth" required>
+                    <div class="help-text">前月16日〜当月15日の期間</div>
+                </div>
+                <div class="form-group">
+                    <label for="statusFilter">ステータス</label>
+                    <select id="statusFilter">
+                        <option value="">すべて</option>
+                        <option value="pending">承認待ち</option>
+                        <option value="approved">承認済み</option>
+                        <option value="rejected">却下</option>
+                    </select>
+                    <div class="help-text">&nbsp;</div>
+                </div>
+                <button class="btn-primary" onclick="searchOvertimeApplications()">🔍 検索</button>
+            </div>
+        </div>
+
+        <!-- 集計サマリー -->
+        <div id="summarySection" style="display: none;">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-number" id="totalCount">0</div>
+                    <div class="summary-label">申告件数</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" id="totalHours">0</div>
+                    <div class="summary-label">合計時間</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" id="pendingCount">0</div>
+                    <div class="summary-label">承認待ち</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" id="approvedCount">0</div>
+                    <div class="summary-label">承認済み</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 一覧テーブル -->
+        <div class="table-container">
+            <table id="overtimeTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>従業員</th>
+                        <th>作業日</th>
+                        <th>時間</th>
+                        <th>分類</th>
+                        <th>時間詳細</th>
+                        <th>作業内容</th>
+                        <th>ステータス</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="overtimeTableBody">
+                    <tr>
+                        <td colspan="9" class="loading">月度を選択して検索してください</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 今月の月度を初期値として設定
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const currentMonth = today.toISOString().slice(0, 7); // YYYY-MM
+            document.getElementById('searchMonth').value = currentMonth;
+        });
+
+        // 時間外申告を検索
+        async function searchOvertimeApplications() {
+            const searchMonth = document.getElementById('searchMonth').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            if (!searchMonth) {
+                showAlert('error', '月度を選択してください');
+                return;
+            }
+
+            const tbody = document.getElementById('overtimeTableBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">読み込み中...</td></tr>';
+
+            try {
+                // 月度の期間を計算（前月16日〜当月15日）
+                const [year, month] = searchMonth.split('-').map(Number);
+                const startDate = new Date(year, month - 2, 16).toISOString().split('T')[0]; // 前月16日
+                const endDate = new Date(year, month - 1, 15).toISOString().split('T')[0];   // 当月15日
+
+                // APIリクエスト
+                let url = `/api/overtime?limit=1000`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    // 期間でフィルタ
+                    const filteredData = result.data.filter(item => {
+                        return item.work_date >= startDate && item.work_date <= endDate;
+                    });
+
+                    displayOvertimeApplications(filteredData);
+                    updateSummary(filteredData);
+                } else {
+                    showAlert('error', result.message || 'データの取得に失敗しました');
+                    tbody.innerHTML = '<tr><td colspan="9" class="no-data">データが見つかりませんでした</td></tr>';
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">エラーが発生しました</td></tr>';
+                console.error(error);
+            }
+        }
+
+        // テーブルにデータを表示
+        function displayOvertimeApplications(data) {
+            const tbody = document.getElementById('overtimeTableBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">該当する申告がありません</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                
+                const totalMinutes = (item.inner_overtime_minutes || 0) + (item.outer_overtime_minutes || 0);
+                const totalHours = (totalMinutes / 60).toFixed(1);
+                const nightHours = ((item.night_overtime_minutes || 0) / 60).toFixed(1);
+
+                const statusClass = 
+                    item.status === 'approved' ? 'status-approved' :
+                    item.status === 'rejected' ? 'status-rejected' : 'status-pending';
+                
+                const statusText =
+                    item.status === 'approved' ? '承認済み' :
+                    item.status === 'rejected' ? '却下' : '承認待ち';
+
+                const typeClass = item.overtime_type === '内残業' ? 'type-inner' : 'type-outer';
+
+                // 操作ボタン（承認待ちの場合のみ表示）
+                let actionButtons = '';
+                if (item.status === 'pending') {
+                    actionButtons = `
+                        <div class="action-buttons">
+                            <button class="btn-success" onclick="approveOvertime(${item.id})">承認</button>
+                            <button class="btn-danger" onclick="rejectOvertime(${item.id})">却下</button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = `<span class="time-info">${item.approved_by || '-'}</span>`;
+                }
+
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>
+                        <strong>${item.employee_name}</strong><br>
+                        <span class="time-info">${item.employee_num}</span>
+                    </td>
+                    <td>${item.work_date}</td>
+                    <td>
+                        ${item.start_time} - ${item.end_time}<br>
+                        <span class="time-info">${totalHours}時間</span>
+                    </td>
+                    <td><span class="type-badge ${typeClass}">${item.overtime_type}</span></td>
+                    <td class="time-info">
+                        内: ${(item.inner_overtime_minutes / 60).toFixed(1)}h<br>
+                        外: ${(item.outer_overtime_minutes / 60).toFixed(1)}h<br>
+                        深夜: ${nightHours}h
+                    </td>
+                    <td>${item.description || '-'}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${actionButtons}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // 集計サマリーを更新
+        function updateSummary(data) {
+            const summarySection = document.getElementById('summarySection');
+            summarySection.style.display = 'block';
+
+            const totalCount = data.length;
+            const pendingCount = data.filter(item => item.status === 'pending').length;
+            const approvedCount = data.filter(item => item.status === 'approved').length;
+
+            const totalMinutes = data.reduce((sum, item) => {
+                return sum + (item.inner_overtime_minutes || 0) + (item.outer_overtime_minutes || 0);
+            }, 0);
+            const totalHours = (totalMinutes / 60).toFixed(1);
+
+            document.getElementById('totalCount').textContent = `${totalCount}件`;
+            document.getElementById('totalHours').textContent = `${totalHours}h`;
+            document.getElementById('pendingCount').textContent = `${pendingCount}件`;
+            document.getElementById('approvedCount').textContent = `${approvedCount}件`;
+        }
+
+        // 時間外申告を承認
+        async function approveOvertime(overtimeId) {
+            if (!confirm('この時間外申告を承認しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/overtime/${overtimeId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        approved_by: 'admin'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', '承認しました');
+                    searchOvertimeApplications(); // 再読み込み
+                } else {
+                    showAlert('error', result.message || '承認に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        // 時間外申告を却下
+        async function rejectOvertime(overtimeId) {
+            if (!confirm('この時間外申告を却下しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/overtime/${overtimeId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rejected_by: 'admin'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', '却下しました');
+                    searchOvertimeApplications(); // 再読み込み
+                } else {
+                    showAlert('error', result.message || '却下に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        // アラート表示
+        function showAlert(type, message) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
+

@@ -7,9 +7,10 @@
 
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from config import Config
+from utils import calculate_time_diff_minutes, get_database_connection
 
 # データベースファイルのパス（config.pyから取得）
 DB_FILE = Config.DATABASE_PATH
@@ -24,7 +25,7 @@ def init_database():
     データベースを初期化
     テーブルが存在しない場合は作成
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_database_connection()
     cursor = conn.cursor()
     
     # 打刻テーブルの作成
@@ -43,13 +44,76 @@ def init_database():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON attendance(timestamp)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_terminal_id ON attendance(terminal_id)")
     
+    # employee_masterテーブルのマイグレーション（sectionカラム追加）
+    migrate_employee_master_table(cursor)
+    
     conn.commit()
     conn.close()
     print("✅ データベース初期化完了")
 
-def get_database_connection():
-    """データベース接続を取得"""
-    return sqlite3.connect(DB_FILE)
+def migrate_employee_master_table(cursor):
+    """
+    employee_masterテーブルにsectionカラムを追加するマイグレーション
+    既存データに対して「設備」を設定
+    """
+    try:
+        # テーブルが存在するか確認
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='employee_master'
+        """)
+        table_exists = cursor.fetchone()
+        
+        if table_exists:
+            # カラムが存在するか確認
+            cursor.execute("PRAGMA table_info(employee_master)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            # sectionカラムが存在しない場合は追加
+            if 'section' not in columns:
+                cursor.execute("""
+                    ALTER TABLE employee_master 
+                    ADD COLUMN section TEXT DEFAULT '設備'
+                """)
+                
+                # 既存データに対して全員「設備」を設定
+                cursor.execute("""
+                    UPDATE employee_master 
+                    SET section = '設備'
+                """)
+                
+                updated_count = cursor.rowcount
+                print(f"✅ employee_masterテーブルにsectionカラムを追加しました（既存{updated_count}件のデータを「設備」に設定）")
+            else:
+                # カラムが既に存在する場合も、NULLや空の値があれば「設備」に設定
+                cursor.execute("""
+                    UPDATE employee_master 
+                    SET section = '設備' 
+                    WHERE section IS NULL OR section = ''
+                """)
+                updated_count = cursor.rowcount
+                if updated_count > 0:
+                    print(f"✅ employee_masterテーブルのsectionカラムを確認しました（{updated_count}件のデータを「設備」に更新）")
+                else:
+                    print("✅ employee_masterテーブルのsectionカラムを確認しました")
+        else:
+            # テーブルが存在しない場合は作成（sectionカラムを含む）
+            # ユーザー指定のスキーマに合わせて作成
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS employee_master (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    employee_num INTEGER NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    idm TEXT NOT NULL UNIQUE,
+                    section TEXT DEFAULT '設備',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            print("✅ employee_masterテーブルを作成しました（sectionカラムを含む）")
+            
+    except sqlite3.Error as e:
+        print(f"⚠️ employee_masterテーブルのマイグレーションエラー: {e}")
 
 def insert_attendance(idm, timestamp, terminal_id):
     """打刻データを挿入"""
@@ -345,35 +409,70 @@ def get_employees():
         cursor = conn.cursor()
         
         # 従業員マスタから基本情報を取得し、24勤シフトの有無を判定
-        query = """
-            SELECT 
-                em.employee_num,
-                em.name,
-                em.idm,
-                CASE 
-                    WHEN COUNT(CASE WHEN as_.work_type LIKE '%24勤%' THEN 1 END) > 0 
-                    THEN 1 
-                    ELSE 0 
-                END as has_24hour_shifts,
-                COUNT(DISTINCT as_.work_date) as total_schedules
-            FROM employee_master em
-            LEFT JOIN attend_schedule as_ ON em.employee_num = as_.employee_id
-            GROUP BY em.employee_num, em.name, em.idm
-            ORDER BY em.employee_num
-        """
+        # sectionカラムが存在するか確認
+        cursor.execute("PRAGMA table_info(employee_master)")
+        columns = [col[1] for col in cursor.fetchall()]
+        has_section = 'section' in columns
+        
+        if has_section:
+            query = """
+                SELECT 
+                    em.employee_num,
+                    em.name,
+                    em.idm,
+                    em.section,
+                    CASE 
+                        WHEN COUNT(CASE WHEN as_.work_type LIKE '%24勤%' THEN 1 END) > 0 
+                        THEN 1 
+                        ELSE 0 
+                    END as has_24hour_shifts,
+                    COUNT(DISTINCT as_.work_date) as total_schedules
+                FROM employee_master em
+                LEFT JOIN attend_schedule as_ ON em.employee_num = as_.employee_id
+                GROUP BY em.employee_num, em.name, em.idm, em.section
+                ORDER BY em.employee_num
+            """
+        else:
+            query = """
+                SELECT 
+                    em.employee_num,
+                    em.name,
+                    em.idm,
+                    CASE 
+                        WHEN COUNT(CASE WHEN as_.work_type LIKE '%24勤%' THEN 1 END) > 0 
+                        THEN 1 
+                        ELSE 0 
+                    END as has_24hour_shifts,
+                    COUNT(DISTINCT as_.work_date) as total_schedules
+                FROM employee_master em
+                LEFT JOIN attend_schedule as_ ON em.employee_num = as_.employee_id
+                GROUP BY em.employee_num, em.name, em.idm
+                ORDER BY em.employee_num
+            """
         
         cursor.execute(query)
         rows = cursor.fetchall()
         
         employees = []
         for row in rows:
-            employees.append({
-                'employee_num': row[0],
-                'name': row[1],
-                'idm': row[2],
-                'has_24hour_shifts': bool(row[3]),
-                'total_schedules': row[4]
-            })
+            if has_section:
+                employees.append({
+                    'employee_num': row[0],
+                    'name': row[1],
+                    'idm': row[2],
+                    'section': row[3] or '設備',  # NULLの場合はデフォルト値
+                    'has_24hour_shifts': bool(row[4]),
+                    'total_schedules': row[5]
+                })
+            else:
+                employees.append({
+                    'employee_num': row[0],
+                    'name': row[1],
+                    'idm': row[2],
+                    'section': '設備',  # カラムが存在しない場合はデフォルト値
+                    'has_24hour_shifts': bool(row[3]),
+                    'total_schedules': row[4]
+                })
         
         conn.close()
         return employees
@@ -394,8 +493,6 @@ def check_attendance_vs_schedule(employee_id, check_date):
     Returns:
         チェック結果のリスト（日付ごとのスケジュールと打刻実績、アラート情報）
     """
-    from datetime import datetime, timedelta
-    
     try:
         conn = get_database_connection()
         cursor = conn.cursor()
@@ -553,6 +650,53 @@ def check_attendance_vs_schedule(employee_id, check_date):
                             'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
                         })
         
+        # 2-1. 休日出勤届が出ている日に打刻時間がない場合のアラート
+        if result['schedule']:
+            work_type = result['schedule']['work_type']
+            if work_type and ('休出' in work_type or '休日出勤' in work_type):
+                if not result['attendance_records']:
+                    alerts.append({
+                        'type': 'error',
+                        'message': '休日出勤届があるのに打刻なし',
+                        'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
+                    })
+        
+        # 2-2. 休暇届が出ているのに打刻がある場合のアラート
+        try:
+            # 承認済みの休暇願を取得（循環インポート回避のため関数内でインポート）
+            from leave_request import get_leave_requests
+            approved_leaves = get_leave_requests(
+                employee_num=str(employee_num),
+                leave_date=check_date,
+                status='approved',
+                limit=100
+            )
+            
+            # チェック日付が休暇期間内かどうかを確認
+            for leave in approved_leaves:
+                leave_date_from = leave.get('leave_date_from')
+                leave_date_to = leave.get('leave_date_to')
+                
+                if leave_date_from and leave_date_to:
+                    # チェック日付が休暇期間内かどうか
+                    if leave_date_from <= check_date <= leave_date_to:
+                        if result['attendance_records']:
+                            leave_type = leave.get('leave_type', '')
+                            leave_subtype = leave.get('leave_subtype', '')
+                            leave_detail = leave_type
+                            if leave_subtype:
+                                leave_detail += f' ({leave_subtype})'
+                            
+                            alerts.append({
+                                'type': 'error',
+                                'message': '休暇願があるのに打刻あり',
+                                'details': f'休暇種類: {leave_detail}、打刻回数: {len(result["attendance_records"])}回'
+                            })
+                            break  # 1件見つかれば十分
+        except Exception as e:
+            # 休暇願の取得エラーは無視（ログに出力）
+            print(f"[警告] 休暇願チェックエラー: {e}")
+        
         # 3. 出退勤時刻の差異チェック（30分以上）
         if result['schedule'] and result['attendance_records']:
             schedule_start = result['schedule']['start_time']
@@ -601,36 +745,3 @@ def check_attendance_vs_schedule(employee_id, check_date):
             'status': 'error',
             'message': f'チェックエラー: {str(e)}'
         }
-
-def calculate_time_diff_minutes(time1_str, time2_str):
-    """
-    2つの時刻（HH:MM形式）の差異を分単位で計算
-    
-    Args:
-        time1_str: 時刻1 (HH:MM形式)
-        time2_str: 時刻2 (HH:MM形式)
-    
-    Returns:
-        差異（分）、time1が早い場合は負の値、time2が早い場合は正の値
-    """
-    try:
-        if not time1_str or not time2_str:
-            return None
-        
-        # HH:MM形式を分に変換
-        def time_to_minutes(time_str):
-            parts = time_str.split(':')
-            if len(parts) >= 2:
-                return int(parts[0]) * 60 + int(parts[1])
-            return None
-        
-        minutes1 = time_to_minutes(time1_str)
-        minutes2 = time_to_minutes(time2_str)
-        
-        if minutes1 is None or minutes2 is None:
-            return None
-        
-        return minutes2 - minutes1
-        
-    except:
-        return None

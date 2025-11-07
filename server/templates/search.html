@@ -280,6 +280,15 @@
             <form id="search-form">
                 <div class="form-grid">
                     <div class="form-group">
+                        <label for="section-select">セクション</label>
+                        <select id="section-select">
+                            <option value="">すべてのセクション</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            セクションで絞り込み
+                        </small>
+                    </div>
+                    <div class="form-group">
                         <label for="employee-id">従業員ID（必須）</label>
                         <select id="employee-id" name="employee_id" required>
                             <option value="">▼ 従業員を読み込み中...</option>
@@ -322,6 +331,8 @@
                             <th>開始時刻</th>
                             <th>終了時刻</th>
                             <th>実際の打刻時間 🕐</th>
+                            <th>時間外申告</th>
+                            <th>休暇願</th>
                         </tr>
                     </thead>
                     <tbody id="results-body">
@@ -345,6 +356,9 @@
         let searchResults = [];
         
         // ページ読み込み時の初期化処理
+        // 全従業員データを保持
+        let allEmployees = [];
+        
         document.addEventListener('DOMContentLoaded', async function() {
             // 従業員情報を動的に読み込み
             await loadEmployees();
@@ -352,12 +366,17 @@
             // データが存在する期間：2025-09-16 から 2025-10-15（10月度検索が必要）
             document.getElementById('search-month').value = '2025/10';
             
-
+            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('section-select');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
         });
         
         // 従業員情報を動的に読み込む
         async function loadEmployees() {
             const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
             const employeeHint = document.getElementById('employee-hint');
             
             try {
@@ -365,32 +384,21 @@
                 const result = await response.json();
                 
                 if (result.status === 'success' && result.data) {
-                    // 既存のオプションをクリア
-                    employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+                    // 全従業員データを保存
+                    allEmployees = result.data;
                     
-                    // 従業員データでオプションを構築
-                    result.data.forEach(employee => {
+                    // セクション一覧を取得・設定
+                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                    sections.forEach(section => {
                         const option = document.createElement('option');
-                        option.value = employee.employee_num;
-                        
-                        // 表示名を構築（24勤シフトがある場合は明示）
-                        let displayName = `${employee.employee_num} - ${employee.name}`;
-                        if (employee.has_24hour_shifts) {
-                            displayName += ' (24勤あり)';
-                        }
-                        if (employee.total_schedules > 0) {
-                            displayName += ` [${employee.total_schedules}件]`;
-                        }
-                        
-                        option.textContent = displayName;
-                        
-                        // デフォルト選択（3252023を優先）
-                        if (employee.employee_num === '3252023') {
-                            option.selected = true;
-                        }
-                        
-                        employeeSelect.appendChild(option);
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
                     });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
                     
                     // ヒント表示を有効化
                     employeeHint.style.display = 'block';
@@ -404,6 +412,45 @@
                 employeeHint.textContent = '従業員データの読み込みに失敗しました';
                 employeeHint.style.color = '#e74c3c';
             }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            const selectedSection = sectionSelect.value;
+            
+            // 既存のオプションをクリア
+            employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+            
+            // セクションでフィルタリング
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            // 従業員データでオプションを構築
+            filteredEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.employee_num;
+                
+                // 表示名を構築（24勤シフトがある場合は明示）
+                let displayName = `${employee.employee_num} - ${employee.name}`;
+                if (employee.has_24hour_shifts) {
+                    displayName += ' (24勤あり)';
+                }
+                if (employee.total_schedules > 0) {
+                    displayName += ` [${employee.total_schedules}件]`;
+                }
+                
+                option.textContent = displayName;
+                
+                // デフォルト選択（3252023を優先）
+                if (employee.employee_num === '3252023') {
+                    option.selected = true;
+                }
+                
+                employeeSelect.appendChild(option);
+            });
         }
         
         // フォーム送信
@@ -500,11 +547,18 @@
                     <td>${formatTime(item.start_time)}</td>
                     <td>${formatEndTime(item)}</td>
                     <td class="attendance-times">${attendanceTimesHtml}</td>
+                    <td id="overtime-${item.work_date}" style="font-size: 0.85em; color: #667eea;">-</td>
+                    <td id="leave-${item.work_date}" style="font-size: 0.85em; color: #28a745;">-</td>
                 `;
                 // 全データを行要素に保存（後で使用可能）
                 tr.dataset.fullData = JSON.stringify(item);
                 tbody.appendChild(tr);
             });
+            
+            // 時間外・休暇願データを非同期で取得
+            const employeeId = searchParams.employee_id;
+            fetchOvertimeDataForMonth(employeeId, results);
+            fetchLeaveDataForMonth(employeeId, results);
             
             // 検索範囲の情報を表示
             let rangeInfo = '';
@@ -661,6 +715,57 @@
             document.getElementById('results-section').style.display = 'none';
             document.getElementById('no-results').style.display = 'none';
             document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // 時間外申告データを月単位で取得
+        async function fetchOvertimeDataForMonth(employeeId, results) {
+            try {
+                const response = await fetch(`/api/overtime?employee_num=${employeeId}&limit=1000`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    result.data.forEach(overtime => {
+                        const cell = document.getElementById(`overtime-${overtime.work_date}`);
+                        if (cell) {
+                            const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
+                            const hours = (totalMin / 60).toFixed(1);
+                            cell.innerHTML = `${overtime.start_time}-${overtime.end_time}<br><small>(${hours}h)</small>`;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('[時間外データ取得エラー]', error);
+            }
+        }
+        
+        // 休暇願データを月単位で取得
+        async function fetchLeaveDataForMonth(employeeId, results) {
+            try {
+                const response = await fetch(`/api/leave?employee_num=${employeeId}&limit=1000`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    result.data.forEach(leave => {
+                        // 休暇期間の各日付をチェック
+                        const startDate = new Date(leave.leave_date_from);
+                        const endDate = new Date(leave.leave_date_to);
+                        
+                        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                            const dateStr = d.toISOString().split('T')[0];
+                            const cell = document.getElementById(`leave-${dateStr}`);
+                            if (cell) {
+                                let detail = leave.leave_type;
+                                if (leave.leave_subtype) {
+                                    detail = leave.leave_subtype.substring(0, 20);
+                                }
+                                cell.innerHTML = `${detail}`;
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('[休暇願データ取得エラー]', error);
+            }
         }
         
         // CSV出力

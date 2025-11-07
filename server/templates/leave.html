@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>休暇願 - 打刻システム</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .form-section h2 {
+            color: #555;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .required { color: #e74c3c; margin-left: 4px; }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .checkbox-group {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #ddd;
+        }
+        .checkbox-group:hover { border-color: #667eea; }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .checkbox-item:last-child { margin-bottom: 0; }
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .checkbox-item label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .sub-checkbox {
+            margin-left: 30px;
+            padding-left: 20px;
+            border-left: 3px solid #667eea;
+        }
+        .sub-checkbox .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+        .sub-checkbox .checkbox-item input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        .sub-checkbox .checkbox-item label {
+            flex: 1;
+            text-align: left;
+        }
+        .conditional-input {
+            margin-left: 30px;
+            margin-top: 10px;
+            display: none;
+        }
+        .conditional-input.active { display: block; }
+        .date-range {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .help-text { font-size: 12px; color: #6c757d; margin-top: 5px; }
+        
+        /* 確認画面用 */
+        #confirmationScreen { display: none; }
+        .confirmation-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .confirmation-section h3 {
+            color: #555;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .info-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            width: 150px;
+        }
+        .info-value { color: #333; flex: 1; }
+        .hidden { display: none; }
+        
+        /* 印刷用スタイル */
+        @media print {
+            body { background: white; padding: 0; color: #000; }
+            .container { box-shadow: none; max-width: 100%; padding: 20mm; border: 2px solid #000; }
+            .back-link, .button-group, .subtitle, #alert { display: none !important; }
+            h1 {
+                font-size: 20pt;
+                text-align: center;
+                border-bottom: 3px double #000;
+                padding-bottom: 10pt;
+                margin-bottom: 20pt;
+            }
+            .confirmation-section {
+                background: white;
+                border: 2px solid #000;
+                margin-bottom: 15pt;
+                page-break-inside: avoid;
+                padding: 12pt;
+            }
+            .confirmation-section h3 {
+                font-size: 14pt;
+                color: #000;
+                border-bottom: 2px solid #000;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link" id="backLink">← トップページに戻る</a>
+        
+        <h1 id="pageTitle">休暇願</h1>
+        <p class="subtitle">休暇の申請を行います</p>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- 入力画面 -->
+        <div id="inputScreen">
+            <form id="leaveForm">
+                <!-- 基本情報 -->
+                <div class="form-section">
+                    <h2>基本情報</h2>
+                    
+                    <div class="form-group">
+                        <label for="sectionSelect">セクション</label>
+                        <select id="sectionSelect">
+                            <option value="">すべてのセクション</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employeeSelect">従業員選択<span class="required">*</span></label>
+                        <select id="employeeSelect" required>
+                            <option value="">従業員を選択してください</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="applicationDate">申請日<span class="required">*</span></label>
+                        <input type="date" id="applicationDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>休暇期間<span class="required">*</span></label>
+                        <div class="date-range">
+                            <div>
+                                <input type="date" id="leaveDateFrom" required>
+                                <div class="help-text">開始日</div>
+                            </div>
+                            <div>
+                                <input type="date" id="leaveDateTo" required>
+                                <div class="help-text">終了日</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 休暇種類 -->
+                <div class="form-section">
+                    <h2>休暇種類<span class="required">*</span></h2>
+                    <div class="help-text" style="margin-bottom:15px">以下から1つ選択してください</div>
+                    
+                    <!-- 有給休暇 -->
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="paidLeave" name="leaveType" value="有給休暇">
+                            <label for="paidLeave">有給休暇</label>
+                        </div>
+                    </div>
+
+                    <!-- 振替休日 -->
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="substituteLeave" name="leaveType" value="振替休日">
+                            <label for="substituteLeave">振替休日</label>
+                        </div>
+                        <div id="substituteDate" class="conditional-input">
+                            <input type="date" id="substituteWorkDate" placeholder="出勤日">
+                            <div class="help-text">出勤日を選択してください</div>
+                        </div>
+                    </div>
+
+                    <!-- 特別休暇 -->
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="specialLeave" name="leaveType" value="特別休暇">
+                            <label for="specialLeave">特別休暇</label>
+                        </div>
+                        <div id="specialLeaveTypes" class="conditional-input">
+                            <div class="sub-checkbox">
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special1" value="本人の結婚（5日）">
+                                    <label for="special1">① 本人の結婚〈5日〉</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special2" value="父母・配偶者・子の死亡（5日）">
+                                    <label for="special2">② [ 父母 ・ 配偶者 ・ 子 ] の死亡〈5日〉</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special3" value="祖父母・兄弟姉妹・配偶者の父母の死亡（3日）">
+                                    <label for="special3">③ [ 祖父母 ・ 兄弟姉妹 ・ 配偶者の父母 ] の死亡〈3日〉</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special4" value="妻の出産（2日）">
+                                    <label for="special4">④ 妻の出産〈2日〉</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special5" value="父母・配偶者・子の法要（1日）">
+                                    <label for="special5">⑤ [ 父母 ・ 配偶者 ・ 子 ] の法要〈1日〉</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special6" value="生理休暇">
+                                    <label for="special6">⑥ 生理休暇</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="radio" name="specialType" id="special7" value="その他（特別）">
+                                    <label for="special7">⑦ その他</label>
+                                </div>
+                                <div id="specialOther" class="conditional-input">
+                                    <input type="text" id="specialOtherReason" placeholder="その他の理由を入力">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- その他 -->
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="otherLeave" name="leaveType" value="その他">
+                            <label for="otherLeave">その他</label>
+                        </div>
+                        <div id="otherReason" class="conditional-input">
+                            <textarea id="otherReasonText" rows="3" placeholder="理由を入力してください"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 送信ボタン -->
+                <div class="button-group">
+                    <button type="button" class="btn-secondary" onclick="window.location.href='/'">キャンセル</button>
+                    <button type="submit" class="btn-primary">確認画面へ</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 確認画面 -->
+        <div id="confirmationScreen">
+            <div class="confirmation-section">
+                <h3>基本情報</h3>
+                <div class="info-row">
+                    <div class="info-label">従業員</div>
+                    <div class="info-value" id="confirmEmployee">-</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">申請日</div>
+                    <div class="info-value" id="confirmApplicationDate">-</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">休暇期間</div>
+                    <div class="info-value" id="confirmLeavePeriod">-</div>
+                </div>
+            </div>
+
+            <div class="confirmation-section">
+                <h3>休暇内容</h3>
+                <div class="info-row">
+                    <div class="info-label">休暇種類</div>
+                    <div class="info-value" id="confirmLeaveType">-</div>
+                </div>
+                <div id="confirmAdditionalInfo" style="margin-top:10px;"></div>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="btn-secondary" onclick="backToInput()">戻る</button>
+                <button type="button" class="btn-success" onclick="submitAndPrint()">登録・印刷</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let employees = [];
+        let formData = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('applicationDate').value = today;
+            document.getElementById('leaveDateFrom').value = today;
+            document.getElementById('leaveDateTo').value = today;
+
+            await loadEmployees();
+            setupEventListeners();
+            
+            document.getElementById('leaveForm').addEventListener('submit', handleFormSubmit);
+            
+            // 従業員選択変更時にボタンの状態をリセット
+            document.getElementById('employeeSelect').addEventListener('change', function() {
+                const submitBtn = document.querySelector('#leaveForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '1';
+                    submitBtn.style.cursor = 'pointer';
+                }
+            });
+            
+            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('sectionSelect');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+
+        // 全従業員データを保持
+        let allEmployees = [];
+        
+        async function loadEmployees() {
+            try {
+                const response = await fetch('/api/employees');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    allEmployees = data.data;
+                    employees = data.data;
+                    
+                    // セクション一覧を取得・設定
+                    const sectionSelect = document.getElementById('sectionSelect');
+                    const sections = [...new Set(data.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                    sections.forEach(section => {
+                        const option = document.createElement('option');
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
+                    });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                }
+            } catch (error) {
+                showAlert('error', '従業員リストの取得に失敗しました');
+            }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employeeSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const selectedSection = sectionSelect.value;
+            
+            employeeSelect.innerHTML = '<option value="">従業員を選択してください</option>';
+            
+            // セクションでフィルタリング
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            employees = filteredEmployees;
+            
+            filteredEmployees.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.employee_num;
+                option.textContent = `${emp.name} (${emp.employee_num})`;
+                employeeSelect.appendChild(option);
+            });
+        }
+        
+        // セクション変更時に従業員リストを更新
+        document.addEventListener('DOMContentLoaded', function() {
+            const sectionSelect = document.getElementById('sectionSelect');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+
+        function setupEventListeners() {
+            // チェックボックスの排他制御
+            document.querySelectorAll('input[name="leaveType"]').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        document.querySelectorAll('input[name="leaveType"]').forEach(cb => {
+                            if (cb !== this) cb.checked = false;
+                        });
+                    }
+                    updateConditionalInputs();
+                });
+            });
+
+            // 特別休暇のその他選択時
+            document.getElementById('special7').addEventListener('change', function() {
+                document.getElementById('specialOther').classList.toggle('active', this.checked);
+            });
+        }
+
+        function updateConditionalInputs() {
+            document.getElementById('substituteDate').classList.toggle('active', 
+                document.getElementById('substituteLeave').checked);
+            document.getElementById('specialLeaveTypes').classList.toggle('active', 
+                document.getElementById('specialLeave').checked);
+            document.getElementById('otherReason').classList.toggle('active', 
+                document.getElementById('otherLeave').checked);
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const employeeNum = document.getElementById('employeeSelect').value;
+            const applicationDate = document.getElementById('applicationDate').value;
+            const leaveDateFrom = document.getElementById('leaveDateFrom').value;
+            const leaveDateTo = document.getElementById('leaveDateTo').value;
+
+            if (!employeeNum) {
+                showAlert('error', '従業員を選択してください');
+                return;
+            }
+
+            // 従業員名のチェック
+            const employee = employees.find(emp => emp.employee_num == employeeNum);
+            if (!employee || !employee.name || employee.name.trim() === '') {
+                showAlert('error', '従業員名が登録されていません。従業員マスタで従業員名を登録してください。');
+                // 確認画面へのボタンを無効化
+                const submitBtn = document.querySelector('#leaveForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.style.opacity = '0.5';
+                    submitBtn.style.cursor = 'not-allowed';
+                }
+                return;
+            }
+
+            // 休暇種類チェック
+            const checkedType = document.querySelector('input[name="leaveType"]:checked');
+            if (!checkedType) {
+                showAlert('error', '休暇種類を選択してください');
+                return;
+            }
+
+            let leaveType = checkedType.value;
+            let leaveSubtype = null;
+            let substituteWorkDate = null;
+            let otherReason = null;
+
+            // 種類別の追加情報
+            if (leaveType === '振替休日') {
+                substituteWorkDate = document.getElementById('substituteWorkDate').value;
+                if (!substituteWorkDate) {
+                    showAlert('error', '振替休日の出勤日を選択してください');
+                    return;
+                }
+            } else if (leaveType === '特別休暇') {
+                const specialType = document.querySelector('input[name="specialType"]:checked');
+                if (!specialType) {
+                    showAlert('error', '特別休暇の種類を選択してください');
+                    return;
+                }
+                leaveSubtype = specialType.value;
+                if (specialType.value === 'その他（特別）') {
+                    const reason = document.getElementById('specialOtherReason').value.trim();
+                    if (!reason) {
+                        showAlert('error', 'その他の理由を入力してください');
+                        return;
+                    }
+                    leaveSubtype += ': ' + reason;
+                }
+            } else if (leaveType === 'その他') {
+                otherReason = document.getElementById('otherReasonText').value.trim();
+                if (!otherReason) {
+                    showAlert('error', 'その他の理由を入力してください');
+                    return;
+                }
+            }
+
+            formData = {
+                employee_num: employeeNum,
+                application_date: applicationDate,
+                leave_date_from: leaveDateFrom,
+                leave_date_to: leaveDateTo,
+                leave_type: leaveType,
+                leave_subtype: leaveSubtype,
+                substitute_work_date: substituteWorkDate,
+                other_reason: otherReason
+            };
+
+            showConfirmationScreen();
+        }
+
+        function showConfirmationScreen() {
+            const employee = employees.find(emp => emp.employee_num == formData.employee_num);
+            const employeeName = employee ? `${employee.name} (${employee.employee_num})` : formData.employee_num;
+
+            // 従業員名が空の場合は登録・印刷ボタンを無効化
+            const printBtn = document.querySelector('button[onclick="submitAndPrint()"]');
+            if (!employee || !employee.name || employee.name.trim() === '') {
+                if (printBtn) {
+                    printBtn.disabled = true;
+                    printBtn.style.opacity = '0.5';
+                    printBtn.style.cursor = 'not-allowed';
+                    printBtn.title = '従業員名が登録されていません';
+                }
+            } else {
+                if (printBtn) {
+                    printBtn.disabled = false;
+                    printBtn.style.opacity = '1';
+                    printBtn.style.cursor = 'pointer';
+                    printBtn.title = '';
+                }
+            }
+
+            document.getElementById('pageTitle').textContent = '休暇願';
+            document.getElementById('confirmEmployee').textContent = employeeName;
+            document.getElementById('confirmApplicationDate').textContent = formData.application_date;
+            document.getElementById('confirmLeavePeriod').textContent = 
+                `${formData.leave_date_from} ～ ${formData.leave_date_to}`;
+
+            let typeText = formData.leave_type;
+            let additionalInfo = '';
+
+            if (formData.leave_type === '振替休日') {
+                additionalInfo = `<div class="info-row"><div class="info-label">出勤日</div><div class="info-value">${formData.substitute_work_date}</div></div>`;
+            } else if (formData.leave_type === '特別休暇') {
+                additionalInfo = `<div class="info-row"><div class="info-label">詳細</div><div class="info-value">${formData.leave_subtype}</div></div>`;
+            } else if (formData.leave_type === 'その他') {
+                additionalInfo = `<div class="info-row"><div class="info-label">理由</div><div class="info-value">${formData.other_reason}</div></div>`;
+            }
+
+            document.getElementById('confirmLeaveType').textContent = typeText;
+            document.getElementById('confirmAdditionalInfo').innerHTML = additionalInfo;
+
+            document.getElementById('inputScreen').classList.add('hidden');
+            document.getElementById('confirmationScreen').style.display = 'block';
+            document.getElementById('backLink').style.display = 'none';
+        }
+
+        function backToInput() {
+            document.getElementById('confirmationScreen').style.display = 'none';
+            document.getElementById('inputScreen').classList.remove('hidden');
+            document.getElementById('backLink').style.display = 'inline-block';
+        }
+
+        async function submitAndPrint() {
+            // 従業員名のチェック
+            const employee = employees.find(emp => emp.employee_num == formData.employee_num);
+            if (!employee || !employee.name || employee.name.trim() === '') {
+                showAlert('error', '従業員名が登録されていません。従業員マスタで従業員名を登録してください。');
+                // 登録・印刷ボタンを無効化
+                const printBtn = document.querySelector('button[onclick="submitAndPrint()"]');
+                if (printBtn) {
+                    printBtn.disabled = true;
+                    printBtn.style.opacity = '0.5';
+                    printBtn.style.cursor = 'not-allowed';
+                }
+                return;
+            }
+
+            try {
+                // 1. データベースに登録
+                const response = await fetch('/api/leave', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                if (result.status !== 'success') {
+                    showAlert('error', result.message || '申請の送信に失敗しました');
+                    return;
+                }
+
+                // 2. PDF保存
+                const confirmationHTML = document.querySelector('.container').outerHTML;
+                const employeeName = employee.name;
+                
+                await fetch('/api/leave/save_pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html_content: confirmationHTML,
+                        employee_num: formData.employee_num,
+                        employee_name: employeeName,
+                        leave_date: formData.leave_date_from
+                    })
+                });
+
+                // 3. 印刷確認
+                showAlert('success', '登録が完了しました。');
+                setTimeout(() => {
+                    if (confirm('登録が完了しました。\n\n印刷プレビューを表示します。\n印刷物が不要の場合は「キャンセル」を押してください。')) {
+                        window.print();
+                        setTimeout(() => { window.location.href = '/'; }, 1000);
+                    } else {
+                        window.location.href = '/';
+                    }
+                }, 500);
+
+            } catch (error) {
+                console.error('エラー:', error);
+                showAlert('error', 'サーバーエラーが発生しました');
+            }
+        }
+
+        function showAlert(type, message) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            window.scrollTo(0, 0);
+            setTimeout(() => { alert.style.display = 'none'; }, 5000);
+        }
+    </script>
+</body>
+</html>
+

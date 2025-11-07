@@ -10,6 +10,10 @@ from datetime import datetime, date, timedelta
 
 from config import Config
 
+def get_database_connection():
+    """データベース接続を取得（共通関数）"""
+    return sqlite3.connect(Config.DATABASE_PATH)
+
 def check_duplicate_attendance(idm, timestamp, terminal_id, threshold_seconds=None):
     """
     チャタリング防止: 重複打刻をチェック
@@ -102,28 +106,17 @@ def calculate_date_range(search_month):
 
 def validate_employee_id(employee_id):
     """従業員IDのバリデーション"""
-    print(f"[DEBUG] validate_employee_id called with: '{employee_id}'")
-    
     if not employee_id or not employee_id.strip():
-        print(f"[DEBUG] Employee ID is empty or whitespace")
         return False, "従業員IDが指定されていません"
     
-    # 基本的なフォーマットチェック（設定から取得）
     employee_id = employee_id.strip()
-    print(f"[DEBUG] Employee ID after strip: '{employee_id}'")
-    print(f"[DEBUG] Employee ID length: {len(employee_id)}")
-    print(f"[DEBUG] Min length: {Config.EMPLOYEE_ID_MIN_LENGTH}")
-    print(f"[DEBUG] Max length: {Config.EMPLOYEE_ID_MAX_LENGTH}")
     
     if len(employee_id) < Config.EMPLOYEE_ID_MIN_LENGTH:
-        print(f"[DEBUG] Employee ID too short")
         return False, f"従業員IDは{Config.EMPLOYEE_ID_MIN_LENGTH}文字以上で入力してください"
     
     if len(employee_id) > Config.EMPLOYEE_ID_MAX_LENGTH:
-        print(f"[DEBUG] Employee ID too long")
         return False, f"従業員IDは{Config.EMPLOYEE_ID_MAX_LENGTH}文字以下で入力してください"
     
-    print(f"[DEBUG] Employee ID validation passed")
     return True, employee_id
 
 def validate_search_month(search_month):
@@ -172,8 +165,149 @@ def format_response(status, data=None, message=None, **kwargs):
     return response
 
 def safe_int(value, default=0):
-    """安全に整数に変換"""
+    """
+    安全に整数に変換
+    
+    Args:
+        value: 変換する値
+        default: 変換失敗時のデフォルト値
+    
+    Returns:
+        int or default: 変換結果
+    """
     try:
+        if value is None:
+            return default
         return int(value)
     except (TypeError, ValueError):
         return default
+
+def calculate_time_diff_minutes(time1_str, time2_str):
+    """
+    2つの時刻（HH:MM形式）の差異を分単位で計算
+    
+    Args:
+        time1_str: 時刻1 (HH:MM形式)
+        time2_str: 時刻2 (HH:MM形式)
+    
+    Returns:
+        差異（分）、time1が早い場合は負の値、time2が早い場合は正の値
+    """
+    try:
+        if not time1_str or not time2_str:
+            return None
+        
+        # HH:MM形式を分に変換
+        def time_to_minutes(time_str):
+            parts = time_str.split(':')
+            if len(parts) >= 2:
+                return int(parts[0]) * 60 + int(parts[1])
+            return None
+        
+        minutes1 = time_to_minutes(time1_str)
+        minutes2 = time_to_minutes(time2_str)
+        
+        if minutes1 is None or minutes2 is None:
+            return None
+        
+        return minutes2 - minutes1
+        
+    except:
+        return None
+
+def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, employee_name='', additional_css=''):
+    """
+    HTMLコンテンツからPDFを生成して保存（共通関数）
+    
+    Args:
+        html_content: HTMLコンテンツ
+        filename_prefix: ファイル名のプレフィックス（例: '時間外'、'休暇願'）
+        employee_num: 従業員番号
+        date_str: 日付文字列（YYYY-MM-DD形式）
+        employee_name: 従業員名（オプション）
+        additional_css: 追加のCSS（オプション）
+    
+    Returns:
+        dict: {'success': bool, 'filename': str, 'path': str, 'message': str}
+    """
+    import os
+    import re
+    from datetime import datetime
+    
+    try:
+        # PDFフォルダのパスを取得（設定から）
+        pdf_dir = Config.PDF_SAVE_DIR
+        
+        # Docker環境の場合は相対パスを絶対パスに変換
+        if not os.path.isabs(pdf_dir):
+            # 相対パスの場合は、データベースパスと同じディレクトリのPDFフォルダを使用
+            pdf_dir = os.path.join(os.path.dirname(Config.DATABASE_PATH), 'PDF')
+        
+        # フォルダが存在しない場合は作成
+        os.makedirs(pdf_dir, exist_ok=True)
+        
+        # ファイル名に使用できない文字を除去（Windowsのファイル名に使用できない文字）
+        safe_employee_name = ''
+        if employee_name:
+            # ファイル名に使用できない文字を除去: < > : " / \ | ? *
+            safe_employee_name = re.sub(r'[<>:"/\\|?*]', '', employee_name)
+            safe_employee_name = safe_employee_name.strip()
+        
+        # ファイル名を生成（「休暇願」または「時間外」+ 従業員名 + 社員番号 + 日付）
+        date_str_clean = date_str.replace('-', '')
+        if safe_employee_name:
+            filename = f'{filename_prefix}{safe_employee_name}{employee_num}{date_str_clean}.pdf'
+        else:
+            filename = f'{filename_prefix}{employee_num}{date_str_clean}.pdf'
+        pdf_path = os.path.join(pdf_dir, filename)
+        
+        # weasyprint を使用してPDF生成
+        try:
+            from weasyprint import HTML, CSS
+            from weasyprint.text.fonts import FontConfiguration
+            
+            font_config = FontConfiguration()
+            base_css = '''
+                @page { size: A4; margin: 15mm; }
+                body { font-family: "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }
+                .container { border: 2px solid #000; padding: 20mm; }
+                h1 { font-size: 20pt; text-align: center; border-bottom: 3px double #000; padding-bottom: 10pt; margin-bottom: 20pt; }
+                .confirmation-section { border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; }
+                .confirmation-section h3 { font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 5pt; margin-bottom: 10pt; }
+                .back-link, .button-group, .subtitle, #alert { display: none; }
+            '''
+            css = CSS(string=base_css + additional_css, font_config=font_config)
+            
+            HTML(string=html_content).write_pdf(pdf_path, stylesheets=[css], font_config=font_config)
+            print(f"[PDF保存] {filename} を {pdf_dir} に保存しました")
+            return {
+                'success': True,
+                'filename': filename,
+                'path': pdf_path,
+                'message': f'PDFを保存しました: {filename}'
+            }
+            
+        except ImportError:
+            # weasyprint が利用できない場合は、HTMLとして保存
+            txt_filename = filename.replace('.pdf', '.html')
+            txt_path = os.path.join(pdf_dir, txt_filename)
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            print(f"[HTML保存] {txt_filename}")
+            return {
+                'success': True,
+                'filename': txt_filename,
+                'path': txt_path,
+                'message': f'HTMLファイルとして保存しました: {txt_filename}'
+            }
+        
+    except Exception as e:
+        print(f"[エラー] PDF保存エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'filename': None,
+            'path': None,
+            'message': f'エラー: {str(e)}'
+        }

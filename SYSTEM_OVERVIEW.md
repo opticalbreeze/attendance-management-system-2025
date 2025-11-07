@@ -1,458 +1,398 @@
-# 打刻システム - システム概要
+# 📊 システム概要
 
-## 🎯 システム全体像
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                    打刻システム全体構成                          │
-└────────────────────────────────────────────────────────────────┘
-
-クライアント側（複数台可能）            サーバー側（1台）
-┌─────────────────────┐               ┌──────────────────────┐
-│  カードリーダー       │  WiFi/LAN    │  Flask Webサーバー   │
-│  + Python Client    │ ─────────→   │  (192.168.1.31:5000) │
-│                     │               │                      │
-│  • IDm読み取り       │ ←─────────   │  • データ受信        │
-│  • 打刻時刻記録     │  レスポンス    │  • DB保存           │
-│  • MACアドレス取得  │               │  • Web検索画面      │
-│  • サーバー送信     │               │                      │
-│                     │               │  SQLiteデータベース  │
-│  送信失敗時:         │               │  ├─ IDm             │
-│  ├─ ローカルDB保存  │               │  ├─ 打刻時刻        │
-│  └─ 10分後に再送信  │               │  ├─ 端末ID          │
-│                     │               │  └─ 受信時刻        │
-└─────────────────────┘               └──────────────────────┘
-
-ブラウザからアクセス
-┌─────────────────────┐
-│  http://192.168.1.31:5000           │
-│  ├─ トップページ: 統計情報          │
-│  └─ 検索ページ: IDm検索・CSV出力    │
-└─────────────────────┘
-```
-
-## 📁 ファイル構成
-
-### クライアント側ファイル
-
-```
-プロジェクトフォルダ/
-│
-├─ client_card_reader.py          ★ メインプログラム
-│   ├─ カードリーダー制御
-│   ├─ サーバー送信機能
-│   ├─ ローカルキャッシュ管理
-│   └─ 自動リトライ機能（10分間隔）
-│
-├─ client_config_gui.py            ★ 設定GUI
-│   ├─ サーバーIP設定
-│   ├─ ポート設定
-│   ├─ 接続テスト機能
-│   └─ クライアント起動機能
-│
-├─ start_client.bat                起動バッチファイル
-├─ start_client_config.bat         設定バッチファイル
-│
-├─ client_config.json              設定ファイル（自動生成）
-│   └─ { "server_url": "http://192.168.1.31:5000" }
-│
-├─ local_cache.db                  ローカルキャッシュDB（自動生成）
-│   └─ 送信失敗時のデータを一時保存
-│
-└─ requirements.txt                依存パッケージ
-    ├─ pyscard
-    ├─ flask>=2.0.0
-    └─ requests>=2.25.0
-```
-
-### サーバー側ファイル
-
-```
-attend_server/
-│
-├─ server/                          # サーバー側プログラム
-│   ├─ server.py                    ★ Flaskサーバー
-│   │   ├─ API: /api/health         (ヘルスチェック)
-│   │   ├─ API: /api/attendance     (打刻データ受信)
-│   │   ├─ API: /api/search         (データ検索)
-│   │   ├─ API: /api/stats          (統計情報)
-│   │   └─ Web: /, /search          (Web画面)
-│   │
-│   ├─ database.py                  # データベース管理
-│   ├─ api.py                       # REST API エンドポイント
-│   ├─ utils.py                     # ユーティリティ関数
-│   ├─ config.py                    # 設定管理モジュール
-│   │
-│   ├─ start_server.bat             # 起動バッチファイル
-│   ├─ start_docker.bat             # Docker起動バッチファイル
-│   │
-│   ├─ requirements_server.txt      # 依存パッケージ
-│   │   └─ flask>=2.0.0
-│   │
-│   ├─ docker-compose.yml           # Docker構成
-│   ├─ Dockerfile                   # Dockerイメージ
-│   │
-│   ├─ templates/                   # HTMLテンプレート
-│   │   ├─ index.html               (トップページ)
-│   │   └─ search.html              (検索ページ)
-│   │
-│   └─ data/                        # データ保存ディレクトリ
-│       └─ attendance.db            # SQLiteデータベース（自動生成）
-│           └─ テーブル: attendance
-│               ├─ id (主キー)
-│               ├─ idm (カードID)
-│               ├─ timestamp (打刻時刻)
-│               ├─ terminal_id (端末ID/MACアドレス)
-│               └─ received_at (受信時刻)
-│
-├─ docker-compose.yml               # Docker構成（ルート版）
-└─ start_docker.bat                 # Docker起動（ルート版）
-```
-
-### ドキュメント
-
-```
-├─ README_ATTENDANCE.md            詳細な説明書
-├─ SETUP_GUIDE.md                  セットアップガイド
-└─ SYSTEM_OVERVIEW.md              このファイル
-```
-
-## 🔄 データフロー
-
-### 正常系（送信成功）
-
-```
-1. カードをかざす
-   ↓
-2. クライアントがIDmを読み取り
-   - IDm: 012E447C1234ABCD
-   - 打刻時刻: 2025-01-15T09:30:45
-   - 端末ID: AA:BB:CC:DD:EE:FF
-   ↓
-3. サーバーにHTTP POST
-   POST http://192.168.1.31:5000/api/attendance
-   {
-     "idm": "012E447C1234ABCD",
-     "timestamp": "2025-01-15T09:30:45",
-     "terminal_id": "AA:BB:CC:DD:EE:FF"
-   }
-   ↓
-4. サーバーがSQLiteに保存
-   INSERT INTO attendance VALUES (...)
-   ↓
-5. 成功レスポンス
-   {
-     "status": "success",
-     "message": "打刻データを保存しました"
-   }
-   ↓
-6. クライアント側で成功表示
-   [送信成功] サーバーレスポンス: 打刻データを保存しました
-```
-
-### 異常系（送信失敗）
-
-```
-1. カードをかざす
-   ↓
-2. クライアントがIDmを読み取り
-   ↓
-3. サーバーへの送信試行
-   POST http://192.168.1.31:5000/api/attendance
-   ↓
-4. ❌ 接続エラー
-   - サーバーがダウン
-   - ネットワーク切断
-   - タイムアウト
-   ↓
-5. ローカルDB (local_cache.db) に保存
-   INSERT INTO pending_records VALUES (...)
-   [ローカル保存] IDm: 012E447C1234ABCD
-   ↓
-6. バックグラウンドで10分待機
-   ↓
-7. 10分後に自動再送信
-   ↓
-8. 成功 → local_cache.db から削除
-   失敗 → リトライカウント+1、次の10分後に再試行
-```
-
-## 🌐 API仕様
-
-### 1. ヘルスチェック
-
-**用途:** サーバー稼働確認、接続テスト
-
-```http
-GET /api/health
-```
-
-**レスポンス:**
-```json
-{
-  "status": "ok",
-  "message": "サーバーは正常に動作しています",
-  "timestamp": "2025-01-15T09:30:45"
-}
-```
-
-### 2. 打刻データ受信
-
-**用途:** クライアントから打刻データを受信
-
-```http
-POST /api/attendance
-Content-Type: application/json
-
-{
-  "idm": "012E447C1234ABCD",
-  "timestamp": "2025-01-15T09:30:45",
-  "terminal_id": "AA:BB:CC:DD:EE:FF"
-}
-```
-
-**レスポンス（成功）:**
-```json
-{
-  "status": "success",
-  "message": "打刻データを保存しました",
-  "idm": "012E447C1234ABCD"
-}
-```
-
-**レスポンス（エラー）:**
-```json
-{
-  "status": "error",
-  "message": "必須フィールドが不足しています"
-}
-```
-
-### 3. 検索API
-
-**用途:** 打刻データを検索
-
-```http
-GET /api/search?idm=012E&start_date=2025-01-01&end_date=2025-01-31&terminal_id=AA:BB&limit=100
-```
-
-**パラメータ:**
-- `idm`: カードID（部分一致）
-- `start_date`: 開始日時
-- `end_date`: 終了日時
-- `terminal_id`: 端末ID（部分一致）
-- `limit`: 最大件数（デフォルト: 100）
-
-**レスポンス:**
-```json
-{
-  "status": "success",
-  "count": 15,
-  "results": [
-    {
-      "id": 1,
-      "idm": "012E447C1234ABCD",
-      "timestamp": "2025-01-15T09:30:45",
-      "terminal_id": "AA:BB:CC:DD:EE:FF",
-      "received_at": "2025-01-15T09:30:45.123456"
-    }
-  ]
-}
-```
-
-### 4. 統計情報API
-
-**用途:** ダッシュボード表示用の統計データ
-
-```http
-GET /api/stats
-```
-
-**レスポンス:**
-```json
-{
-  "status": "success",
-  "stats": {
-    "total_records": 1234,
-    "unique_idm": 56,
-    "unique_terminals": 3,
-    "today_count": 89,
-    "latest": [
-      {
-        "idm": "012E447C1234ABCD",
-        "timestamp": "2025-01-15T09:30:45",
-        "terminal_id": "AA:BB:CC:DD:EE:FF"
-      }
-    ]
-  }
-}
-```
-
-## 🎨 Web画面
-
-### トップページ (`/`)
-
-**URL:** `http://192.168.1.31:5000/`
-
-**機能:**
-- 統計情報カード表示
-  - 総打刻数
-  - 登録カード数
-  - 端末数
-  - 今日の打刻数
-- 最新の打刻履歴（直近5件）
-- 検索ページへのリンク
-- 30秒ごとに自動更新
-
-### 検索ページ (`/search`)
-
-**URL:** `http://192.168.1.31:5000/search`
-
-**機能:**
-- 検索フォーム
-  - IDm（カードID）
-  - 開始日時
-  - 終了日時
-  - 端末ID
-- 検索結果テーブル表示
-- CSV出力機能
-- リアルタイム検索
-
-## 🔐 セキュリティ考慮事項
-
-### 現在の実装（試作版）
-
-- ✅ ローカルネットワーク内での通信を想定
-- ✅ SQLインジェクション対策（パラメータ化クエリ使用）
-- ⚠️ 認証機能なし（誰でもアクセス可能）
-- ⚠️ HTTPS未対応（HTTP通信）
-
-### 本番環境への移行時の推奨事項
-
-1. **認証の追加**
-   - Basic認証またはトークン認証
-   - ユーザー管理機能
-
-2. **HTTPS化**
-   - SSL/TLS証明書の導入
-   - 通信の暗号化
-
-3. **アクセス制御**
-   - IPアドレス制限
-   - ファイアウォール設定
-
-4. **ログ記録**
-   - アクセスログ
-   - エラーログ
-   - 監査ログ
-
-## 📊 データベース設計
-
-### attendance テーブル
-
-```sql
-CREATE TABLE attendance (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,  -- 連番ID
-    idm TEXT NOT NULL,                     -- カードID（16進数文字列）
-    timestamp TEXT NOT NULL,               -- 打刻時刻（ISO 8601形式）
-    terminal_id TEXT NOT NULL,             -- 端末ID（MACアドレス）
-    received_at TEXT NOT NULL,             -- サーバー受信時刻
-    INDEX idx_idm (idm),                   -- IDmでの検索高速化
-    INDEX idx_timestamp (timestamp),       -- 日時での検索高速化
-    INDEX idx_terminal_id (terminal_id)    -- 端末IDでの検索高速化
-);
-```
-
-**データ例:**
-```
-id  | idm              | timestamp           | terminal_id       | received_at
-----|------------------|---------------------|-------------------|--------------------
-1   | 012E447C1234ABCD | 2025-01-15T09:30:45 | AA:BB:CC:DD:EE:FF | 2025-01-15T09:30:45
-2   | 012E447C5678EFGH | 2025-01-15T09:35:20 | AA:BB:CC:DD:EE:FF | 2025-01-15T09:35:21
-3   | 012E447C1234ABCD | 2025-01-15T18:15:10 | BB:CC:DD:EE:FF:00 | 2025-01-15T18:15:10
-```
-
-## 🚀 運用シナリオ
-
-### 起動手順
-
-**毎朝の起動:**
-
-1. サーバー側
-   ```cmd
-   C:\Users\take_me_hospital\Desktop\N100\start_server.bat
-   ```
-
-2. クライアント側（各端末）
-   ```cmd
-   start_client.bat
-   ```
-
-### 日次運用
-
-```
-08:00 - システム起動
-08:30 - 出勤打刻開始
-12:00 - 昼休憩（打刻続行）
-18:00 - 退勤打刻
-18:30 - データ確認（Web画面）
-19:00 - CSV出力（必要に応じて）
-```
-
-### 週次メンテナンス
-
-```
-金曜日 18:00
-1. データベースバックアップ
-   copy attendance.db attendance_backup_20250115.db
-
-2. ログ確認
-   - エラーがないか確認
-
-3. ディスク容量確認
-   - データベースサイズ確認
-```
-
-## 🔧 拡張可能性
-
-### 将来的な機能追加案
-
-1. **複数リーダー同時接続**
-   - 現在: 1台のリーダーのみ
-   - 拡張: 複数リーダーを並列処理
-
-2. **ユーザー管理**
-   - IDmとユーザー情報の紐付け
-   - 名前、部署、役職など
-
-3. **勤怠集計機能**
-   - 出勤・退勤の自動判定
-   - 労働時間の自動計算
-   - 月次レポート生成
-
-4. **通知機能**
-   - 打刻完了時の音声通知
-   - 異常検知時のアラート
-   - メール通知
-
-5. **モバイル対応**
-   - スマホからの閲覧
-   - レスポンシブデザイン
-
-## 📝 バージョン履歴
-
-### v1.0.0 (2025-01-15)
-- ✅ 初回リリース
-- ✅ カードリーダー対応（複数メーカー）
-- ✅ サーバー送信機能
-- ✅ ローカルキャッシュ・リトライ機能
-- ✅ Web検索画面
-- ✅ CSV出力機能
+勤怠打刻システムの全体像と技術仕様をまとめています。
 
 ---
 
-**システム開発完了** 🎉
+## 🎯 システムの目的
 
-このドキュメントは、打刻システムの全体像を把握するための参照資料です。
-詳細な手順は `SETUP_GUIDE.md` を参照してください。
+NFCカードリーダーを使用した打刻データの収集・管理、勤怠チェック、時間外申告管理を行う統合システムです。
 
+---
+
+## 🏗️ システムアーキテクチャ
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    ユーザー                              │
+│                    (ブラウザ)                            │
+└───────────────────────┬─────────────────────────────────┘
+                        │ HTTP
+                        ↓
+┌─────────────────────────────────────────────────────────┐
+│               Flask Webサーバー                          │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  server.py     - メインサーバー                  │   │
+│  │  api.py        - REST API                       │   │
+│  │  database.py   - データベース操作                │   │
+│  │  overtime.py   - 時間外申告管理                  │   │
+│  │  utils.py      - ユーティリティ                  │   │
+│  │  config.py     - 設定管理                        │   │
+│  └─────────────────────────────────────────────────┘   │
+│                        │                                 │
+│                        ↓                                 │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  SQLite データベース                              │   │
+│  │  - attendance (打刻データ)                       │   │
+│  │  - employee_master (従業員マスタ)               │   │
+│  │  - attend_schedule (勤怠スケジュール)           │   │
+│  │  - overtime_applications (時間外申告)           │   │
+│  └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+                        ↑
+                        │ POST /api/attendance
+                        │
+┌─────────────────────────────────────────────────────────┐
+│              NFCクライアント                              │
+│         (Raspberry Pi / Windows)                        │
+│  - カードリーダー接続                                     │
+│  - 打刻データ送信                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 💻 技術スタック
+
+### バックエンド
+- **言語**: Python 3.11
+- **Webフレームワーク**: Flask 3.x
+- **データベース**: SQLite3
+- **コンテナ**: Docker / Docker Compose
+
+### フロントエンド
+- **HTML5** + **CSS3**
+- **JavaScript** (Vanilla JS - フレームワーク不使用)
+- **Fetch API** (非同期通信)
+
+### インフラ
+- **OS**: Windows / Linux
+- **実行環境**: Docker コンテナ
+- **データベース配置**: ホスト側（Dockerの外）
+
+---
+
+## 📋 主要機能
+
+### 1. 打刻データ管理
+
+**機能:**
+- NFCカードリーダーからの打刻データ受信
+- チャタリング防止（重複除外）
+- リアルタイム統計表示
+- 打刻履歴検索
+
+**API:**
+```
+POST /api/attendance      # 打刻データ受信
+GET  /api/stats           # 統計情報
+GET  /api/search          # データ検索
+```
+
+### 2. 勤怠チェック
+
+**機能:**
+- スケジュールと実績の差異チェック
+- 休日打刻アラート
+- 未打刻アラート
+- 時間外申告との照合
+
+**画面:**
+- `/check` - 勤怠チェック画面
+
+**API:**
+```
+GET /api/attendance_check
+```
+
+### 3. 時間外申告管理（NEW!）
+
+**機能:**
+- 時間外作業の申告（最大4件/日）
+- 内残業/外残業の自動分類
+- 深夜時間（20:00-05:00）の自動計算
+- 申告の承認・却下
+- 月次集計（前月16日〜当月15日）
+
+**画面:**
+- `/overtime` - 時間外申告
+- `/overtime/list` - 時間外一覧・承認
+
+**API:**
+```
+POST /api/overtime                  # 申告登録
+GET  /api/overtime                  # 申告取得
+POST /api/overtime/<id>/approve     # 承認
+POST /api/overtime/<id>/reject      # 却下
+GET  /api/overtime/monthly_summary  # 月次集計
+```
+
+**自動計算ロジック:**
+
+```python
+# 内残業: 勤務時間内の休憩時間を潰した作業
+if 時間外開始 >= 勤務開始 and 時間外終了 <= 勤務終了:
+    内残業
+
+# 外残業: 勤務予定外の作業
+if 時間外開始 < 勤務開始 or 時間外終了 > 勤務終了:
+    外残業
+
+# 深夜時間: 20:00-05:00
+if 時間外時間 ∩ (20:00-05:00):
+    深夜時間を計算
+```
+
+### 4. 従業員マスタ管理
+
+**機能:**
+- 従業員情報管理
+- カードIDとの紐付け
+- 24勤シフトの判定
+
+**API:**
+```
+GET /api/employees
+```
+
+---
+
+## 🗄️ データベーススキーマ
+
+### attendance（打刻データ）
+
+| カラム名 | 型 | 説明 |
+|---------|---|------|
+| id | INTEGER | 主キー |
+| idm | TEXT | カードID |
+| timestamp | TEXT | 打刻時刻 |
+| terminal_id | TEXT | 端末ID |
+| received_at | TEXT | 受信時刻 |
+
+**インデックス:**
+- `idx_idm` - IDmでの検索
+- `idx_timestamp` - 日時での検索
+- `idx_terminal_id` - 端末での検索
+
+### employee_master（従業員マスタ）
+
+| カラム名 | 型 | 説明 |
+|---------|---|------|
+| id | INTEGER | 主キー |
+| employee_num | INTEGER | 従業員番号 |
+| name | TEXT | 氏名 |
+| idm | TEXT | カードID |
+| created_at | DATETIME | 登録日時 |
+| updated_at | DATETIME | 更新日時 |
+
+### attend_schedule（勤怠スケジュール）
+
+| カラム名 | 型 | 説明 |
+|---------|---|------|
+| id | INTEGER | 主キー |
+| sheet_number | TEXT | シート番号 |
+| employee_id | TEXT | 従業員ID |
+| employee_name | TEXT | 従業員名 |
+| work_date | TEXT | 勤務日 |
+| work_type | TEXT | 勤務区分 |
+| start_time | TEXT | 開始時刻 |
+| end_time | TEXT | 終了時刻 |
+| created_at | TEXT | 登録日時 |
+| updated_at | TEXT | 更新日時 |
+
+### overtime_applications（時間外申告）
+
+| カラム名 | 型 | 説明 |
+|---------|---|------|
+| id | INTEGER | 主キー |
+| employee_num | TEXT | 従業員番号 |
+| employee_name | TEXT | 従業員名 |
+| application_date | TEXT | 申告日 |
+| work_date | TEXT | 作業日 |
+| start_time | TEXT | 開始時刻 |
+| end_time | TEXT | 終了時刻 |
+| description | TEXT | 作業内容 |
+| status | TEXT | pending/approved/rejected |
+| overtime_type | TEXT | 内残業/外残業 |
+| inner_overtime_minutes | INTEGER | 内残業時間（分） |
+| outer_overtime_minutes | INTEGER | 外残業時間（分） |
+| night_overtime_minutes | INTEGER | 深夜時間（分） |
+| approved_by | TEXT | 承認者 |
+| approved_at | TEXT | 承認日時 |
+| created_at | TEXT | 登録日時 |
+| updated_at | TEXT | 更新日時 |
+
+**インデックス:**
+- `idx_overtime_employee` - 従業員番号
+- `idx_overtime_work_date` - 作業日
+- `idx_overtime_status` - ステータス
+
+---
+
+## 🔄 データフロー
+
+### 打刻データの流れ
+
+```
+1. NFCカード読み取り
+   ↓
+2. クライアント → サーバー (POST /api/attendance)
+   {
+     "idm": "XXXXX",
+     "timestamp": "2025-11-06T09:00:00",
+     "terminal_id": "TERMINAL_01"
+   }
+   ↓
+3. チャタリング防止チェック
+   - 同じIDm + 端末で10秒以内 → 重複として除外
+   ↓
+4. データベースに保存 (attendance テーブル)
+   ↓
+5. レスポンス返却
+   {
+     "status": "success",
+     "attendance_id": 123
+   }
+```
+
+### 時間外申告の流れ
+
+```
+1. Web画面で申告入力
+   - 従業員選択
+   - 作業日・時間・内容入力
+   ↓
+2. JavaScript → サーバー (POST /api/overtime)
+   {
+     "employee_num": "2952089",
+     "work_date": "2025-11-05",
+     "overtime_entries": [
+       {
+         "start_time": "18:00",
+         "end_time": "20:00",
+         "description": "緊急対応"
+       }
+     ]
+   }
+   ↓
+3. サーバー側で自動計算
+   - スケジュールと照合
+   - 内残業/外残業を判定
+   - 深夜時間を計算
+   ↓
+4. データベースに保存（status: pending）
+   ↓
+5. 管理者が承認/却下
+   - POST /api/overtime/{id}/approve
+   - POST /api/overtime/{id}/reject
+   ↓
+6. ステータス更新（approved/rejected）
+```
+
+---
+
+## ⚙️ 設定管理
+
+### 環境変数
+
+| 変数名 | デフォルト値 | 説明 |
+|--------|------------|------|
+| SERVER_HOST | 0.0.0.0 | サーバーホスト |
+| SERVER_PORT | 5000 | ポート番号 |
+| FLASK_DEBUG | False | デバッグモード |
+| DATABASE_PATH | ../data/attendance.db | DB パス |
+| CHATTERING_THRESHOLD | 10 | チャタリング防止（秒） |
+| PAYROLL_START_DAY | 16 | 給与期間開始日 |
+| PAYROLL_END_DAY | 15 | 給与期間終了日 |
+
+### 設定クラス
+
+```python
+# server/config.py
+class Config:
+    HOST = os.environ.get('SERVER_HOST', '0.0.0.0')
+    PORT = int(os.environ.get('SERVER_PORT', '5000'))
+    DATABASE_PATH = os.environ.get('DATABASE_PATH', '../../data/attendance.db')
+    CHATTERING_THRESHOLD_SECONDS = int(os.environ.get('CHATTERING_THRESHOLD', '10'))
+    PAYROLL_START_DAY = int(os.environ.get('PAYROLL_START_DAY', '16'))
+    PAYROLL_END_DAY = int(os.environ.get('PAYROLL_END_DAY', '15'))
+```
+
+---
+
+## 🔒 セキュリティ考慮事項
+
+### 現在の実装
+
+- ✅ IP制限（設定可能）
+- ✅ チャタリング防止
+- ✅ SQLインジェクション対策（パラメータバインディング）
+- ✅ データベースをDockerの外に配置
+
+### 今後の実装（本番運用時）
+
+- 📄 管理者認証（トークンベース）
+- 📄 監査ログ
+- 📄 自動バックアップ
+- 📄 HTTPS対応
+
+詳細は **[SECURITY_IMPLEMENTATION_GUIDE.md](./SECURITY_IMPLEMENTATION_GUIDE.md)** を参照
+
+---
+
+## 📊 パフォーマンス
+
+### スケーラビリティ
+
+- **同時接続**: 100接続程度まで対応（開発サーバー）
+- **データベース**: SQLite（数万件まで高速）
+- **応答時間**: 平均50-100ms
+
+### 制限事項
+
+- SQLiteは1ライターのため、大量の同時書き込みには不向き
+- 本格的な運用にはPostgreSQL等への移行を推奨
+
+---
+
+## 🛠️ 拡張性
+
+### 追加可能な機能
+
+1. **通知機能**
+   - Discord Webhook
+   - メール通知（GAS）
+
+2. **レポート機能**
+   - 月次勤怠レポート
+   - 時間外集計レポート
+   - CSV/PDF出力
+
+3. **認証・認可**
+   - ユーザー管理
+   - ロールベースアクセス制御
+
+4. **クライアント側機能**
+   - オフライン対応
+   - 打刻時の音声通知
+   - LCD表示対応
+
+---
+
+## 📝 更新履歴
+
+### v2.0.0 (2025-11-06)
+- 時間外申告機能の追加
+- 自動分類（内残業/外残業/深夜）
+- 承認・却下ワークフロー
+- 月次集計機能
+
+### v1.0.0 (2025-10-23)
+- 初回リリース
+- 打刻データ管理
+- 勤怠チェック
+- Docker対応
+
+---
+
+**更新日**: 2025-11-06

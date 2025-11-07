@@ -11,13 +11,17 @@ RUN pip install --no-cache-dir -r requirements_server.txt
 # アプリケーションファイルをコピー
 COPY server.py .
 COPY database.py .
-COPY api.py .
 COPY utils.py .
 COPY config.py .
+COPY overtime.py .
+COPY leave_request.py .
+COPY api_attendance.py .
+COPY api_overtime.py .
+COPY api_leave.py .
 COPY templates/ templates/
 
-# データベースディレクトリの作成（永続化用）
-RUN mkdir -p /data && chmod 777 /data
+# データディレクトリの作成（マウントポイント）
+RUN mkdir -p /app/data
 
 # ポート5000を公開
 EXPOSE 5000
@@ -25,7 +29,7 @@ EXPOSE 5000
 # 環境変数
 ENV FLASK_APP=server.py
 ENV PYTHONUNBUFFERED=1
-ENV DATABASE_PATH=/data/attendance.db
+ENV DATABASE_PATH=/app/data/attendance.db
 
 # サーバー起動
 CMD ["python", "server.py"]

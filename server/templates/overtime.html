@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時間外作業申告 - 打刻システム</title>
+    <!-- html2pdf.js ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .form-section h2 {
+            color: #555;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .required {
+            color: #e74c3c;
+            margin-left: 4px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .overtime-entry {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .overtime-entry h3 {
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        .time-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+
+        /* PDF生成用のスタイル */
+        .pdf-content {
+            background: white;
+            color: #000;
+        }
+
+        .pdf-content h1 {
+            font-size: 20pt;
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 10pt;
+            margin-bottom: 15pt;
+        }
+
+        .pdf-footer {
+            text-align: right;
+            font-size: 9pt;
+            margin-top: 15pt;
+            padding-top: 10pt;
+            border-top: 1px solid #000;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        /* 確認画面用スタイル */
+        #confirmationScreen {
+            display: none;
+        }
+
+        .confirmation-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .confirmation-header h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .confirmation-message {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .confirmation-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .confirmation-section h3 {
+            color: #555;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .info-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            width: 150px;
+        }
+
+        .info-value {
+            color: #333;
+            flex: 1;
+        }
+
+        .overtime-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .overtime-item h4 {
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        /* 印刷用スタイル - モノクロビジネスライク */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                color: #000;
+            }
+
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+                padding: 20mm;
+                border: 2px solid #000;
+            }
+
+            .back-link,
+            .button-group,
+            #alert {
+                display: none !important;
+            }
+
+            h1 {
+                font-size: 20pt;
+                text-align: center;
+                border-bottom: 3px double #000;
+                padding-bottom: 10pt;
+                margin-bottom: 20pt;
+            }
+
+            .subtitle {
+                display: none;
+            }
+
+            .confirmation-section {
+                background: white;
+                border: 2px solid #000;
+                margin-bottom: 15pt;
+                page-break-inside: avoid;
+                padding: 12pt;
+            }
+
+            .confirmation-section h3 {
+                font-size: 14pt;
+                color: #000;
+                border-bottom: 2px solid #000;
+                padding-bottom: 5pt;
+                margin-bottom: 10pt;
+            }
+
+            .info-row {
+                padding: 8pt 0;
+                border-bottom: 1px solid #666;
+                font-size: 11pt;
+            }
+
+            .info-label {
+                font-weight: bold;
+                color: #000;
+                width: 120pt;
+            }
+
+            .info-value {
+                color: #000;
+            }
+
+            .overtime-item {
+                border: 1px solid #000;
+                background: white;
+                padding: 10pt;
+                margin-bottom: 10pt;
+                page-break-inside: avoid;
+            }
+
+            .overtime-item h4 {
+                font-size: 12pt;
+                color: #000;
+                border-bottom: 1px solid #000;
+                padding-bottom: 5pt;
+                margin-bottom: 8pt;
+            }
+
+            /* 印刷日時を追加 */
+            .container::after {
+                content: "印刷日時: " attr(data-print-date);
+                display: block;
+                text-align: right;
+                font-size: 9pt;
+                margin-top: 15pt;
+                padding-top: 10pt;
+                border-top: 1px solid #000;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link" id="backLink">← トップページに戻る</a>
+        
+        <h1 id="pageTitle">時間外作業申告</h1>
+        <p class="subtitle">時間外勤務の申告を行います</p>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- 入力画面 -->
+        <div id="inputScreen">
+            <form id="overtimeForm">
+                <!-- 基本情報 -->
+                <div class="form-section">
+                    <h2>📋 基本情報</h2>
+                    
+                    <div class="form-group">
+                        <label for="sectionSelect">セクション</label>
+                        <select id="sectionSelect">
+                            <option value="">すべてのセクション</option>
+                        </select>
+                        <div class="help-text">セクションで絞り込み</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employeeSelect">従業員選択<span class="required">*</span></label>
+                        <select id="employeeSelect" required>
+                            <option value="">従業員を選択してください</option>
+                        </select>
+                        <div class="help-text">申告する従業員を選択してください</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="applicationDate">申告日<span class="required">*</span></label>
+                        <input type="date" id="applicationDate" required>
+                        <div class="help-text">今日の日付が自動入力されます</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workDate">作業実施日<span class="required">*</span></label>
+                        <input type="date" id="workDate" required>
+                        <div class="help-text">時間外作業を行った日付を選択してください</div>
+                    </div>
+                </div>
+
+                <!-- 時間外作業内容（4項目） -->
+                <div class="form-section">
+                    <h2>⏱️ 時間外作業内容（最大4件まで登録可能）</h2>
+                    
+                    <div id="overtimeEntries">
+                        <!-- JavaScript で動的生成 -->
+                    </div>
+                </div>
+
+                <!-- 送信ボタン -->
+                <div class="button-group">
+                    <button type="button" class="btn-secondary" onclick="window.location.href='/'">キャンセル</button>
+                    <button type="submit" class="btn-primary">確認画面へ</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 確認画面 -->
+        <div id="confirmationScreen">
+            <!-- 基本情報 -->
+            <div class="confirmation-section">
+                <h3>基本情報</h3>
+                <div class="info-row">
+                    <div class="info-label">従業員</div>
+                    <div class="info-value" id="confirmEmployee">-</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">申告日</div>
+                    <div class="info-value" id="confirmApplicationDate">-</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">作業実施日</div>
+                    <div class="info-value" id="confirmWorkDate">-</div>
+                </div>
+            </div>
+
+            <!-- 時間外作業内容 -->
+            <div class="confirmation-section">
+                <h3>時間外作業内容</h3>
+                <div id="confirmOvertimeList">
+                    <!-- JavaScriptで動的生成 -->
+                </div>
+            </div>
+
+            <!-- ボタン -->
+            <div class="button-group">
+                <button type="button" class="btn-secondary" onclick="backToInput()">戻る</button>
+                <button type="button" class="btn-success" onclick="submitAndPrint()">登録・印刷</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 従業員データ
+        let employees = [];
+        let formData = null;
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 今日の日付を設定
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('applicationDate').value = today;
+            document.getElementById('workDate').value = today;
+
+            // 従業員リストを取得
+            await loadEmployees();
+
+            // 時間外作業入力欄を4つ生成
+            generateOvertimeEntries();
+
+            // フォーム送信イベント
+            document.getElementById('overtimeForm').addEventListener('submit', handleFormSubmit);
+            
+            // 従業員選択変更時にボタンの状態をリセット
+            document.getElementById('employeeSelect').addEventListener('change', function() {
+                const submitBtn = document.querySelector('#overtimeForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.style.opacity = '1';
+                    submitBtn.style.cursor = 'pointer';
+                }
+            });
+            
+            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('sectionSelect');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+
+        // 全従業員データを保持
+        let allEmployees = [];
+        
+        // 従業員リスト取得
+        async function loadEmployees() {
+            try {
+                const response = await fetch('/api/employees');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    allEmployees = data.data;
+                    employees = data.data;
+                    
+                    // セクション一覧を取得・設定
+                    const sectionSelect = document.getElementById('sectionSelect');
+                    const sections = [...new Set(data.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                    sections.forEach(section => {
+                        const option = document.createElement('option');
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
+                    });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                }
+            } catch (error) {
+                showAlert('error', '従業員リストの取得に失敗しました');
+            }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employeeSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const selectedSection = sectionSelect.value;
+            
+            employeeSelect.innerHTML = '<option value="">従業員を選択してください</option>';
+            
+            // セクションでフィルタリング
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            employees = filteredEmployees;
+            
+            filteredEmployees.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.employee_num;
+                option.textContent = `${emp.name} (${emp.employee_num})`;
+                employeeSelect.appendChild(option);
+            });
+        }
+        
+        // セクション変更時に従業員リストを更新
+        document.addEventListener('DOMContentLoaded', function() {
+            const sectionSelect = document.getElementById('sectionSelect');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+
+        // 時間外作業入力欄を生成
+        function generateOvertimeEntries() {
+            const container = document.getElementById('overtimeEntries');
+            
+            for (let i = 1; i <= 4; i++) {
+                const entry = document.createElement('div');
+                entry.className = 'overtime-entry';
+                entry.innerHTML = `
+                    <h3>作業 ${i}</h3>
+                    <div class="time-inputs">
+                        <div class="form-group">
+                            <label for="startTime${i}">開始時刻</label>
+                            <input type="time" id="startTime${i}" step="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="endTime${i}">終了時刻</label>
+                            <input type="time" id="endTime${i}" step="60">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="description${i}">作業内容</label>
+                        <textarea id="description${i}" placeholder="例: 緊急対応作業、イベント準備など"></textarea>
+                    </div>
+                `;
+                container.appendChild(entry);
+            }
+        }
+
+        // フォーム送信処理（確認画面へ）
+        function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const employeeNum = document.getElementById('employeeSelect').value;
+            const applicationDate = document.getElementById('applicationDate').value;
+            const workDate = document.getElementById('workDate').value;
+
+            if (!employeeNum) {
+                showAlert('error', '従業員を選択してください');
+                return;
+            }
+
+            // 従業員名のチェック
+            const employee = employees.find(emp => emp.employee_num == employeeNum);
+            if (!employee || !employee.name || employee.name.trim() === '') {
+                showAlert('error', '従業員名が登録されていません。従業員マスタで従業員名を登録してください。');
+                // 確認画面へのボタンを無効化
+                const submitBtn = document.querySelector('#overtimeForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.style.opacity = '0.5';
+                    submitBtn.style.cursor = 'not-allowed';
+                }
+                return;
+            }
+
+            // 時間外作業データを収集
+            const overtimeEntries = [];
+            for (let i = 1; i <= 4; i++) {
+                const startTime = document.getElementById(`startTime${i}`).value;
+                const endTime = document.getElementById(`endTime${i}`).value;
+                const description = document.getElementById(`description${i}`).value;
+
+                // 開始時刻と終了時刻が両方入力されている場合のみ追加
+                if (startTime && endTime) {
+                    overtimeEntries.push({
+                        start_time: startTime,
+                        end_time: endTime,
+                        description: description || ''
+                    });
+                }
+            }
+
+            if (overtimeEntries.length === 0) {
+                showAlert('error', '少なくとも1つの時間外作業を入力してください');
+                return;
+            }
+
+            // フォームデータを保存
+            formData = {
+                employee_num: employeeNum,
+                application_date: applicationDate,
+                work_date: workDate,
+                overtime_entries: overtimeEntries
+            };
+
+            // 確認画面を表示
+            showConfirmationScreen();
+        }
+
+        // 確認画面を表示
+        function showConfirmationScreen() {
+            // 従業員情報を取得
+            const employee = employees.find(emp => emp.employee_num == formData.employee_num);
+            const employeeName = employee ? `${employee.name} (${employee.employee_num})` : formData.employee_num;
+            
+            // 従業員名が空の場合は登録・印刷ボタンを無効化
+            const printBtn = document.querySelector('button[onclick="submitAndPrint()"]');
+            if (!employee || !employee.name || employee.name.trim() === '') {
+                if (printBtn) {
+                    printBtn.disabled = true;
+                    printBtn.style.opacity = '0.5';
+                    printBtn.style.cursor = 'not-allowed';
+                    printBtn.title = '従業員名が登録されていません';
+                }
+            } else {
+                if (printBtn) {
+                    printBtn.disabled = false;
+                    printBtn.style.opacity = '1';
+                    printBtn.style.cursor = 'pointer';
+                    printBtn.title = '';
+                }
+            }
+
+            // タイトルを確認画面用に変更
+            document.getElementById('pageTitle').textContent = '時間外作業申告書';
+
+            // 確認画面に情報を表示
+            document.getElementById('confirmEmployee').textContent = employeeName;
+            document.getElementById('confirmApplicationDate').textContent = formData.application_date;
+            document.getElementById('confirmWorkDate').textContent = formData.work_date;
+
+            // 時間外作業リストを生成
+            const overtimeList = document.getElementById('confirmOvertimeList');
+            overtimeList.innerHTML = '';
+
+            formData.overtime_entries.forEach((entry, index) => {
+                const item = document.createElement('div');
+                item.className = 'overtime-item';
+                
+                const duration = calculateDuration(entry.start_time, entry.end_time);
+                
+                item.innerHTML = `
+                    <h4>作業 ${index + 1}</h4>
+                    <div class="info-row">
+                        <div class="info-label">時間</div>
+                        <div class="info-value">${entry.start_time} - ${entry.end_time} （${duration}）</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">作業内容</div>
+                        <div class="info-value">${entry.description || '（未入力）'}</div>
+                    </div>
+                `;
+                overtimeList.appendChild(item);
+            });
+
+            // 画面を切り替え
+            document.getElementById('inputScreen').classList.add('hidden');
+            document.getElementById('confirmationScreen').style.display = 'block';
+            
+            // トップに戻るリンクを一時的に非表示
+            document.getElementById('backLink').style.display = 'none';
+        }
+
+        // 時間の長さを計算
+        function calculateDuration(startTime, endTime) {
+            const [startH, startM] = startTime.split(':').map(Number);
+            const [endH, endM] = endTime.split(':').map(Number);
+            
+            let minutes = (endH * 60 + endM) - (startH * 60 + startM);
+            if (minutes < 0) minutes += 24 * 60; // 日をまたぐ場合
+            
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            
+            return `${hours}時間${mins > 0 ? mins + '分' : ''}`;
+        }
+
+        // 入力画面に戻る
+        function backToInput() {
+            document.getElementById('confirmationScreen').style.display = 'none';
+            document.getElementById('inputScreen').classList.remove('hidden');
+            document.getElementById('backLink').style.display = 'inline-block';
+            // タイトルを元に戻す
+            document.getElementById('pageTitle').textContent = '時間外作業申告';
+        }
+
+        // 登録とPDF保存と印刷を同時実行
+        async function submitAndPrint() {
+            // 従業員名のチェック
+            const employee = employees.find(emp => emp.employee_num == formData.employee_num);
+            if (!employee || !employee.name || employee.name.trim() === '') {
+                showAlert('error', '従業員名が登録されていません。従業員マスタで従業員名を登録してください。');
+                // 登録・印刷ボタンを無効化
+                const printBtn = document.querySelector('button[onclick="submitAndPrint()"]');
+                if (printBtn) {
+                    printBtn.disabled = true;
+                    printBtn.style.opacity = '0.5';
+                    printBtn.style.cursor = 'not-allowed';
+                }
+                return;
+            }
+
+            try {
+                // 1. データベースに登録
+                const response = await fetch('/api/overtime', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.status !== 'success') {
+                    showAlert('error', result.message || '申告の送信に失敗しました');
+                    return;
+                }
+
+                // 2. 確認画面のHTMLを取得してサーバーに送信（PDF保存用）
+                const confirmationHTML = document.querySelector('.container').outerHTML;
+                const employeeName = employee.name;
+                
+                await fetch('/api/overtime/save_pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        html_content: confirmationHTML,
+                        employee_num: formData.employee_num,
+                        employee_name: employeeName,
+                        work_date: formData.work_date
+                    })
+                });
+
+                // 3. 登録完了メッセージとダイアログを表示
+                showAlert('success', '登録が完了しました。');
+                
+                // 印刷確認ダイアログを表示
+                setTimeout(() => {
+                    // カスタムダイアログ的なアラート表示
+                    if (confirm('登録が完了しました。\n\n印刷プレビューを表示します。\n印刷物が不要の場合は「キャンセル」を押してください。')) {
+                        // OKを押した場合、印刷プレビューを表示
+                        window.print();
+                        // 印刷後、トップページに戻る
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1000);
+                    } else {
+                        // キャンセルを押した場合、そのままトップページに戻る
+                        window.location.href = '/';
+                    }
+                }, 500);
+
+            } catch (error) {
+                console.error('エラー:', error);
+                showAlert('error', 'サーバーエラーが発生しました');
+            }
+        }
+
+        // 実際に送信（後方互換性のため残す）
+        async function submitForm() {
+            try {
+                const response = await fetch('/api/overtime', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', '時間外作業申告を送信しました');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+                } else {
+                    showAlert('error', result.message || '申告の送信に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        // アラート表示
+        function showAlert(type, message) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+
+            // スクロールをトップに
+            window.scrollTo(0, 0);
+
+            // 5秒後に自動で消す
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

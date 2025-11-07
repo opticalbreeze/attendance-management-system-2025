@@ -105,6 +105,16 @@
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
         
+        .btn-leave {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: white;
+        }
+        
+        .btn-leave:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(86, 171, 47, 0.4);
+        }
+        
         .recent-activity {
             background: #f8f9fa;
             padding: 25px;
@@ -186,6 +196,18 @@
         <div class="buttons">
             <a href="/search" class="btn btn-primary">🔍 打刻データを検索</a>
             <a href="/check" class="btn btn-primary">✅ 勤怠チェック</a>
+        </div>
+        
+        <div class="buttons">
+            <a href="/overtime" class="btn btn-primary">⏰ 時間外作業申告</a>
+            <a href="/overtime/check" class="btn btn-primary">👤 時間外確認（個人）</a>
+            <a href="/overtime/list" class="btn btn-primary">📋 時間外一覧（管理）</a>
+        </div>
+        
+        <div class="buttons">
+            <a href="/leave" class="btn btn-leave">📄 休暇願申請</a>
+            <a href="/leave/check" class="btn btn-leave">👤 休暇願確認（個人）</a>
+            <a href="/leave/list" class="btn btn-leave">📋 休暇願一覧（管理）</a>
         </div>
         
         <div class="recent-activity">

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>休暇願確認（個人用） - 打刻システム</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .search-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .search-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        label {
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .required { color: #e74c3c; margin-left: 4px; }
+        input, select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .summary-card.green { background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%); }
+        .summary-card.orange { background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%); }
+        .summary-card.blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .summary-number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }
+        .summary-label { font-size: 0.9em; opacity: 0.9; }
+        .table-container { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        thead { background: #f8f9fa; }
+        th {
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        tbody tr:hover { background: #f8f9fa; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .no-data { text-align: center; padding: 40px; color: #999; font-size: 16px; }
+        .help-text { font-size: 12px; color: #6c757d; margin-top: 5px; }
+        .employee-info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .employee-info h3 { color: #333; font-size: 18px; margin-bottom: 5px; }
+        .employee-info p { color: #666; font-size: 14px; }
+        .time-info { font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← トップページに戻る</a>
+        
+        <h1>📋 休暇願確認（個人用）</h1>
+        <p class="subtitle">従業員別の休暇申請状況を確認できます</p>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- 検索フォーム -->
+        <div class="search-section">
+            <div class="search-form">
+                <div class="form-group">
+                    <label for="sectionSelect">セクション</label>
+                    <select id="sectionSelect">
+                        <option value="">すべてのセクション</option>
+                    </select>
+                    <div class="help-text">セクションで絞り込み</div>
+                </div>
+                <div class="form-group">
+                    <label for="employeeSelect">従業員<span class="required">*</span></label>
+                    <select id="employeeSelect" required>
+                        <option value="">従業員を選択してください</option>
+                    </select>
+                    <div class="help-text">&nbsp;</div>
+                </div>
+                <div class="form-group">
+                    <label for="searchMonth">月度（給与計算期間）<span class="required">*</span></label>
+                    <input type="month" id="searchMonth" required>
+                    <div class="help-text">前月16日〜当月15日の期間</div>
+                </div>
+                <div class="form-group">
+                    <label for="statusFilter">ステータス</label>
+                    <select id="statusFilter">
+                        <option value="">すべて</option>
+                        <option value="pending">承認待ち</option>
+                        <option value="approved">承認済み</option>
+                        <option value="rejected">却下</option>
+                    </select>
+                    <div class="help-text">&nbsp;</div>
+                </div>
+                <button class="btn-primary" onclick="searchLeaveRequests()">🔍 検索</button>
+            </div>
+        </div>
+
+        <!-- 従業員情報 -->
+        <div id="employeeInfo" class="employee-info">
+            <h3 id="employeeName">-</h3>
+            <p id="employeeNumber">従業員番号: -</p>
+        </div>
+
+        <!-- 集計サマリー -->
+        <div id="summarySection" style="display: none;">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-number" id="totalCount">0</div>
+                    <div class="summary-label">申請件数</div>
+                </div>
+                <div class="summary-card green">
+                    <div class="summary-number" id="totalDays">0</div>
+                    <div class="summary-label">合計日数</div>
+                </div>
+                <div class="summary-card orange">
+                    <div class="summary-number" id="pendingCount">0</div>
+                    <div class="summary-label">承認待ち</div>
+                </div>
+                <div class="summary-card blue">
+                    <div class="summary-number" id="approvedCount">0</div>
+                    <div class="summary-label">承認済み</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 一覧テーブル -->
+        <div class="table-container">
+            <table id="leaveTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>休暇種類</th>
+                        <th>休暇期間</th>
+                        <th>日数</th>
+                        <th>詳細</th>
+                        <th>ステータス</th>
+                        <th>申請日</th>
+                    </tr>
+                </thead>
+                <tbody id="leaveTableBody">
+                    <tr>
+                        <td colspan="7" class="loading">従業員と月度を選択して検索してください</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let employees = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const today = new Date();
+            const currentMonth = today.toISOString().slice(0, 7);
+            document.getElementById('searchMonth').value = currentMonth;
+
+            await loadEmployees();
+        });
+
+        // 全従業員データを保持
+        let allEmployees = [];
+        
+        async function loadEmployees() {
+            try {
+                const response = await fetch('/api/employees');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    allEmployees = data.data;
+                    employees = data.data;
+                    
+                    // セクション一覧を取得・設定
+                    const sectionSelect = document.getElementById('sectionSelect');
+                    const sections = [...new Set(data.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                    sections.forEach(section => {
+                        const option = document.createElement('option');
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
+                    });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                }
+            } catch (error) {
+                showAlert('error', '従業員リストの取得に失敗しました');
+                console.error(error);
+            }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employeeSelect');
+            const sectionSelect = document.getElementById('sectionSelect');
+            const selectedSection = sectionSelect.value;
+            
+            employeeSelect.innerHTML = '<option value="">従業員を選択してください</option>';
+            
+            // セクションでフィルタリング
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            employees = filteredEmployees;
+            
+            filteredEmployees.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.employee_num;
+                option.textContent = `${emp.name} (${emp.employee_num})`;
+                employeeSelect.appendChild(option);
+            });
+        }
+        
+        // セクション変更時に従業員リストを更新
+        document.addEventListener('DOMContentLoaded', function() {
+            const sectionSelect = document.getElementById('sectionSelect');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+
+        async function searchLeaveRequests() {
+            const employeeNum = document.getElementById('employeeSelect').value;
+            const searchMonth = document.getElementById('searchMonth').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            if (!employeeNum) {
+                showAlert('error', '従業員を選択してください');
+                return;
+            }
+
+            if (!searchMonth) {
+                showAlert('error', '月度を選択してください');
+                return;
+            }
+
+            const selectedEmployee = employees.find(emp => emp.employee_num == employeeNum);
+            if (selectedEmployee) {
+                document.getElementById('employeeName').textContent = selectedEmployee.name;
+                document.getElementById('employeeNumber').textContent = `従業員番号: ${selectedEmployee.employee_num}`;
+                document.getElementById('employeeInfo').style.display = 'block';
+            }
+
+            const tbody = document.getElementById('leaveTableBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">読み込み中...</td></tr>';
+
+            try {
+                const [year, month] = searchMonth.split('-').map(Number);
+                const startDate = new Date(year, month - 2, 16).toISOString().split('T')[0];
+                const endDate = new Date(year, month - 1, 15).toISOString().split('T')[0];
+
+                let url = `/api/leave?employee_num=${employeeNum}&limit=1000`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    const filteredData = result.data.filter(item => {
+                        return item.leave_date_from >= startDate && item.leave_date_from <= endDate;
+                    });
+
+                    displayLeaveRequests(filteredData);
+                    updateSummary(filteredData);
+                } else {
+                    showAlert('error', result.message || 'データの取得に失敗しました');
+                    tbody.innerHTML = '<tr><td colspan="7" class="no-data">データが見つかりませんでした</td></tr>';
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">エラーが発生しました</td></tr>';
+                console.error(error);
+            }
+        }
+
+        function displayLeaveRequests(data) {
+            const tbody = document.getElementById('leaveTableBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="no-data">該当する申請がありません</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                
+                const statusClass = 
+                    item.status === 'approved' ? 'status-approved' :
+                    item.status === 'rejected' ? 'status-rejected' : 'status-pending';
+                
+                const statusText =
+                    item.status === 'approved' ? '承認済み' :
+                    item.status === 'rejected' ? '却下' : '承認待ち';
+
+                const days = calculateDays(item.leave_date_from, item.leave_date_to);
+
+                let detail = '';
+                if (item.leave_subtype) {
+                    detail = item.leave_subtype;
+                } else if (item.substitute_work_date) {
+                    detail = `出勤日: ${item.substitute_work_date}`;
+                } else if (item.other_reason) {
+                    detail = item.other_reason;
+                }
+
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.leave_type}</td>
+                    <td>
+                        ${item.leave_date_from} ～ ${item.leave_date_to}
+                    </td>
+                    <td>${days}日</td>
+                    <td class="time-info">${detail || '-'}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td class="time-info">${item.application_date || '-'}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function calculateDays(from, to) {
+            const start = new Date(from);
+            const end = new Date(to);
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return diffDays;
+        }
+
+        function updateSummary(data) {
+            const summarySection = document.getElementById('summarySection');
+            summarySection.style.display = 'block';
+
+            const totalCount = data.length;
+            const pendingCount = data.filter(item => item.status === 'pending').length;
+            const approvedCount = data.filter(item => item.status === 'approved').length;
+
+            const totalDays = data.reduce((sum, item) => {
+                return sum + calculateDays(item.leave_date_from, item.leave_date_to);
+            }, 0);
+
+            document.getElementById('totalCount').textContent = `${totalCount}件`;
+            document.getElementById('totalDays').textContent = `${totalDays}日`;
+            document.getElementById('pendingCount').textContent = `${pendingCount}件`;
+            document.getElementById('approvedCount').textContent = `${approvedCount}件`;
+        }
+
+        function showAlert(type, message) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
+

@@ -10,7 +10,11 @@ from flask import Flask, render_template, make_response
 # カスタムモジュール
 from config import Config
 from database import init_database
-from api import register_api_routes
+from overtime import init_overtime_table
+from leave_request import init_leave_request_table
+from api_attendance import register_attendance_api_routes
+from api_overtime import register_overtime_api_routes
+from api_leave import register_leave_api_routes
 
 def create_app():
     """Flaskアプリケーションを作成・設定"""
@@ -19,6 +23,13 @@ def create_app():
     app.config['JSON_AS_ASCII'] = Config.JSON_AS_ASCII
     
     return app
+
+def _add_no_cache_headers(response):
+    """キャッシュ制御ヘッダーを追加（開発時のブラウザキャッシュ問題対策）"""
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 def register_web_routes(app):
     """Webページのルートを登録"""
@@ -31,22 +42,42 @@ def register_web_routes(app):
     @app.route('/search')
     def search_page():
         """検索ページ"""
-        # キャッシュ制御ヘッダーを追加（開発時のブラウザキャッシュ問題対策）
-        response = make_response(render_template('search.html'))
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
+        return _add_no_cache_headers(make_response(render_template('search.html')))
 
     @app.route('/check')
     def check_page():
         """勤怠チェックページ"""
-        # キャッシュ制御ヘッダーを追加（開発時のブラウザキャッシュ問題対策）
-        response = make_response(render_template('check.html'))
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
+        return _add_no_cache_headers(make_response(render_template('check.html')))
+
+    @app.route('/overtime')
+    def overtime_page():
+        """時間外申告ページ"""
+        return _add_no_cache_headers(make_response(render_template('overtime.html')))
+
+    @app.route('/overtime/list')
+    def overtime_list_page():
+        """時間外申告一覧ページ"""
+        return _add_no_cache_headers(make_response(render_template('overtime_list.html')))
+
+    @app.route('/overtime/check')
+    def overtime_check_page():
+        """時間外申告確認ページ（個人用）"""
+        return _add_no_cache_headers(make_response(render_template('overtime_check.html')))
+
+    @app.route('/leave')
+    def leave_page():
+        """休暇願申告ページ"""
+        return _add_no_cache_headers(make_response(render_template('leave.html')))
+
+    @app.route('/leave/check')
+    def leave_check_page():
+        """休暇願確認ページ（個人用）"""
+        return _add_no_cache_headers(make_response(render_template('leave_check.html')))
+
+    @app.route('/leave/list')
+    def leave_list_page():
+        """休暇願一覧ページ（管理用）"""
+        return _add_no_cache_headers(make_response(render_template('leave_list.html')))
 
 def print_startup_info():
     """起動時の情報を表示"""
@@ -74,6 +105,12 @@ def print_startup_info():
     print("  - トップページ:   GET  /")
     print("  - 検索ページ:     GET  /search")
     print("  - 勤怠チェック:   GET  /check")
+    print("  - 時間外申告:     GET  /overtime")
+    print("  - 時間外一覧:     GET  /overtime/list")
+    print("  - 時間外確認:     GET  /overtime/check")
+    print("  - 休暇願申告:     GET  /leave")
+    print("  - 休暇願一覧:     GET  /leave/list")
+    print("  - 休暇願確認:     GET  /leave/check")
     print()
     print("[API エンドポイント]")
     print("  - ヘルスチェック: GET  /api/health")
@@ -83,6 +120,11 @@ def print_startup_info():
     print("  - 重複削除:       POST /api/cleanup_duplicates")
     print("  - サンプルデータ: POST /api/sample_data")
     print("  - 勤怠チェック:   GET  /api/attendance_check")
+    print("  - 時間外申告:     POST /api/overtime")
+    print("  - 時間外取得:     GET  /api/overtime")
+    print("  - 時間外承認:     POST /api/overtime/<id>/approve")
+    print("  - 時間外却下:     POST /api/overtime/<id>/reject")
+    print("  - 月次集計:       GET  /api/overtime/monthly_summary")
     print("=" * 79)
     print()
 
@@ -93,10 +135,14 @@ def main():
     
     # データベース初期化
     init_database()
+    init_overtime_table()
+    init_leave_request_table()
     
     # ルート登録
     register_web_routes(app)
-    register_api_routes(app)
+    register_attendance_api_routes(app)
+    register_overtime_api_routes(app)
+    register_leave_api_routes(app)
     
     # 起動情報表示
     print_startup_info()

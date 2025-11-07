@@ -5,16 +5,20 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      # データベースを永続化
-      - ./data:/data
+      # データベースをDockerの外（attendance/dataフォルダ）に永続化
+      - ../../data:/app/data
       # テンプレートファイルを最新に保つ
       - ./templates:/app/templates
       # サーバーコード（リファクタリング版）を最新に保つ
       - ./server.py:/app/server.py
       - ./database.py:/app/database.py
-      - ./api.py:/app/api.py
+      - ./api_attendance.py:/app/api_attendance.py
+      - ./api_overtime.py:/app/api_overtime.py
+      - ./api_leave.py:/app/api_leave.py
       - ./utils.py:/app/utils.py
       - ./config.py:/app/config.py
+      - ./overtime.py:/app/overtime.py
+      - ./leave_request.py:/app/leave_request.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定
@@ -22,8 +26,10 @@ services:
       - SERVER_PORT=5000
       - FLASK_DEBUG=False
       - FLASK_ENV=docker
-      # データベース設定
-      - DATABASE_PATH=/data/attendance.db
+      # データベース設定（ホストのdataディレクトリにマウント）
+      - DATABASE_PATH=/app/data/attendance.db
+      # PDF保存先設定（ホストのdata/PDFディレクトリにマウント）
+      - PDF_SAVE_DIR=/app/data/PDF
       # チャタリング防止設定
       - CHATTERING_THRESHOLD=10
       # API設定

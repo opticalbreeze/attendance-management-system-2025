@@ -320,6 +320,15 @@
             <form id="check-form">
                 <div class="form-grid">
                     <div class="form-group">
+                        <label for="section-select">セクション</label>
+                        <select id="section-select">
+                            <option value="">すべてのセクション</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            セクションで絞り込み
+                        </small>
+                    </div>
+                    <div class="form-group">
                         <label for="employee-id">従業員（必須）</label>
                         <select id="employee-id" name="employee_id" required>
                             <option value="">▼ 従業員を読み込み中...</option>
@@ -387,6 +396,9 @@
     
     <script>
         // ページ読み込み時の初期化処理
+        // 全従業員データを保持
+        let allEmployees = [];
+        
         document.addEventListener('DOMContentLoaded', async function() {
             console.log('==============================================');
             console.log('[DEBUG] 🚀 勤怠チェックページが読み込まれました');
@@ -410,10 +422,19 @@
             console.log('==============================================');
             console.log('[DEBUG] 🎯 初期化完了 - ページ準備OK');
             console.log('==============================================');
-        });        // 従業員情報を動的に読み込む
+            
+            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('section-select');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+        
+        // 従業員情報を動的に読み込む
         async function loadEmployees() {
             console.log('[DEBUG] loadEmployees called');
             const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
 
             try {
                 console.log('[DEBUG] Fetching employees from /api/employees');
@@ -423,14 +444,22 @@
                 console.log('[DEBUG] Employee API response:', result);
 
                 if (result.status === 'success' && result.data) {
-                    employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
-
-                    result.data.forEach(employee => {
+                    // 全従業員データを保存
+                    allEmployees = result.data;
+                    
+                    // セクション一覧を取得・設定
+                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                    sections.forEach(section => {
                         const option = document.createElement('option');
-                        option.value = employee.employee_num;
-                        option.textContent = `${employee.employee_num} - ${employee.name}`;
-                        employeeSelect.appendChild(option);
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
                     });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                    
                     console.log('[DEBUG] Employee options added:', result.data.length);
                 } else {
                     throw new Error(result.message || '従業員データの読み込みに失敗');
@@ -439,6 +468,29 @@
                 console.error('[DEBUG] Employee loading error:', error);
                 employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
             }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            const selectedSection = sectionSelect.value;
+            
+            employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+            
+            // セクションでフィルタリング
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            filteredEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.employee_num;
+                option.textContent = `${employee.employee_num} - ${employee.name}`;
+                employeeSelect.appendChild(option);
+            });
+            
+            console.log('[DEBUG] Employee list updated:', filteredEmployees.length, 'employees');
         }
         
         // フォーム送信
@@ -633,6 +685,12 @@
                     <td>${data.attendance_records.length}回</td>
                 `;
                 scheduleBody.appendChild(row4);
+                
+                // 時間外申告データを取得・表示
+                fetchOvertimeData(data.employee_id, data.check_date, scheduleBody);
+                
+                // 休暇願データを取得・表示
+                fetchLeaveData(data.employee_id, data.check_date, scheduleBody);
             } else {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -758,6 +816,97 @@
             });
             
             return timeSpans.join(' ');
+        }
+        
+        // 時間外申告データを取得・表示
+        async function fetchOvertimeData(employeeId, checkDate, scheduleBody) {
+            try {
+                const response = await fetch(`/api/overtime?employee_num=${employeeId}&work_date=${checkDate}`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data && result.data.length > 0) {
+                    const overtimeRow = document.createElement('tr');
+                    const overtimeList = result.data.map(ot => {
+                        const totalMin = (ot.inner_overtime_minutes || 0) + (ot.outer_overtime_minutes || 0);
+                        const hours = (totalMin / 60).toFixed(1);
+                        return `${ot.start_time}-${ot.end_time} (${hours}h)`;
+                    }).join(', ');
+                    
+                    overtimeRow.innerHTML = `
+                        <td><strong>時間外申告</strong></td>
+                        <td>-</td>
+                        <td style="color: #667eea; font-weight: 600;">${overtimeList}</td>
+                        <td>${result.data.length}件</td>
+                    `;
+                    scheduleBody.appendChild(overtimeRow);
+                    
+                    // アラート: 時間外申告があるのに打刻がない
+                    const attendanceRecords = window.currentAttendanceRecords || [];
+                    if (attendanceRecords.length === 0) {
+                        addAlert('warning', '時間外申告がありますが、打刻記録がありません', 
+                            '時間外作業を行った場合は打刻が必要です。打刻を確認してください。');
+                    }
+                }
+            } catch (error) {
+                console.error('[時間外データ取得エラー]', error);
+            }
+        }
+        
+        // 休暇願データを取得・表示
+        async function fetchLeaveData(employeeId, checkDate, scheduleBody) {
+            try {
+                const response = await fetch(`/api/leave?employee_num=${employeeId}&leave_date=${checkDate}`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data && result.data.length > 0) {
+                    const leaveRow = document.createElement('tr');
+                    const leaveList = result.data.map(leave => {
+                        let detail = leave.leave_type;
+                        if (leave.leave_subtype) detail += ` (${leave.leave_subtype})`;
+                        return detail;
+                    }).join(', ');
+                    
+                    leaveRow.innerHTML = `
+                        <td><strong>休暇願</strong></td>
+                        <td style="color: #28a745; font-weight: 600;">${leaveList}</td>
+                        <td>-</td>
+                        <td>${result.data.length}件</td>
+                    `;
+                    scheduleBody.appendChild(leaveRow);
+                    
+                    // アラート: 休暇願があるのに打刻がある
+                    const attendanceRecords = window.currentAttendanceRecords || [];
+                    if (attendanceRecords.length > 0) {
+                        const leaveTypes = result.data.map(leave => leave.leave_type).join('、');
+                        addAlert('warning', '休暇願がありますが、打刻記録があります', 
+                            `休暇種類: ${leaveTypes}。休暇中の打刻記録があるため確認が必要です。`);
+                    }
+                }
+            } catch (error) {
+                console.error('[休暇願データ取得エラー]', error);
+            }
+        }
+        
+        // アラートを追加する関数
+        function addAlert(type, message, details) {
+            const alertsContainer = document.getElementById('alerts-container');
+            
+            // 既存の「アラートはありません」メッセージを削除
+            const noAlertDiv = alertsContainer.querySelector('.no-data');
+            if (noAlertDiv) {
+                noAlertDiv.remove();
+            }
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type === 'error' ? 'error' : 'warning'}`;
+            alertDiv.innerHTML = `
+                <div class="alert-icon">${type === 'error' ? '❌' : '⚠️'}</div>
+                <div class="alert-content">
+                    <div class="alert-title">${message}</div>
+                    <div class="alert-details">${details || ''}</div>
+                </div>
+            `;
+            alertsContainer.appendChild(alertDiv);
         }
         
         // エラー表示
