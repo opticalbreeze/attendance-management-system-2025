@@ -208,6 +208,25 @@
             background: #f8d7da;
             color: #721c24;
         }
+        .status-withdrawn {
+            background: #e2e3e5;
+            color: #383d41;
+            border: 1px solid #d6d8db;
+        }
+        .btn-withdraw {
+            padding: 6px 12px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-withdraw:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
 
         .type-badge {
             display: inline-block;
@@ -382,6 +401,7 @@
                         <th>作業内容</th>
                         <th>ステータス</th>
                         <th>申告日</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="overtimeTableBody">
@@ -497,7 +517,7 @@
             }
 
             const tbody = document.getElementById('overtimeTableBody');
-            tbody.innerHTML = '<tr><td colspan="8" class="loading">読み込み中...</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="loading">読み込み中...</td></tr>';
 
             try {
                 // 月度の期間を計算（前月16日〜当月15日）
@@ -524,11 +544,11 @@
                     updateSummary(filteredData);
                 } else {
                     showAlert('error', result.message || 'データの取得に失敗しました');
-                    tbody.innerHTML = '<tr><td colspan="8" class="no-data">データが見つかりませんでした</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="no-data">データが見つかりませんでした</td></tr>';
                 }
             } catch (error) {
                 showAlert('error', 'サーバーエラーが発生しました');
-                tbody.innerHTML = '<tr><td colspan="8" class="no-data">エラーが発生しました</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="no-data">エラーが発生しました</td></tr>';
                 console.error(error);
             }
         }
@@ -538,7 +558,7 @@
             const tbody = document.getElementById('overtimeTableBody');
 
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="no-data">該当する申告がありません</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">該当する申告がありません</td></tr>';
                 return;
             }
 
@@ -553,13 +573,20 @@
 
                 const statusClass = 
                     item.status === 'approved' ? 'status-approved' :
-                    item.status === 'rejected' ? 'status-rejected' : 'status-pending';
+                    item.status === 'rejected' ? 'status-rejected' :
+                    item.status === 'withdrawn' ? 'status-withdrawn' : 'status-pending';
                 
                 const statusText =
                     item.status === 'approved' ? '承認済み' :
-                    item.status === 'rejected' ? '却下' : '承認待ち';
+                    item.status === 'rejected' ? '却下' :
+                    item.status === 'withdrawn' ? '取り下げ済み' : '承認待ち';
 
                 const typeClass = item.overtime_type === '内残業' ? 'type-inner' : 'type-outer';
+                
+                // 取り下げボタン（承認前のみ表示）
+                const withdrawButton = item.status === 'pending' 
+                    ? `<button class="btn-withdraw" onclick="withdrawOvertime(${item.id})">取り下げ</button>`
+                    : '-';
 
                 row.innerHTML = `
                     <td>${item.id}</td>
@@ -577,6 +604,7 @@
                     <td>${item.description || '-'}</td>
                     <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                     <td class="time-info">${item.application_date || '-'}</td>
+                    <td>${withdrawButton}</td>
                 `;
 
                 tbody.appendChild(row);
@@ -613,6 +641,37 @@
             setTimeout(() => {
                 alert.style.display = 'none';
             }, 5000);
+        }
+        
+        // 時間外申告を取り下げ
+        async function withdrawOvertime(overtimeId) {
+            if (!confirm('この時間外申告を取り下げますか？\n取り下げ後もデータは残りますが、承認待ちの状態から取り下げ済みに変更されます。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/overtime/${overtimeId}/withdraw`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showAlert('success', '時間外申告を取り下げました');
+                    // 検索を再実行して最新の状態を表示
+                    setTimeout(() => {
+                        searchOvertimeApplications();
+                    }, 1000);
+                } else {
+                    showAlert('error', result.message || '取り下げ処理に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
         }
     </script>
 </body>

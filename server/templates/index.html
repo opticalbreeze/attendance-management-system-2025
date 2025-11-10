@@ -37,45 +37,6 @@
             font-size: 2.5em;
         }
         
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 40px;
-            font-size: 1.1em;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .stat-number {
-            font-size: 2.5em;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            font-size: 0.9em;
-            opacity: 0.9;
-        }
-        
         .buttons {
             display: flex;
             gap: 15px;
@@ -84,15 +45,21 @@
         }
         
         .btn {
-            padding: 15px 40px;
+            padding: 12px 30px;
             border: none;
             border-radius: 50px;
-            font-size: 1.1em;
+            font-size: 0.9em;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
             text-decoration: none;
             display: inline-block;
+            line-height: 1.4;
+        }
+        
+        .btn small {
+            display: block;
+            margin-top: 4px;
         }
         
         .btn-primary {
@@ -125,7 +92,12 @@
         .recent-activity h2 {
             color: #333;
             margin-bottom: 15px;
-            font-size: 1.5em;
+            font-size: 1.2em;
+        }
+        
+        .recent-activity h2 small {
+            display: block;
+            margin-top: 5px;
         }
         
         .activity-list {
@@ -134,24 +106,26 @@
         
         .activity-item {
             background: white;
-            padding: 12px 20px;
-            margin-bottom: 10px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
             border-radius: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            font-size: 0.85em;
         }
         
         .activity-idm {
             font-weight: bold;
             color: #667eea;
             font-family: 'Courier New', monospace;
+            font-size: 0.9em;
         }
         
         .activity-time {
             color: #666;
-            font-size: 0.9em;
+            font-size: 0.85em;
         }
         
         .loading {
@@ -163,66 +137,51 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔖 打刻システム</h1>
-        <p class="subtitle">Attendance Tracking System</p>
+        <h1>🔖 打刻システム<br><small style="font-size: 0.5em; font-weight: normal;">Attendance Tracking System</small></h1>
         
-        <div class="stats-grid" id="stats">
-            <div class="stat-card">
-                <div class="stat-number" id="total-records">-</div>
-                <div class="stat-label">総打刻数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="unique-idm">-</div>
-                <div class="stat-label">登録カード数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="schedule-records">-</div>
-                <div class="stat-label">スケジュール数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="unique-employees">-</div>
-                <div class="stat-label">従業員数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="unique-terminals">-</div>
-                <div class="stat-label">端末数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="today-count">-</div>
-                <div class="stat-label">今日の打刻</div>
-            </div>
+        <div class="buttons">
+            <a href="/search" class="btn btn-primary">🔍 打刻データを検索<br><small style="font-size: 0.7em; opacity: 0.9;">Search Attendance</small></a>
+            <a href="/check" class="btn btn-primary">✅ 勤怠チェック<br><small style="font-size: 0.7em; opacity: 0.9;">Attendance Check</small></a>
         </div>
         
         <div class="buttons">
-            <a href="/search" class="btn btn-primary">🔍 打刻データを検索</a>
-            <a href="/check" class="btn btn-primary">✅ 勤怠チェック</a>
+            <a href="/overtime" class="btn btn-primary">⏰ 時間外作業申告<br><small style="font-size: 0.7em; opacity: 0.9;">Overtime Application</small></a>
+            <a href="/overtime/check" class="btn btn-primary">👤 時間外確認（個人）<br><small style="font-size: 0.7em; opacity: 0.9;">Overtime Check (Personal)</small></a>
+            <a href="/overtime/list" class="btn btn-primary">📋 時間外一覧（管理）<br><small style="font-size: 0.7em; opacity: 0.9;">Overtime List (Admin)</small></a>
         </div>
         
         <div class="buttons">
-            <a href="/overtime" class="btn btn-primary">⏰ 時間外作業申告</a>
-            <a href="/overtime/check" class="btn btn-primary">👤 時間外確認（個人）</a>
-            <a href="/overtime/list" class="btn btn-primary">📋 時間外一覧（管理）</a>
-        </div>
-        
-        <div class="buttons">
-            <a href="/leave" class="btn btn-leave">📄 休暇願申請</a>
-            <a href="/leave/check" class="btn btn-leave">👤 休暇願確認（個人）</a>
-            <a href="/leave/list" class="btn btn-leave">📋 休暇願一覧（管理）</a>
+            <a href="/leave" class="btn btn-leave">📄 休暇願申請<br><small style="font-size: 0.7em; opacity: 0.9;">Leave Request</small></a>
+            <a href="/leave/check" class="btn btn-leave">👤 休暇願確認（個人）<br><small style="font-size: 0.7em; opacity: 0.9;">Leave Check (Personal)</small></a>
+            <a href="/leave/list" class="btn btn-leave">📋 休暇願一覧（管理）<br><small style="font-size: 0.7em; opacity: 0.9;">Leave List (Admin)</small></a>
         </div>
         
         <div class="recent-activity">
-            <h2>📋 最新の打刻履歴</h2>
+            <h2 style="font-size: 1.2em;">📋 最新の打刻履歴<br><small style="font-size: 0.7em; font-weight: normal; color: #666;">Recent Attendance History</small></h2>
             <ul class="activity-list" id="recent-activity">
-                <li class="loading">読み込み中...</li>
+                <li class="loading">読み込み中...<br><small style="font-size: 0.8em; color: #999;">Loading...</small></li>
             </ul>
         </div>
     </div>
     
     <script>
-        // 統計情報を取得
-        async function loadStats() {
+        // 日時をフォーマット
+        function formatDateTime(datetime) {
+            if (!datetime) return '';
+            const dt = new Date(datetime);
+            return dt.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // 最新の打刻履歴のみを取得（統計情報は不要）
+        async function loadRecentActivity() {
             try {
-                // キャッシュ制御ヘッダー設定（AI_DEVELOPMENT_GUIDE推奨）
                 const response = await fetch('/api/stats', {
                     method: 'GET',
                     headers: {
@@ -231,37 +190,14 @@
                     }
                 });
                 
-                // HTTPエラーレスポンスの確認
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
                 const data = await response.json();
                 
-                // レスポンス構造の確認（AI_DEVELOPMENT_GUIDE推奨）
                 if (data.status === 'success') {
-                    // 直接dataプロパティを使用（stats.statsではなくdata）
                     const stats = data;
-                    
-                    // 安全なフィールドアクセス（AI_DEVELOPMENT_GUIDE推奨パターン）
-                    const safeUpdate = (elementId, value, defaultValue = '0') => {
-                        const element = document.getElementById(elementId);
-                        if (element) {
-                            element.textContent = (value || defaultValue).toLocaleString();
-                        } else {
-                            console.warn(`Element not found: ${elementId}`);
-                        }
-                    };
-                    
-                    // 統計情報を安全に表示
-                    safeUpdate('total-records', stats.total_records);
-                    safeUpdate('unique-idm', stats.unique_cards);
-                    safeUpdate('schedule-records', stats.schedule_records);
-                    safeUpdate('unique-employees', stats.unique_employees);
-                    safeUpdate('unique-terminals', stats.unique_terminals);
-                    safeUpdate('today-count', stats.today_count);
-                    
-                    // 最新の打刻履歴を安全に表示
                     const activityList = document.getElementById('recent-activity');
                     if (!activityList) {
                         console.warn('Recent activity list element not found');
@@ -284,62 +220,33 @@
                             }
                         });
                     } else {
-                        activityList.innerHTML = '<li class="loading">まだ打刻データがありません</li>';
+                        activityList.innerHTML = '<li class="loading">まだ打刻データがありません<br><small style="font-size: 0.8em; color: #999;">No attendance data yet</small></li>';
                     }
-                    
                 } else if (data.status === 'error') {
-                    // サーバーサイドエラーの表示
                     showError(data.message || 'サーバーエラーが発生しました');
-                } else {
-                    // 予期しないレスポンス形式
-                    console.warn('Unexpected response format:', data);
-                    showError('予期しないレスポンス形式です');
                 }
-                
             } catch (error) {
-                console.error('統計情報の取得エラー:', error);
-                showError(`統計情報の取得に失敗しました: ${error.message}`);
+                console.error('最新の打刻履歴の取得エラー:', error);
+                const activityList = document.getElementById('recent-activity');
+                if (activityList) {
+                    activityList.innerHTML = `<li class="error" style="color: #ff6b6b;">エラー: ${error.message}<br><small style="font-size: 0.8em;">Error: ${error.message}</small></li>`;
+                }
             }
         }
         
-        // エラー表示関数（AI_DEVELOPMENT_GUIDE推奨）
+        // エラー表示関数
         function showError(message) {
             const activityList = document.getElementById('recent-activity');
             if (activityList) {
-                activityList.innerHTML = `<li class="error" style="color: #ff6b6b;">${message}</li>`;
+                activityList.innerHTML = `<li class="error" style="color: #ff6b6b;">${message}<br><small style="font-size: 0.8em;">${message}</small></li>`;
             }
-            
-            // 統計値をエラー状態に設定
-            const errorElements = ['total-records', 'unique-idm', 'schedule-records', 
-                                  'unique-employees', 'unique-terminals', 'today-count'];
-            errorElements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.textContent = 'エラー';
-                    element.style.color = '#ff6b6b';
-                }
-            });
         }
         
-        // 日時をフォーマット
-        function formatDateTime(datetime) {
-            if (!datetime) return '';
-            const dt = new Date(datetime);
-            return dt.toLocaleString('ja-JP', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-        }
-        
-        // ページ読み込み時に統計情報を取得
-        loadStats();
+        // ページ読み込み時に最新の打刻履歴を取得
+        loadRecentActivity();
         
         // 30秒ごとに自動更新
-        setInterval(loadStats, 30000);
+        setInterval(loadRecentActivity, 30000);
     </script>
 </body>
 </html>

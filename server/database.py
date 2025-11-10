@@ -47,6 +47,9 @@ def init_database():
     # employee_masterテーブルのマイグレーション（sectionカラム追加）
     migrate_employee_master_table(cursor)
     
+    # 遅刻早退申告テーブルの作成
+    init_late_early_requests_tables(cursor)
+    
     conn.commit()
     conn.close()
     print("✅ データベース初期化完了")
@@ -114,6 +117,57 @@ def migrate_employee_master_table(cursor):
             
     except sqlite3.Error as e:
         print(f"⚠️ employee_masterテーブルのマイグレーションエラー: {e}")
+
+def init_late_early_requests_tables(cursor):
+    """
+    遅刻早退申告テーブルの初期化
+    """
+    try:
+        # 遅刻申告テーブル
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS late_arrival_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_num INTEGER NOT NULL,
+                employee_name TEXT NOT NULL,
+                request_date TEXT NOT NULL,
+                work_date TEXT NOT NULL,
+                late_minutes INTEGER NOT NULL,
+                reason TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
+        # 早退申告テーブル
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS early_leave_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_num INTEGER NOT NULL,
+                employee_name TEXT NOT NULL,
+                request_date TEXT NOT NULL,
+                work_date TEXT NOT NULL,
+                early_minutes INTEGER NOT NULL,
+                reason TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
+        # インデックス作成
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_late_employee ON late_arrival_requests(employee_num)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_late_work_date ON late_arrival_requests(work_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_late_status ON late_arrival_requests(status)")
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_early_employee ON early_leave_requests(employee_num)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_early_work_date ON early_leave_requests(work_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_early_status ON early_leave_requests(status)")
+        
+        print("✅ 遅刻早退申告テーブル初期化完了")
+        
+    except sqlite3.Error as e:
+        print(f"⚠️ 遅刻早退申告テーブルの初期化エラー: {e}")
 
 def insert_attendance(idm, timestamp, terminal_id):
     """打刻データを挿入"""
@@ -697,7 +751,33 @@ def check_attendance_vs_schedule(employee_id, check_date):
             # 休暇願の取得エラーは無視（ログに出力）
             print(f"[警告] 休暇願チェックエラー: {e}")
         
-        # 3. 出退勤時刻の差異チェック（30分以上）
+        # 3. 遅刻早退申告を取得
+        late_requests = get_late_arrival_requests(employee_num=employee_num, work_date=check_date, status='pending')
+        early_requests = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='pending')
+        
+        # 24勤や夜勤の場合、翌日の「明」の日に遅刻申告があるかチェック
+        late_minutes_adjustment = 0
+        early_minutes_adjustment = 0
+        
+        if late_requests:
+            # 承認済みの遅刻申告の合計分数を取得
+            approved_late = get_late_arrival_requests(employee_num=employee_num, work_date=check_date, status='approved')
+            late_minutes_adjustment = sum(req['late_minutes'] for req in approved_late)
+        
+        if early_requests:
+            # 承認済みの早退申告の合計分数を取得
+            approved_early = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='approved')
+            early_minutes_adjustment = sum(req['early_minutes'] for req in approved_early)
+        
+        # 24勤や夜勤の場合、翌日の「明」の日に遅刻申告があるかチェック
+        if work_type and ('24勤' in work_type or '夜勤' in work_type):
+            next_date = (datetime.strptime(check_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+            next_day_late_requests = get_late_arrival_requests(employee_num=employee_num, work_date=next_date, status='approved')
+            if next_day_late_requests:
+                # 翌日の「明」の日に遅刻申告があれば、出勤と退勤を行ったように処理
+                late_minutes_adjustment += sum(req['late_minutes'] for req in next_day_late_requests)
+        
+        # 3. 出退勤時刻の差異チェック（30分以上、遅刻早退申告を考慮）
         if result['schedule'] and result['attendance_records']:
             schedule_start = result['schedule']['start_time']
             schedule_end = result['schedule']['end_time']
@@ -706,21 +786,27 @@ def check_attendance_vs_schedule(employee_id, check_date):
             
             if schedule_start and actual_start:
                 diff_start = calculate_time_diff_minutes(schedule_start, actual_start)
-                if diff_start is not None and abs(diff_start) >= 30:
-                    alerts.append({
-                        'type': 'warning',
-                        'message': '出退勤時刻に差異あり',
-                        'details': f'出勤時刻: スケジュール {schedule_start} / 実際 {actual_start} (差異: {diff_start:+d}分)'
-                    })
+                # 遅刻申告がある場合は、その分数を引いて判定
+                if diff_start is not None:
+                    adjusted_diff_start = diff_start - late_minutes_adjustment
+                    if abs(adjusted_diff_start) >= 30:
+                        alerts.append({
+                            'type': 'warning',
+                            'message': '出退勤時刻に差異あり',
+                            'details': f'出勤時刻: スケジュール {schedule_start} / 実際 {actual_start} (差異: {diff_start:+d}分, 遅刻申告調整後: {adjusted_diff_start:+d}分)'
+                        })
             
             if schedule_end and actual_end:
                 diff_end = calculate_time_diff_minutes(schedule_end, actual_end)
-                if diff_end is not None and abs(diff_end) >= 30:
-                    alerts.append({
-                        'type': 'warning',
-                        'message': '出退勤時刻に差異あり',
-                        'details': f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分)'
-                    })
+                # 早退申告がある場合は、その分数を引いて判定
+                if diff_end is not None:
+                    adjusted_diff_end = diff_end + early_minutes_adjustment  # 早退は負の値なので加算
+                    if abs(adjusted_diff_end) >= 30:
+                        alerts.append({
+                            'type': 'warning',
+                            'message': '出退勤時刻に差異あり',
+                            'details': f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)'
+                        })
             elif schedule_end and not actual_end:
                 # 退勤スケジュールがあるのに退勤打刻がない
                 if work_type and ('24勤' not in work_type and '夜勤' not in work_type):
@@ -745,3 +831,209 @@ def check_attendance_vs_schedule(employee_id, check_date):
             'status': 'error',
             'message': f'チェックエラー: {str(e)}'
         }
+
+def insert_late_arrival_request(employee_num, employee_name, request_date, work_date, late_minutes, reason=''):
+    """
+    遅刻申告を登録
+    
+    Args:
+        employee_num: 従業員番号
+        employee_name: 従業員名
+        request_date: 申告日
+        work_date: 勤務日
+        late_minutes: 遅刻分数
+        reason: 理由
+    
+    Returns:
+        int: 登録されたIDまたはNone
+    """
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        now = datetime.now().isoformat()
+        
+        cursor.execute("""
+            INSERT INTO late_arrival_requests (
+                employee_num, employee_name, request_date, work_date,
+                late_minutes, reason, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+        """, (employee_num, employee_name, request_date, work_date, late_minutes, reason, now, now))
+        
+        request_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"[遅刻申告] ID:{request_id} | {employee_name} | {work_date} | {late_minutes}分")
+        return request_id
+        
+    except Exception as e:
+        print(f"[エラー] 遅刻申告登録エラー: {e}")
+        if conn:
+            conn.close()
+        return None
+
+def insert_early_leave_request(employee_num, employee_name, request_date, work_date, early_minutes, reason=''):
+    """
+    早退申告を登録
+    
+    Args:
+        employee_num: 従業員番号
+        employee_name: 従業員名
+        request_date: 申告日
+        work_date: 勤務日
+        early_minutes: 早退分数
+        reason: 理由
+    
+    Returns:
+        int: 登録されたIDまたはNone
+    """
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        now = datetime.now().isoformat()
+        
+        cursor.execute("""
+            INSERT INTO early_leave_requests (
+                employee_num, employee_name, request_date, work_date,
+                early_minutes, reason, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+        """, (employee_num, employee_name, request_date, work_date, early_minutes, reason, now, now))
+        
+        request_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"[早退申告] ID:{request_id} | {employee_name} | {work_date} | {early_minutes}分")
+        return request_id
+        
+    except Exception as e:
+        print(f"[エラー] 早退申告登録エラー: {e}")
+        if conn:
+            conn.close()
+        return None
+
+def get_late_arrival_requests(employee_num=None, work_date=None, status=None, limit=100):
+    """
+    遅刻申告を取得
+    
+    Args:
+        employee_num: 従業員番号（オプション）
+        work_date: 勤務日（オプション）
+        status: ステータス（オプション）
+        limit: 取得件数上限
+    
+    Returns:
+        list: 遅刻申告のリスト
+    """
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM late_arrival_requests WHERE 1=1"
+        params = []
+        
+        if employee_num:
+            query += " AND employee_num = ?"
+            params.append(employee_num)
+        
+        if work_date:
+            query += " AND work_date = ?"
+            params.append(work_date)
+        
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        
+        query += " ORDER BY work_date DESC, created_at DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            results.append({
+                'id': row[0],
+                'employee_num': row[1],
+                'employee_name': row[2],
+                'request_date': row[3],
+                'work_date': row[4],
+                'late_minutes': row[5],
+                'reason': row[6],
+                'status': row[7],
+                'created_at': row[8],
+                'updated_at': row[9]
+            })
+        
+        conn.close()
+        return results
+        
+    except Exception as e:
+        print(f"[エラー] 遅刻申告取得エラー: {e}")
+        if conn:
+            conn.close()
+        return []
+
+def get_early_leave_requests(employee_num=None, work_date=None, status=None, limit=100):
+    """
+    早退申告を取得
+    
+    Args:
+        employee_num: 従業員番号（オプション）
+        work_date: 勤務日（オプション）
+        status: ステータス（オプション）
+        limit: 取得件数上限
+    
+    Returns:
+        list: 早退申告のリスト
+    """
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM early_leave_requests WHERE 1=1"
+        params = []
+        
+        if employee_num:
+            query += " AND employee_num = ?"
+            params.append(employee_num)
+        
+        if work_date:
+            query += " AND work_date = ?"
+            params.append(work_date)
+        
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        
+        query += " ORDER BY work_date DESC, created_at DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            results.append({
+                'id': row[0],
+                'employee_num': row[1],
+                'employee_name': row[2],
+                'request_date': row[3],
+                'work_date': row[4],
+                'early_minutes': row[5],
+                'reason': row[6],
+                'status': row[7],
+                'created_at': row[8],
+                'updated_at': row[9]
+            })
+        
+        conn.close()
+        return results
+        
+    except Exception as e:
+        print(f"[エラー] 早退申告取得エラー: {e}")
+        if conn:
+            conn.close()
+        return []

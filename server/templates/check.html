@@ -383,6 +383,68 @@
                 <h2 style="margin-bottom: 15px; color: #333;">⚠️ アラート</h2>
                 <div id="alerts-container"></div>
             </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 15px;">
+                <h2 style="margin-bottom: 15px; color: #333;">📝 遅刻・早退申告</h2>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn btn-primary" onclick="openLateArrivalModal()" style="background: #ffc107; color: #333;">
+                        ⏰ 遅刻申告
+                    </button>
+                    <button class="btn btn-primary" onclick="openEarlyLeaveModal()" style="background: #17a2b8; color: white;">
+                        🏃 早退申告
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 遅刻申告モーダル -->
+        <div id="lateArrivalModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                <h2 style="margin-bottom: 20px;">⏰ 遅刻申告</h2>
+                <form id="lateArrivalForm">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>勤務日</label>
+                        <input type="date" id="late-work-date" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>遅刻時間（分）</label>
+                        <input type="number" id="late-minutes" min="1" required placeholder="例: 30">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>理由（任意）</label>
+                        <textarea id="late-reason" rows="3" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-check">登録</button>
+                        <button type="button" class="btn btn-clear" onclick="closeLateArrivalModal()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 早退申告モーダル -->
+        <div id="earlyLeaveModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                <h2 style="margin-bottom: 20px;">🏃 早退申告</h2>
+                <form id="earlyLeaveForm">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>勤務日</label>
+                        <input type="date" id="early-work-date" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>早退時間（分）</label>
+                        <input type="number" id="early-minutes" min="1" required placeholder="例: 60">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>理由（任意）</label>
+                        <textarea id="early-reason" rows="3" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-check">登録</button>
+                        <button type="button" class="btn btn-clear" onclick="closeEarlyLeaveModal()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
         </div>
         
         <div id="loading" class="loading" style="display: none;">
@@ -927,6 +989,157 @@
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('check-date').value = today;
         }
+        
+        // 遅刻申告モーダル
+        function openLateArrivalModal() {
+            const modal = document.getElementById('lateArrivalModal');
+            modal.style.display = 'block';
+            
+            // 現在のチェック日付を設定
+            const checkDate = document.getElementById('check-date').value;
+            if (checkDate) {
+                document.getElementById('late-work-date').value = checkDate;
+            } else {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('late-work-date').value = today;
+            }
+        }
+        
+        function closeLateArrivalModal() {
+            document.getElementById('lateArrivalModal').style.display = 'none';
+            document.getElementById('lateArrivalForm').reset();
+        }
+        
+        // 早退申告モーダル
+        function openEarlyLeaveModal() {
+            const modal = document.getElementById('earlyLeaveModal');
+            modal.style.display = 'block';
+            
+            // 現在のチェック日付を設定
+            const checkDate = document.getElementById('check-date').value;
+            if (checkDate) {
+                document.getElementById('early-work-date').value = checkDate;
+            } else {
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('early-work-date').value = today;
+            }
+        }
+        
+        function closeEarlyLeaveModal() {
+            document.getElementById('earlyLeaveModal').style.display = 'none';
+            document.getElementById('earlyLeaveForm').reset();
+        }
+        
+        // 遅刻申告フォーム送信
+        document.getElementById('lateArrivalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const employeeId = document.getElementById('employee-id').value;
+            const employeeName = document.getElementById('employee-id').selectedOptions[0]?.textContent.split(' - ')[1] || '';
+            const workDate = document.getElementById('late-work-date').value;
+            const lateMinutes = parseInt(document.getElementById('late-minutes').value);
+            const reason = document.getElementById('late-reason').value;
+            
+            if (!employeeId) {
+                alert('従業員を選択してください');
+                return;
+            }
+            
+            const requestDate = new Date().toISOString().split('T')[0];
+            
+            try {
+                const response = await fetch('/api/late_arrival', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employee_num: parseInt(employeeId),
+                        employee_name: employeeName,
+                        request_date: requestDate,
+                        work_date: workDate,
+                        late_minutes: lateMinutes,
+                        reason: reason
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('遅刻申告を登録しました');
+                    closeLateArrivalModal();
+                    // チェックを再実行
+                    await performCheck();
+                } else {
+                    alert('エラー: ' + (result.message || '遅刻申告の登録に失敗しました'));
+                }
+            } catch (error) {
+                console.error('遅刻申告エラー:', error);
+                alert('サーバーエラーが発生しました');
+            }
+        });
+        
+        // 早退申告フォーム送信
+        document.getElementById('earlyLeaveForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const employeeId = document.getElementById('employee-id').value;
+            const employeeName = document.getElementById('employee-id').selectedOptions[0]?.textContent.split(' - ')[1] || '';
+            const workDate = document.getElementById('early-work-date').value;
+            const earlyMinutes = parseInt(document.getElementById('early-minutes').value);
+            const reason = document.getElementById('early-reason').value;
+            
+            if (!employeeId) {
+                alert('従業員を選択してください');
+                return;
+            }
+            
+            const requestDate = new Date().toISOString().split('T')[0];
+            
+            try {
+                const response = await fetch('/api/early_leave', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employee_num: parseInt(employeeId),
+                        employee_name: employeeName,
+                        request_date: requestDate,
+                        work_date: workDate,
+                        early_minutes: earlyMinutes,
+                        reason: reason
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('早退申告を登録しました');
+                    closeEarlyLeaveModal();
+                    // チェックを再実行
+                    await performCheck();
+                } else {
+                    alert('エラー: ' + (result.message || '早退申告の登録に失敗しました'));
+                }
+            } catch (error) {
+                console.error('早退申告エラー:', error);
+                alert('サーバーエラーが発生しました');
+            }
+        });
+        
+        // モーダル外クリックで閉じる
+        document.getElementById('lateArrivalModal').addEventListener('click', (e) => {
+            if (e.target.id === 'lateArrivalModal') {
+                closeLateArrivalModal();
+            }
+        });
+        
+        document.getElementById('earlyLeaveModal').addEventListener('click', (e) => {
+            if (e.target.id === 'earlyLeaveModal') {
+                closeEarlyLeaveModal();
+            }
+        });
     </script>
 </body>
 </html>

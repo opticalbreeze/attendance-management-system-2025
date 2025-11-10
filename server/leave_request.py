@@ -200,6 +200,54 @@ def reject_leave_request(leave_id, rejected_by):
             conn.close()
         return False
 
+def withdraw_leave_request(leave_id):
+    """
+    休暇願を取り下げ（承認前のみ可能）
+    データは削除せず、ステータスを'withdrawn'に変更
+    
+    Args:
+        leave_id: 休暇願ID
+    
+    Returns:
+        bool: 成功した場合True、失敗した場合False
+    """
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        # 現在のステータスを確認（承認前のみ取り下げ可能）
+        cursor.execute("SELECT status FROM leave_requests WHERE id = ?", (leave_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            print(f"[エラー] 休暇願ID {leave_id} が見つかりません")
+            conn.close()
+            return False
+        
+        current_status = result[0]
+        if current_status != 'pending':
+            print(f"[エラー] 休暇願ID {leave_id} は既に承認済みまたは却下済みのため取り下げできません（現在のステータス: {current_status}）")
+            conn.close()
+            return False
+        
+        # ステータスを'withdrawn'に変更
+        cursor.execute("""
+            UPDATE leave_requests
+            SET status = 'withdrawn',
+                updated_at = ?
+            WHERE id = ?
+        """, (datetime.now().isoformat(), leave_id))
+        
+        conn.commit()
+        conn.close()
+        print(f"[休暇願取り下げ] ID:{leave_id} を取り下げました")
+        return True
+    except Exception as e:
+        print(f"[エラー] 休暇願取り下げエラー: {e}")
+        if conn:
+            conn.close()
+        return False
+
 def get_leaves_for_date_range(employee_num, start_date, end_date):
     """
     指定期間の休暇願を取得

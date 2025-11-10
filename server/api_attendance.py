@@ -11,7 +11,9 @@ from datetime import datetime
 from config import Config
 from database import (
     insert_attendance, search_schedule, get_stats, cleanup_duplicates,
-    get_employees, check_attendance_vs_schedule, get_database_connection
+    get_employees, check_attendance_vs_schedule, get_database_connection,
+    insert_late_arrival_request, insert_early_leave_request,
+    get_late_arrival_requests, get_early_leave_requests
 )
 from utils import (
     check_duplicate_attendance, calculate_date_range,
@@ -197,5 +199,129 @@ def register_attendance_api_routes(app):
             
         except Exception as e:
             print(f"[エラー] 勤怠チェックエラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
+    @app.route('/api/late_arrival', methods=['POST'])
+    def submit_late_arrival():
+        """遅刻申告API"""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify(format_response('error', message='データが送信されていません')), 400
+            
+            employee_num = data.get('employee_num')
+            employee_name = data.get('employee_name')
+            request_date = data.get('request_date')
+            work_date = data.get('work_date')
+            late_minutes = data.get('late_minutes')
+            reason = data.get('reason', '')
+            
+            if not all([employee_num, employee_name, request_date, work_date, late_minutes is not None]):
+                return jsonify(format_response('error', message='必須フィールドが不足しています')), 400
+            
+            try:
+                late_minutes = int(late_minutes)
+            except ValueError:
+                return jsonify(format_response('error', message='遅刻分数は数値で指定してください')), 400
+            
+            request_id = insert_late_arrival_request(
+                employee_num, employee_name, request_date, work_date, late_minutes, reason
+            )
+            
+            if request_id:
+                return jsonify(format_response('success', message='遅刻申告を登録しました', request_id=request_id))
+            else:
+                return jsonify(format_response('error', message='遅刻申告の登録に失敗しました')), 500
+                
+        except Exception as e:
+            print(f"[エラー] 遅刻申告エラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
+    @app.route('/api/early_leave', methods=['POST'])
+    def submit_early_leave():
+        """早退申告API"""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify(format_response('error', message='データが送信されていません')), 400
+            
+            employee_num = data.get('employee_num')
+            employee_name = data.get('employee_name')
+            request_date = data.get('request_date')
+            work_date = data.get('work_date')
+            early_minutes = data.get('early_minutes')
+            reason = data.get('reason', '')
+            
+            if not all([employee_num, employee_name, request_date, work_date, early_minutes is not None]):
+                return jsonify(format_response('error', message='必須フィールドが不足しています')), 400
+            
+            try:
+                early_minutes = int(early_minutes)
+            except ValueError:
+                return jsonify(format_response('error', message='早退分数は数値で指定してください')), 400
+            
+            request_id = insert_early_leave_request(
+                employee_num, employee_name, request_date, work_date, early_minutes, reason
+            )
+            
+            if request_id:
+                return jsonify(format_response('success', message='早退申告を登録しました', request_id=request_id))
+            else:
+                return jsonify(format_response('error', message='早退申告の登録に失敗しました')), 500
+                
+        except Exception as e:
+            print(f"[エラー] 早退申告エラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
+    @app.route('/api/late_arrival', methods=['GET'])
+    def get_late_arrival():
+        """遅刻申告取得API"""
+        try:
+            employee_num = request.args.get('employee_num')
+            work_date = request.args.get('work_date')
+            status = request.args.get('status')
+            
+            if employee_num:
+                try:
+                    employee_num = int(employee_num)
+                except ValueError:
+                    return jsonify(format_response('error', message='従業員番号は数値で指定してください')), 400
+            
+            requests = get_late_arrival_requests(
+                employee_num=employee_num,
+                work_date=work_date,
+                status=status
+            )
+            
+            return jsonify(format_response('success', data=requests))
+            
+        except Exception as e:
+            print(f"[エラー] 遅刻申告取得エラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
+    @app.route('/api/early_leave', methods=['GET'])
+    def get_early_leave():
+        """早退申告取得API"""
+        try:
+            employee_num = request.args.get('employee_num')
+            work_date = request.args.get('work_date')
+            status = request.args.get('status')
+            
+            if employee_num:
+                try:
+                    employee_num = int(employee_num)
+                except ValueError:
+                    return jsonify(format_response('error', message='従業員番号は数値で指定してください')), 400
+            
+            requests = get_early_leave_requests(
+                employee_num=employee_num,
+                work_date=work_date,
+                status=status
+            )
+            
+            return jsonify(format_response('success', data=requests))
+            
+        except Exception as e:
+            print(f"[エラー] 早退申告取得エラー: {e}")
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 

@@ -355,6 +355,54 @@ def reject_overtime(overtime_id, rejected_by):
             conn.close()
         return False
 
+def withdraw_overtime(overtime_id):
+    """
+    時間外申告を取り下げ（承認前のみ可能）
+    データは削除せず、ステータスを'withdrawn'に変更
+    
+    Args:
+        overtime_id: 時間外申告ID
+    
+    Returns:
+        bool: 成功した場合True、失敗した場合False
+    """
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        # 現在のステータスを確認（承認前のみ取り下げ可能）
+        cursor.execute("SELECT status FROM overtime_applications WHERE id = ?", (overtime_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            print(f"[エラー] 時間外申告ID {overtime_id} が見つかりません")
+            conn.close()
+            return False
+        
+        current_status = result[0]
+        if current_status != 'pending':
+            print(f"[エラー] 時間外申告ID {overtime_id} は既に承認済みまたは却下済みのため取り下げできません（現在のステータス: {current_status}）")
+            conn.close()
+            return False
+        
+        # ステータスを'withdrawn'に変更
+        cursor.execute("""
+            UPDATE overtime_applications
+            SET status = 'withdrawn',
+                updated_at = ?
+            WHERE id = ?
+        """, (datetime.now().isoformat(), overtime_id))
+        
+        conn.commit()
+        conn.close()
+        print(f"[時間外申告取り下げ] ID:{overtime_id} を取り下げました")
+        return True
+    except Exception as e:
+        print(f"[エラー] 時間外申告取り下げエラー: {e}")
+        if conn:
+            conn.close()
+        return False
+
 def get_monthly_overtime_summary(employee_num, year, month):
     """
     月度の時間外集計（前月16日〜当月15日）

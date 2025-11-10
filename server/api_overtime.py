@@ -12,7 +12,7 @@ from config import Config
 from database import get_employees
 from overtime import (
     insert_overtime_application, get_overtime_applications,
-    approve_overtime, reject_overtime, get_monthly_overtime_summary
+    approve_overtime, reject_overtime, withdraw_overtime, get_monthly_overtime_summary
 )
 from utils import format_response, safe_int, save_pdf_from_html
 
@@ -126,6 +126,21 @@ def register_overtime_api_routes(app):
             
         except Exception as e:
             print(f"[エラー] 時間外却下エラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
+    @app.route('/api/overtime/<int:overtime_id>/withdraw', methods=['POST'])
+    def withdraw_overtime_api(overtime_id):
+        """時間外申告取り下げAPI（承認前のみ可能）"""
+        try:
+            success = withdraw_overtime(overtime_id)
+            
+            if success:
+                return jsonify(format_response('success', message='時間外申告を取り下げました', overtime_id=overtime_id))
+            else:
+                return jsonify(format_response('error', message='取り下げ処理に失敗しました。承認前の申請のみ取り下げ可能です。')), 400
+            
+        except Exception as e:
+            print(f"[エラー] 時間外取り下げエラー: {e}")
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime/monthly_summary', methods=['GET'])

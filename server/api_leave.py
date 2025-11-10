@@ -12,7 +12,7 @@ from config import Config
 from database import get_employees
 from leave_request import (
     insert_leave_request, get_leave_requests,
-    approve_leave_request, reject_leave_request, get_leaves_for_date_range
+    approve_leave_request, reject_leave_request, withdraw_leave_request, get_leaves_for_date_range
 )
 from utils import format_response, safe_int, save_pdf_from_html
 
@@ -117,6 +117,21 @@ def register_leave_api_routes(app):
             
         except Exception as e:
             print(f"[エラー] 休暇願却下エラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
+    @app.route('/api/leave/<int:leave_id>/withdraw', methods=['POST'])
+    def withdraw_leave_api(leave_id):
+        """休暇願取り下げAPI（承認前のみ可能）"""
+        try:
+            success = withdraw_leave_request(leave_id)
+            
+            if success:
+                return jsonify(format_response('success', message='休暇願を取り下げました', leave_id=leave_id))
+            else:
+                return jsonify(format_response('error', message='取り下げ処理に失敗しました。承認前の申請のみ取り下げ可能です。')), 400
+            
+        except Exception as e:
+            print(f"[エラー] 休暇願取り下げエラー: {e}")
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/leave/save_pdf', methods=['POST'])
