@@ -10,8 +10,6 @@ from flask import Flask, render_template, make_response
 # カスタムモジュール
 from config import Config
 from database import init_database
-from overtime import init_overtime_table
-from leave_request import init_leave_request_table
 from api_attendance import register_attendance_api_routes
 from api_overtime import register_overtime_api_routes
 from api_leave import register_leave_api_routes
@@ -133,10 +131,8 @@ def main():
     # アプリケーション作成
     app = create_app()
     
-    # データベース初期化
+    # データベース初期化（全テーブルを一元管理）
     init_database()
-    init_overtime_table()
-    init_leave_request_table()
     
     # ルート登録
     register_web_routes(app)

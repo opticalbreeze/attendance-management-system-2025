@@ -11,41 +11,22 @@ from config import Config
 from utils import get_database_connection
 
 def init_overtime_table():
-    """時間外申告テーブルの初期化"""
+    """
+    時間外申告テーブルの初期化（後方互換性のため残存）
+    
+    Note: この関数は非推奨です。database.init_database()を使用してください。
+    この関数は既存コードとの互換性のために残されています。
+    """
+    from database import init_overtime_table_internal
+    
     conn = get_database_connection()
     cursor = conn.cursor()
     
-    # 時間外申告テーブル
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS overtime_applications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_num TEXT NOT NULL,
-            employee_name TEXT NOT NULL,
-            application_date TEXT NOT NULL,
-            work_date TEXT NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            description TEXT,
-            status TEXT DEFAULT 'pending',
-            overtime_type TEXT,
-            inner_overtime_minutes INTEGER DEFAULT 0,
-            outer_overtime_minutes INTEGER DEFAULT 0,
-            night_overtime_minutes INTEGER DEFAULT 0,
-            approved_by TEXT,
-            approved_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    """)
-    
-    # インデックス作成
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_overtime_employee ON overtime_applications(employee_num)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_overtime_work_date ON overtime_applications(work_date)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_overtime_status ON overtime_applications(status)")
+    # database.pyの内部関数を呼び出し
+    init_overtime_table_internal(cursor)
     
     conn.commit()
     conn.close()
-    print("✅ 時間外申告テーブル初期化完了")
 
 def calculate_overtime_categories(employee_num, work_date, start_time, end_time):
     """
@@ -308,57 +289,41 @@ def get_overtime_applications(employee_num=None, work_date=None, status=None, li
         return []
 
 def approve_overtime(overtime_id, approved_by):
-    """時間外申告を承認"""
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE overtime_applications
-            SET status = 'approved',
-                approved_by = ?,
-                approved_at = ?,
-                updated_at = ?
-            WHERE id = ?
-        """, (approved_by, datetime.now().isoformat(), datetime.now().isoformat(), overtime_id))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[エラー] 時間外申告承認エラー: {e}")
-        if conn:
-            conn.close()
-        return False
+    """時間外申告を承認（共通関数を使用）"""
+    from utils import update_request_status
+    
+    result = update_request_status(
+        table_name='overtime_applications',
+        request_id=overtime_id,
+        status='approved',
+        updated_by=approved_by
+    )
+    
+    if result['success']:
+        print(f"[時間外申告承認] ID:{overtime_id} を承認しました")
+    
+    return result['success']
 
 def reject_overtime(overtime_id, rejected_by):
-    """時間外申告を却下"""
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE overtime_applications
-            SET status = 'rejected',
-                approved_by = ?,
-                approved_at = ?,
-                updated_at = ?
-            WHERE id = ?
-        """, (rejected_by, datetime.now().isoformat(), datetime.now().isoformat(), overtime_id))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[エラー] 時間外申告却下エラー: {e}")
-        if conn:
-            conn.close()
-        return False
+    """時間外申告を却下（共通関数を使用）"""
+    from utils import update_request_status
+    
+    result = update_request_status(
+        table_name='overtime_applications',
+        request_id=overtime_id,
+        status='rejected',
+        updated_by=rejected_by
+    )
+    
+    if result['success']:
+        print(f"[時間外申告却下] ID:{overtime_id} を却下しました")
+    
+    return result['success']
 
 def withdraw_overtime(overtime_id):
     """
     時間外申告を取り下げ（承認前のみ可能）
-    データは削除せず、ステータスを'withdrawn'に変更
+    データは削除せず、ステータスを'withdrawn'に変更（共通関数を使用）
     
     Args:
         overtime_id: 時間外申告ID
@@ -366,42 +331,20 @@ def withdraw_overtime(overtime_id):
     Returns:
         bool: 成功した場合True、失敗した場合False
     """
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        # 現在のステータスを確認（承認前のみ取り下げ可能）
-        cursor.execute("SELECT status FROM overtime_applications WHERE id = ?", (overtime_id,))
-        result = cursor.fetchone()
-        
-        if not result:
-            print(f"[エラー] 時間外申告ID {overtime_id} が見つかりません")
-            conn.close()
-            return False
-        
-        current_status = result[0]
-        if current_status != 'pending':
-            print(f"[エラー] 時間外申告ID {overtime_id} は既に承認済みまたは却下済みのため取り下げできません（現在のステータス: {current_status}）")
-            conn.close()
-            return False
-        
-        # ステータスを'withdrawn'に変更
-        cursor.execute("""
-            UPDATE overtime_applications
-            SET status = 'withdrawn',
-                updated_at = ?
-            WHERE id = ?
-        """, (datetime.now().isoformat(), overtime_id))
-        
-        conn.commit()
-        conn.close()
+    from utils import update_request_status
+    
+    result = update_request_status(
+        table_name='overtime_applications',
+        request_id=overtime_id,
+        status='withdrawn'
+    )
+    
+    if result['success']:
         print(f"[時間外申告取り下げ] ID:{overtime_id} を取り下げました")
-        return True
-    except Exception as e:
-        print(f"[エラー] 時間外申告取り下げエラー: {e}")
-        if conn:
-            conn.close()
-        return False
+    else:
+        print(f"[エラー] {result['message']}")
+    
+    return result['success']
 
 def get_monthly_overtime_summary(employee_num, year, month):
     """

@@ -23,7 +23,7 @@ if os.environ.get('DEBUG', '').lower() in ('true', '1', 'yes'):
 def init_database():
     """
     データベースを初期化
-    テーブルが存在しない場合は作成
+    すべてのテーブルを一元管理して作成
     """
     conn = get_database_connection()
     cursor = conn.cursor()
@@ -50,9 +50,15 @@ def init_database():
     # 遅刻早退申告テーブルの作成
     init_late_early_requests_tables(cursor)
     
+    # 休暇願テーブルの作成
+    init_leave_request_table_internal(cursor)
+    
+    # 時間外申告テーブルの作成
+    init_overtime_table_internal(cursor)
+    
     conn.commit()
     conn.close()
-    print("✅ データベース初期化完了")
+    print("✅ データベース初期化完了（全テーブル統合管理）")
 
 def migrate_employee_master_table(cursor):
     """
@@ -168,6 +174,82 @@ def init_late_early_requests_tables(cursor):
         
     except sqlite3.Error as e:
         print(f"⚠️ 遅刻早退申告テーブルの初期化エラー: {e}")
+
+def init_leave_request_table_internal(cursor):
+    """
+    休暇願テーブルの初期化（内部関数）
+    cursorを受け取ってテーブルを作成
+    """
+    try:
+        # 休暇願テーブル
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS leave_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_num TEXT NOT NULL,
+                employee_name TEXT NOT NULL,
+                application_date TEXT NOT NULL,
+                leave_date_from TEXT NOT NULL,
+                leave_date_to TEXT NOT NULL,
+                leave_type TEXT NOT NULL,
+                leave_subtype TEXT,
+                substitute_work_date TEXT,
+                other_reason TEXT,
+                status TEXT DEFAULT 'pending',
+                approved_by TEXT,
+                approved_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
+        # インデックス作成
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_leave_employee ON leave_requests(employee_num)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_leave_date ON leave_requests(leave_date_from)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_leave_status ON leave_requests(status)")
+        
+        print("✅ 休暇願テーブル初期化完了")
+        
+    except sqlite3.Error as e:
+        print(f"⚠️ 休暇願テーブルの初期化エラー: {e}")
+
+def init_overtime_table_internal(cursor):
+    """
+    時間外申告テーブルの初期化（内部関数）
+    cursorを受け取ってテーブルを作成
+    """
+    try:
+        # 時間外申告テーブル
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS overtime_applications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_num TEXT NOT NULL,
+                employee_name TEXT NOT NULL,
+                application_date TEXT NOT NULL,
+                work_date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'pending',
+                overtime_type TEXT,
+                inner_overtime_minutes INTEGER DEFAULT 0,
+                outer_overtime_minutes INTEGER DEFAULT 0,
+                night_overtime_minutes INTEGER DEFAULT 0,
+                approved_by TEXT,
+                approved_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
+        # インデックス作成
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_overtime_employee ON overtime_applications(employee_num)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_overtime_work_date ON overtime_applications(work_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_overtime_status ON overtime_applications(status)")
+        
+        print("✅ 時間外申告テーブル初期化完了")
+        
+    except sqlite3.Error as e:
+        print(f"⚠️ 時間外申告テーブルの初期化エラー: {e}")
 
 def insert_attendance(idm, timestamp, terminal_id):
     """打刻データを挿入"""

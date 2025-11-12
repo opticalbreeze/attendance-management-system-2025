@@ -23,7 +23,7 @@ def check_duplicate_attendance(idm, timestamp, terminal_id, threshold_seconds=No
         threshold_seconds = Config.CHATTERING_THRESHOLD_SECONDS
     
     try:
-        conn = sqlite3.connect(Config.DATABASE_PATH)
+        conn = get_database_connection()
         cursor = conn.cursor()
         
         # 同じIDm、端末での最新の打刻を取得
@@ -214,6 +214,110 @@ def calculate_time_diff_minutes(time1_str, time2_str):
         
     except:
         return None
+
+def update_request_status(table_name, request_id, status, updated_by=None):
+    """
+    申請のステータスを更新（汎用関数）
+    
+    Args:
+        table_name: テーブル名 ('overtime_applications' or 'leave_requests')
+        request_id: 申請ID
+        status: 新しいステータス ('approved', 'rejected', 'withdrawn')
+        updated_by: 更新者（承認/却下の場合に使用、オプション）
+    
+    Returns:
+        dict: {'success': bool, 'message': str}
+    """
+    from datetime import datetime
+    
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        
+        # テーブル名のバリデーション
+        valid_tables = ['overtime_applications', 'leave_requests']
+        if table_name not in valid_tables:
+            conn.close()
+            return {
+                'success': False,
+                'message': f'無効なテーブル名: {table_name}'
+            }
+        
+        # ステータスのバリデーション
+        valid_statuses = ['approved', 'rejected', 'withdrawn']
+        if status not in valid_statuses:
+            conn.close()
+            return {
+                'success': False,
+                'message': f'無効なステータス: {status}'
+            }
+        
+        # 取り下げの場合は現在のステータスを確認
+        if status == 'withdrawn':
+            cursor.execute(f"SELECT status FROM {table_name} WHERE id = ?", (request_id,))
+            result = cursor.fetchone()
+            
+            if not result:
+                conn.close()
+                return {
+                    'success': False,
+                    'message': f'申請ID {request_id} が見つかりません'
+                }
+            
+            current_status = result[0]
+            if current_status != 'pending':
+                conn.close()
+                return {
+                    'success': False,
+                    'message': f'申請は既に承認済みまたは却下済みのため取り下げできません（現在のステータス: {current_status}）'
+                }
+        
+        # ステータス更新
+        now = datetime.now().isoformat()
+        
+        if status in ['approved', 'rejected']:
+            # 承認/却下の場合はapproved_byとapproved_atも設定
+            cursor.execute(f"""
+                UPDATE {table_name}
+                SET status = ?,
+                    approved_by = ?,
+                    approved_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (status, updated_by or 'admin', now, now, request_id))
+        else:
+            # 取り下げの場合はupdated_atのみ更新
+            cursor.execute(f"""
+                UPDATE {table_name}
+                SET status = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (status, now, request_id))
+        
+        conn.commit()
+        conn.close()
+        
+        status_names = {
+            'approved': '承認',
+            'rejected': '却下',
+            'withdrawn': '取り下げ'
+        }
+        
+        return {
+            'success': True,
+            'message': f'申請を{status_names[status]}しました'
+        }
+        
+    except Exception as e:
+        print(f"[エラー] ステータス更新エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        if 'conn' in locals():
+            conn.close()
+        return {
+            'success': False,
+            'message': f'エラー: {str(e)}'
+        }
 
 def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, employee_name='', additional_css=''):
     """

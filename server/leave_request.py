@@ -11,39 +11,22 @@ from config import Config
 from utils import get_database_connection
 
 def init_leave_request_table():
-    """休暇願テーブルの初期化"""
+    """
+    休暇願テーブルの初期化（後方互換性のため残存）
+    
+    Note: この関数は非推奨です。database.init_database()を使用してください。
+    この関数は既存コードとの互換性のために残されています。
+    """
+    from database import init_leave_request_table_internal
+    
     conn = get_database_connection()
     cursor = conn.cursor()
     
-    # 休暇願テーブル
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS leave_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_num TEXT NOT NULL,
-            employee_name TEXT NOT NULL,
-            application_date TEXT NOT NULL,
-            leave_date_from TEXT NOT NULL,
-            leave_date_to TEXT NOT NULL,
-            leave_type TEXT NOT NULL,
-            leave_subtype TEXT,
-            substitute_work_date TEXT,
-            other_reason TEXT,
-            status TEXT DEFAULT 'pending',
-            approved_by TEXT,
-            approved_at TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    """)
-    
-    # インデックス作成
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_leave_employee ON leave_requests(employee_num)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_leave_date ON leave_requests(leave_date_from)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_leave_status ON leave_requests(status)")
+    # database.pyの内部関数を呼び出し
+    init_leave_request_table_internal(cursor)
     
     conn.commit()
     conn.close()
-    print("✅ 休暇願テーブル初期化完了")
 
 def insert_leave_request(employee_num, employee_name, application_date, 
                          leave_date_from, leave_date_to, leave_type,
@@ -153,57 +136,41 @@ def get_leave_requests(employee_num=None, leave_date=None, status=None, limit=10
         return []
 
 def approve_leave_request(leave_id, approved_by):
-    """休暇願を承認"""
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE leave_requests
-            SET status = 'approved',
-                approved_by = ?,
-                approved_at = ?,
-                updated_at = ?
-            WHERE id = ?
-        """, (approved_by, datetime.now().isoformat(), datetime.now().isoformat(), leave_id))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[エラー] 休暇願承認エラー: {e}")
-        if conn:
-            conn.close()
-        return False
+    """休暇願を承認（共通関数を使用）"""
+    from utils import update_request_status
+    
+    result = update_request_status(
+        table_name='leave_requests',
+        request_id=leave_id,
+        status='approved',
+        updated_by=approved_by
+    )
+    
+    if result['success']:
+        print(f"[休暇願承認] ID:{leave_id} を承認しました")
+    
+    return result['success']
 
 def reject_leave_request(leave_id, rejected_by):
-    """休暇願を却下"""
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE leave_requests
-            SET status = 'rejected',
-                approved_by = ?,
-                approved_at = ?,
-                updated_at = ?
-            WHERE id = ?
-        """, (rejected_by, datetime.now().isoformat(), datetime.now().isoformat(), leave_id))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[エラー] 休暇願却下エラー: {e}")
-        if conn:
-            conn.close()
-        return False
+    """休暇願を却下（共通関数を使用）"""
+    from utils import update_request_status
+    
+    result = update_request_status(
+        table_name='leave_requests',
+        request_id=leave_id,
+        status='rejected',
+        updated_by=rejected_by
+    )
+    
+    if result['success']:
+        print(f"[休暇願却下] ID:{leave_id} を却下しました")
+    
+    return result['success']
 
 def withdraw_leave_request(leave_id):
     """
     休暇願を取り下げ（承認前のみ可能）
-    データは削除せず、ステータスを'withdrawn'に変更
+    データは削除せず、ステータスを'withdrawn'に変更（共通関数を使用）
     
     Args:
         leave_id: 休暇願ID
@@ -211,42 +178,20 @@ def withdraw_leave_request(leave_id):
     Returns:
         bool: 成功した場合True、失敗した場合False
     """
-    try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        # 現在のステータスを確認（承認前のみ取り下げ可能）
-        cursor.execute("SELECT status FROM leave_requests WHERE id = ?", (leave_id,))
-        result = cursor.fetchone()
-        
-        if not result:
-            print(f"[エラー] 休暇願ID {leave_id} が見つかりません")
-            conn.close()
-            return False
-        
-        current_status = result[0]
-        if current_status != 'pending':
-            print(f"[エラー] 休暇願ID {leave_id} は既に承認済みまたは却下済みのため取り下げできません（現在のステータス: {current_status}）")
-            conn.close()
-            return False
-        
-        # ステータスを'withdrawn'に変更
-        cursor.execute("""
-            UPDATE leave_requests
-            SET status = 'withdrawn',
-                updated_at = ?
-            WHERE id = ?
-        """, (datetime.now().isoformat(), leave_id))
-        
-        conn.commit()
-        conn.close()
+    from utils import update_request_status
+    
+    result = update_request_status(
+        table_name='leave_requests',
+        request_id=leave_id,
+        status='withdrawn'
+    )
+    
+    if result['success']:
         print(f"[休暇願取り下げ] ID:{leave_id} を取り下げました")
-        return True
-    except Exception as e:
-        print(f"[エラー] 休暇願取り下げエラー: {e}")
-        if conn:
-            conn.close()
-        return False
+    else:
+        print(f"[エラー] {result['message']}")
+    
+    return result['success']
 
 def get_leaves_for_date_range(employee_num, start_date, end_date):
     """
