@@ -137,6 +137,12 @@
 </head>
 <body>
     <div class="container">
+        <div style="text-align: right; margin-bottom: 10px;">
+            <span id="auth-status" style="color: #666; font-size: 0.9em;"></span>
+            <a href="/login" id="login-link" class="btn" style="padding: 8px 20px; font-size: 0.85em; margin-left: 10px;">🔒 ログイン</a>
+            <a href="/logout" id="logout-link" class="btn" style="padding: 8px 20px; font-size: 0.85em; margin-left: 10px; display: none;">🚪 ログアウト</a>
+        </div>
+        
         <h1>🔖 打刻システム<br><small style="font-size: 0.5em; font-weight: normal;">Attendance Tracking System</small></h1>
         
         <div class="buttons">
@@ -165,6 +171,29 @@
     </div>
     
     <script>
+        // 認証状態を確認
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.logged_in) {
+                    document.getElementById('login-link').style.display = 'none';
+                    document.getElementById('logout-link').style.display = 'inline-block';
+                    document.getElementById('auth-status').textContent = '✅ ログイン中';
+                } else {
+                    document.getElementById('login-link').style.display = 'inline-block';
+                    document.getElementById('logout-link').style.display = 'none';
+                    document.getElementById('auth-status').textContent = '';
+                }
+            } catch (error) {
+                console.error('認証状態確認エラー:', error);
+            }
+        }
+        
+        // ページ読み込み時に認証状態を確認
+        checkAuthStatus();
+        
         // 日時をフォーマット
         function formatDateTime(datetime) {
             if (!datetime) return '';

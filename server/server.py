@@ -5,7 +5,7 @@
 簡潔で保守しやすい構造
 """
 
-from flask import Flask, render_template, make_response
+from flask import Flask, render_template, make_response, request, jsonify, session, redirect, url_for
 
 # カスタムモジュール
 from config import Config
@@ -13,12 +13,19 @@ from database import init_database
 from api_attendance import register_attendance_api_routes
 from api_overtime import register_overtime_api_routes
 from api_leave import register_leave_api_routes
+from auth import init_auth, login_required, verify_admin_password, verify_db_password, set_db_access_granted
 
 def create_app():
     """Flaskアプリケーションを作成・設定"""
     app = Flask(__name__)
     app.config['TEMPLATES_AUTO_RELOAD'] = Config.TEMPLATES_AUTO_RELOAD
     app.config['JSON_AS_ASCII'] = Config.JSON_AS_ASCII
+    app.config['SECRET_KEY'] = Config.SECRET_KEY
+    app.config['SESSION_COOKIE_HTTPONLY'] = Config.SESSION_COOKIE_HTTPONLY
+    app.config['SESSION_COOKIE_SAMESITE'] = Config.SESSION_COOKIE_SAMESITE
+    
+    # 認証機能を初期化
+    init_auth(app)
     
     return app
 
@@ -37,24 +44,38 @@ def register_web_routes(app):
         """トップページ"""
         return render_template('index.html')
 
+    @app.route('/login')
+    def login_page():
+        """ログインページ"""
+        return render_template('login.html')
+
+    @app.route('/logout')
+    def logout():
+        """ログアウト"""
+        session.clear()
+        return redirect('/')
+
     @app.route('/search')
+    @login_required
     def search_page():
-        """検索ページ"""
+        """検索ページ（管理画面）"""
         return _add_no_cache_headers(make_response(render_template('search.html')))
 
     @app.route('/check')
+    @login_required
     def check_page():
-        """勤怠チェックページ"""
+        """勤怠チェックページ（管理画面）"""
         return _add_no_cache_headers(make_response(render_template('check.html')))
 
     @app.route('/overtime')
     def overtime_page():
-        """時間外申告ページ"""
+        """時間外申告ページ（一般ユーザー可）"""
         return _add_no_cache_headers(make_response(render_template('overtime.html')))
 
     @app.route('/overtime/list')
+    @login_required
     def overtime_list_page():
-        """時間外申告一覧ページ"""
+        """時間外申告一覧ページ（管理画面）"""
         return _add_no_cache_headers(make_response(render_template('overtime_list.html')))
 
     @app.route('/overtime/check')
@@ -64,7 +85,7 @@ def register_web_routes(app):
 
     @app.route('/leave')
     def leave_page():
-        """休暇願申告ページ"""
+        """休暇願申告ページ（一般ユーザー可）"""
         return _add_no_cache_headers(make_response(render_template('leave.html')))
 
     @app.route('/leave/check')
@@ -73,9 +94,86 @@ def register_web_routes(app):
         return _add_no_cache_headers(make_response(render_template('leave_check.html')))
 
     @app.route('/leave/list')
+    @login_required
     def leave_list_page():
         """休暇願一覧ページ（管理用）"""
         return _add_no_cache_headers(make_response(render_template('leave_list.html')))
+
+def register_auth_routes(app):
+    """認証関連のAPIルートを登録"""
+    
+    @app.route('/api/login', methods=['POST'])
+    def login_api():
+        """ログインAPI"""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'データが送信されていません'
+                }), 400
+            
+            password = data.get('password', '').strip()
+            db_access = data.get('db_access', False)
+            
+            if not password:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'パスワードを入力してください'
+                }), 400
+            
+            # 管理者パスワードを検証
+            if verify_admin_password(password):
+                session['admin_logged_in'] = True
+                session.permanent = True
+                
+                # データベースアクセス権限の設定
+                if db_access:
+                    # データベースパスワードも検証
+                    db_password = data.get('db_password', '').strip()
+                    if db_password and verify_db_password(db_password):
+                        set_db_access_granted(True)
+                    else:
+                        # DBパスワードが提供されていない、または間違っている
+                        set_db_access_granted(False)
+                else:
+                    set_db_access_granted(False)
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': 'ログインに成功しました',
+                    'db_access': session.get('db_access_granted', False)
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'パスワードが正しくありません'
+                }), 401
+                
+        except Exception as e:
+            print(f"[エラー] ログインエラー: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': f'エラー: {str(e)}'
+            }), 500
+    
+    @app.route('/api/logout', methods=['POST'])
+    def logout_api():
+        """ログアウトAPI"""
+        session.clear()
+        return jsonify({
+            'status': 'success',
+            'message': 'ログアウトしました'
+        })
+    
+    @app.route('/api/auth/check', methods=['GET'])
+    def check_auth():
+        """認証状態確認API"""
+        return jsonify({
+            'status': 'success',
+            'logged_in': session.get('admin_logged_in', False),
+            'db_access': session.get('db_access_granted', False)
+        })
 
 def print_startup_info():
     """起動時の情報を表示"""
@@ -136,6 +234,7 @@ def main():
     
     # ルート登録
     register_web_routes(app)
+    register_auth_routes(app)
     register_attendance_api_routes(app)
     register_overtime_api_routes(app)
     register_leave_api_routes(app)

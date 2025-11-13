@@ -318,30 +318,74 @@
         
         <div class="check-form">
             <form id="check-form">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="section-select">セクション</label>
-                        <select id="section-select">
-                            <option value="">すべてのセクション</option>
-                        </select>
-                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
-                            セクションで絞り込み
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="employee-id">従業員（必須）</label>
-                        <select id="employee-id" name="employee_id" required>
-                            <option value="">▼ 従業員を読み込み中...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="check-date">チェック日付（必須）</label>
-                        <input type="date" id="check-date" name="check_date" required>
-                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
-                            YYYY-MM-DD形式で選択
-                        </small>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="check-mode" value="daily" id="mode-daily" checked onchange="toggleCheckMode()">
+                        <span>単日チェック</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-left: 20px;">
+                        <input type="radio" name="check-mode" value="monthly" id="mode-monthly" onchange="toggleCheckMode()">
+                        <span>月度チェック（係員ごと）</span>
+                    </label>
+                </div>
+                
+                <div id="daily-mode" class="check-mode-section">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="section-select">セクション</label>
+                            <select id="section-select">
+                                <option value="">すべてのセクション</option>
+                            </select>
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                セクションで絞り込み
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="employee-id">従業員（必須）</label>
+                            <select id="employee-id" name="employee_id">
+                                <option value="">▼ 従業員を読み込み中...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="check-date">チェック日付（必須）</label>
+                            <input type="date" id="check-date" name="check_date">
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                YYYY-MM-DD形式で選択
+                            </small>
+                        </div>
                     </div>
                 </div>
+                
+                <div id="monthly-mode" class="check-mode-section" style="display: none;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="monthly-section-select">セクション（必須）</label>
+                            <select id="monthly-section-select" required>
+                                <option value="">▼ セクションを選択</option>
+                            </select>
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                係員ごとにチェック
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-month">検索月（必須）</label>
+                            <input type="text" id="search-month" name="search_month" placeholder="2025/10" pattern="\d{4}/\d{1,2}">
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                YYYY/MM形式（例: 2025/10）
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="monthly-employee-id">従業員（任意）</label>
+                            <select id="monthly-employee-id" name="monthly_employee_id">
+                                <option value="">すべての従業員</option>
+                            </select>
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                特定の従業員のみチェック
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
                 <div>
                     <button type="submit" class="btn btn-check">🔍 チェック実行</button>
                     <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
@@ -490,7 +534,47 @@
             if (sectionSelect) {
                 sectionSelect.addEventListener('change', updateEmployeeList);
             }
+            
+            // 月度モードのセクション変更時に従業員リストを更新
+            const monthlySectionSelect = document.getElementById('monthly-section-select');
+            if (monthlySectionSelect) {
+                monthlySectionSelect.addEventListener('change', updateMonthlyEmployeeList);
+            }
+            
+            // 検索月のデフォルト値を設定（現在の月）
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const searchMonthInput = document.getElementById('search-month');
+            if (searchMonthInput) {
+                searchMonthInput.value = currentMonth;
+            }
         });
+        
+        // チェックモードの切り替え
+        function toggleCheckMode() {
+            const mode = document.querySelector('input[name="check-mode"]:checked').value;
+            document.getElementById('daily-mode').style.display = mode === 'daily' ? 'block' : 'none';
+            document.getElementById('monthly-mode').style.display = mode === 'monthly' ? 'block' : 'none';
+        }
+        
+        // 月度モードの従業員リスト更新
+        function updateMonthlyEmployeeList() {
+            const monthlyEmployeeSelect = document.getElementById('monthly-employee-id');
+            const monthlySectionSelect = document.getElementById('monthly-section-select');
+            const selectedSection = monthlySectionSelect.value;
+            
+            monthlyEmployeeSelect.innerHTML = '<option value="">すべての従業員</option>';
+            
+            if (selectedSection && allEmployees.length > 0) {
+                const filteredEmployees = allEmployees.filter(emp => (emp.section || '設備') === selectedSection);
+                filteredEmployees.forEach(employee => {
+                    const option = document.createElement('option');
+                    option.value = employee.employee_num;
+                    option.textContent = `${employee.employee_num} - ${employee.name}`;
+                    monthlyEmployeeSelect.appendChild(option);
+                });
+            }
+        }
         
         // 従業員情報を動的に読み込む
         async function loadEmployees() {
@@ -521,6 +605,18 @@
                     
                     // 従業員リストを更新
                     updateEmployeeList();
+                    
+                    // 月度モードのセクション選択を設定
+                    const monthlySectionSelect = document.getElementById('monthly-section-select');
+                    if (monthlySectionSelect) {
+                        monthlySectionSelect.innerHTML = '<option value="">▼ セクションを選択</option>';
+                        sections.forEach(section => {
+                            const option = document.createElement('option');
+                            option.value = section;
+                            option.textContent = section;
+                            monthlySectionSelect.appendChild(option);
+                        });
+                    }
                     
                     console.log('[DEBUG] Employee options added:', result.data.length);
                 } else {
@@ -564,48 +660,30 @@
         
         // チェック実行
         async function performCheck() {
-            console.log('💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥');
             console.log('[DEBUG] 🔥 performCheck関数が呼び出されました！');
-            console.log('[DEBUG] 時刻:', new Date().toISOString());
-            console.log('💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥');
             
+            const mode = document.querySelector('input[name="check-mode"]:checked').value;
+            
+            if (mode === 'monthly') {
+                await performMonthlyCheck();
+            } else {
+                await performDailyCheck();
+            }
+        }
+        
+        // 単日チェック実行
+        async function performDailyCheck() {
             const employeeId = document.getElementById('employee-id').value.trim();
             const checkDate = document.getElementById('check-date').value.trim();
             
-            // デバッグ出力を追加
-            console.log('[DEBUG] performCheck called');
-            console.log('[DEBUG] employeeId:', employeeId);
-            console.log('[DEBUG] checkDate:', checkDate);
-            console.log('[DEBUG] employee-id element:', document.getElementById('employee-id'));
-            console.log('[DEBUG] check-date element:', document.getElementById('check-date'));
-            
             // バリデーション
             if (!employeeId) {
-                console.log('[DEBUG] Employee ID validation failed');
                 showError('従業員を選択してください');
                 return;
             }
             
             if (!checkDate) {
-                console.log('[DEBUG] Check date validation failed');
                 showError('チェック日付を選択してください');
-                return;
-            }
-            
-            console.log('[DEBUG] Validation passed, proceeding with API call');
-            
-            // ネットワーク接続の事前チェック
-            try {
-                console.log('[DEBUG] Testing basic connectivity...');
-                const healthResponse = await fetch('/api/health');
-                console.log('[DEBUG] Health check status:', healthResponse.status);
-                if (!healthResponse.ok) {
-                    throw new Error('サーバーへの基本接続に失敗しました');
-                }
-            } catch (healthError) {
-                console.error('[DEBUG] Health check failed:', healthError);
-                document.getElementById('loading').style.display = 'none';
-                showError('サーバーに接続できません。ネットワーク接続を確認してください。');
                 return;
             }
             
@@ -623,7 +701,6 @@
             const checkUrl = `/api/attendance_check?${params}`;
             
             console.log('[DEBUG] API URL:', checkUrl);
-            console.log('[DEBUG] Params:', params.toString());
 
             try {
                 console.log('[DEBUG] Making fetch request to:', checkUrl);
@@ -645,17 +722,8 @@
 
                 // ステータスコードとレスポンス内容の両方をチェック
                 if (response.ok && data.status === 'success') {
-                    console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
                     console.log('[DEBUG] ✅ Success response, calling displayResults');
-                    console.log('[DEBUG] Data to be passed to displayResults:', data);
-                    console.log('[DEBUG] typeof data:', typeof data);
-                    console.log('[DEBUG] data.employee_name:', data.employee_name);
-                    console.log('[DEBUG] About to call displayResults...');
-                    console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
-                    
-                    displayResults(data);  // data.data ではなく data を渡す
-                    
-                    console.log('[DEBUG] ✅ displayResults 呼び出し完了');
+                    displayResults(data.data);  // data.dataを渡す
                 } else {
                     // 400エラーや500エラーでも、サーバーからのエラーメッセージを表示
                     console.log('[DEBUG] Server returned error (HTTP:', response.status, '):', data.message);
@@ -671,7 +739,188 @@
             }
         }
         
-        // 結果を表示
+        // 月度チェック実行
+        async function performMonthlyCheck() {
+            const section = document.getElementById('monthly-section-select').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            const employeeId = document.getElementById('monthly-employee-id').value.trim();
+            
+            // バリデーション
+            if (!section) {
+                showError('セクションを選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            // UIリセット
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            // クエリパラメータ構築
+            const params = new URLSearchParams();
+            params.append('search_month', searchMonth);
+            params.append('section', section);
+            if (employeeId) {
+                params.append('employee_id', employeeId);
+            }
+            
+            const checkUrl = `/api/attendance_check?${params}`;
+            
+            console.log('[DEBUG] Monthly API URL:', checkUrl);
+            
+            try {
+                const response = await fetch(checkUrl);
+                let data;
+                try {
+                    data = await response.json();
+                    console.log('[DEBUG] Monthly check response:', data);
+                } catch (jsonError) {
+                    throw new Error(`HTTP ${response.status}: JSONの解析に失敗しました`);
+                }
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok && data.status === 'success') {
+                    // format_responseの実装により、dataが辞書の場合は直接マージされる
+                    // つまり、data.dataではなく、data自体にsearch_monthなどが含まれる
+                    const resultData = data.data ? data.data : data;
+                    console.log('[DEBUG] Monthly check result data:', resultData);
+                    
+                    // データ構造の確認とエラーハンドリング
+                    if (!resultData) {
+                        console.error('[DEBUG] resultData is null or undefined');
+                        showError('サーバーからのレスポンスにデータが含まれていません');
+                        return;
+                    }
+                    
+                    if (!resultData.search_month) {
+                        console.error('[DEBUG] Invalid response structure:', resultData);
+                        console.error('[DEBUG] Available keys:', Object.keys(resultData));
+                        showError('サーバーからのレスポンス形式が正しくありません。コンソールを確認してください。');
+                        return;
+                    }
+                    
+                    displayMonthlyResults(resultData);
+                } else {
+                    const errorMessage = data.message || `サーバーエラーが発生しました (HTTP ${response.status})`;
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                console.error('[DEBUG] Monthly check error:', error);
+                console.error('[DEBUG] Error stack:', error.stack);
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // 月度チェック結果を表示
+        function displayMonthlyResults(data) {
+            const resultsSection = document.getElementById('results-section');
+            resultsSection.innerHTML = `
+                <div style="margin-bottom: 30px;">
+                    <h2>📊 月度勤怠チェック結果</h2>
+                    <div class="info-grid" style="margin-top: 15px;">
+                        <div class="info-item">
+                            <div class="info-label">検索月</div>
+                            <div class="info-value">${data.search_month}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">期間</div>
+                            <div class="info-value">${formatDate(data.start_date)} 〜 ${formatDate(data.end_date)}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">エラー件数</div>
+                            <div class="info-value" style="color: #dc3545; font-weight: bold;">${data.total_errors}件</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">警告件数</div>
+                            <div class="info-value" style="color: #ffc107; font-weight: bold;">${data.total_warnings}件</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="monthly-results-list"></div>
+            `;
+            
+            const resultsList = document.getElementById('monthly-results-list');
+            
+            if (!data.results || data.results.length === 0) {
+                resultsList.innerHTML = '<div class="no-data">エラー・警告はありませんでした。正常です。</div>';
+                resultsSection.style.display = 'block';
+                return;
+            }
+            
+            // 従業員ごとに結果を表示
+            data.results.forEach(employee => {
+                const employeeDiv = document.createElement('div');
+                employeeDiv.style.cssText = 'margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #667eea;';
+                
+                employeeDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0; color: #333;">【${employee.employee_id}】${employee.employee_name}</h3>
+                            <div style="color: #666; font-size: 0.9em; margin-top: 5px;">セクション: ${employee.section}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: #dc3545; font-weight: bold; font-size: 1.2em;">❌ ${employee.error_count}件</div>
+                            <div style="color: #ffc107; font-weight: bold; font-size: 1.2em;">⚠️ ${employee.warning_count}件</div>
+                        </div>
+                    </div>
+                    <div id="employee-dates-${employee.employee_id}"></div>
+                `;
+                
+                resultsList.appendChild(employeeDiv);
+                
+                const datesDiv = document.getElementById(`employee-dates-${employee.employee_id}`);
+                
+                employee.dates.forEach(dateInfo => {
+                    const dateDiv = document.createElement('div');
+                    dateDiv.style.cssText = 'margin-bottom: 15px; padding: 15px; background: white; border-radius: 8px;';
+                    
+                    const schedule = dateInfo.schedule || {};
+                    const workTypeClass = getWorkTypeClass(schedule.work_type);
+                    
+                    let alertsHtml = '';
+                    dateInfo.errors.forEach(error => {
+                        alertsHtml += `<div style="margin: 5px 0; padding: 8px; background: #fee; border-left: 3px solid #dc3545; border-radius: 4px;">
+                            <strong style="color: #dc3545;">❌ ${error.message}</strong>
+                            ${error.details ? `<div style="font-size: 0.9em; color: #666; margin-top: 3px;">${error.details}</div>` : ''}
+                        </div>`;
+                    });
+                    dateInfo.warnings.forEach(warning => {
+                        alertsHtml += `<div style="margin: 5px 0; padding: 8px; background: #fffbf0; border-left: 3px solid #ffc107; border-radius: 4px;">
+                            <strong style="color: #ffc107;">⚠️ ${warning.message}</strong>
+                            ${warning.details ? `<div style="font-size: 0.9em; color: #666; margin-top: 3px;">${warning.details}</div>` : ''}
+                        </div>`;
+                    });
+                    
+                    dateDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <strong style="font-size: 1.1em;">📅 ${formatDate(dateInfo.date)}</strong>
+                                ${schedule.work_type ? `<span class="work-type ${workTypeClass}" style="margin-left: 10px;">${schedule.work_type}</span>` : ''}
+                            </div>
+                            <div style="color: #666; font-size: 0.9em;">
+                                ${schedule.start_time || '-'} 〜 ${schedule.end_time || '-'}
+                            </div>
+                        </div>
+                        ${alertsHtml}
+                    `;
+                    
+                    datesDiv.appendChild(dateDiv);
+                });
+            });
+            
+            resultsSection.style.display = 'block';
+        }
+        
+        // 結果を表示（単日チェック用）
         function displayResults(data) {
             console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
             console.log('[DEBUG] ✨ displayResults関数が呼び出されました！');

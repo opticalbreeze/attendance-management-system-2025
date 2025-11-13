@@ -17,6 +17,7 @@ services:
       - ./api_leave.py:/app/api_leave.py
       - ./utils.py:/app/utils.py
       - ./config.py:/app/config.py
+      - ./auth.py:/app/auth.py
       - ./overtime.py:/app/overtime.py
       - ./leave_request.py:/app/leave_request.py
     environment:
@@ -44,6 +45,10 @@ services:
       - EMPLOYEE_ID_MAX_LENGTH=20
       - YEAR_MIN=2000
       - YEAR_MAX=2100
+      # セキュリティ設定（本番環境では必ず変更）
+      - SECRET_KEY=change-me-in-production-please-set-secure-key
+      - ADMIN_PASSWORD=admin
+      - DB_PASSWORD=dbadmin
     restart: unless-stopped
     networks:
       - attendance-network

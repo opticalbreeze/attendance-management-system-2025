@@ -53,10 +53,22 @@ class Config:
     JSONIFY_PRETTYPRINT_REGULAR = False
     
     # ==================== セキュリティ設定 ====================
-    # 本番環境では以下を設定推奨
-    # SECRET_KEY = os.environ.get('SECRET_KEY', 'change-me-in-production')
+    # セッション用シークレットキー（本番環境では必ず変更）
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'change-me-in-production-please-set-in-env')
+    
+    # 管理者パスワード（環境変数 ADMIN_PASSWORD から設定、デフォルト: 'admin'）
+    # 本番環境では必ず環境変数で設定してください
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
+    
+    # データベースアクセスパスワード（環境変数 DB_PASSWORD から設定、デフォルト: 'dbadmin'）
+    # 本番環境では必ず環境変数で設定してください
+    DB_PASSWORD = os.environ.get('DB_PASSWORD', 'dbadmin')
+    
+    # セッション設定
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    # HTTPS環境では以下を有効化
     # SESSION_COOKIE_SECURE = True  # HTTPS必須
-    # SESSION_COOKIE_HTTPONLY = True
 
 
 class DevelopmentConfig(Config):

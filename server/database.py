@@ -777,14 +777,24 @@ def check_attendance_vs_schedule(employee_id, check_date):
         if result['schedule']:
             work_type = result['schedule']['work_type']
             # 休み以外で、出退勤スケジュールがあるのに打刻がない
-            if work_type and '有' not in work_type and '所' not in work_type and '法' not in work_type and '明' not in work_type:
-                if result['schedule']['start_time'] or result['schedule']['end_time']:
-                    if not result['attendance_records']:
-                        alerts.append({
-                            'type': 'error',
-                            'message': '打刻なし',
-                            'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
-                        })
+            # 「明」勤務も打刻が必要な場合はチェック対象に含める
+            if work_type and '有' not in work_type and '所' not in work_type and '法' not in work_type:
+                # 「明」勤務の場合はstart_time/end_timeがなくても打刻チェックを行う
+                # その他の勤務タイプはstart_timeまたはend_timeがある場合のみチェック
+                should_check = False
+                if '明' in work_type:
+                    # 「明」勤務は常にチェック
+                    should_check = True
+                elif result['schedule']['start_time'] or result['schedule']['end_time']:
+                    # その他の勤務タイプはstart_timeまたはend_timeがある場合のみチェック
+                    should_check = True
+                
+                if should_check and not result['attendance_records']:
+                    alerts.append({
+                        'type': 'error',
+                        'message': '打刻なし',
+                        'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
+                    })
         
         # 2-1. 休日出勤届が出ている日に打刻時間がない場合のアラート
         if result['schedule']:

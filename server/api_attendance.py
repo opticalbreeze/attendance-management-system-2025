@@ -172,10 +172,20 @@ def register_attendance_api_routes(app):
 
     @app.route('/api/attendance_check', methods=['GET'])
     def attendance_check_api():
-        """勤怠チェックAPI"""
+        """勤怠チェックAPI（単日または月度）"""
         try:
             employee_id = request.args.get('employee_id', '').strip()
             check_date = request.args.get('check_date', '').strip()
+            search_month = request.args.get('search_month', '').strip()
+            section = request.args.get('section', '').strip()
+            
+            # 月度検索モード
+            if search_month:
+                return attendance_check_monthly_api(search_month, employee_id, section)
+            
+            # 単日検索モード（既存の処理）
+            if not employee_id:
+                return jsonify(format_response('error', message='従業員IDが指定されていません')), 400
             
             valid, employee_id_or_error = validate_employee_id(employee_id)
             if not valid:
@@ -199,6 +209,114 @@ def register_attendance_api_routes(app):
             
         except Exception as e:
             print(f"[エラー] 勤怠チェックエラー: {e}")
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+    
+    def attendance_check_monthly_api(search_month, employee_id_filter=None, section_filter=None):
+        """月度勤怠チェックAPI（複数従業員・複数日）"""
+        try:
+            from database import get_database_connection, get_employees
+            from utils import calculate_date_range, validate_search_month
+            
+            # 月度バリデーション
+            valid, search_month_or_error = validate_search_month(search_month)
+            if not valid:
+                return jsonify(format_response('error', message=search_month_or_error)), 400
+            search_month = search_month_or_error
+            
+            # 日付範囲を計算
+            try:
+                start_date, end_date = calculate_date_range(search_month)
+            except ValueError as e:
+                return jsonify(format_response('error', message=str(e))), 400
+            
+            # 従業員一覧を取得
+            all_employees = get_employees()
+            
+            # フィルタリング
+            filtered_employees = all_employees
+            if section_filter:
+                filtered_employees = [e for e in filtered_employees if (e.get('section') or '設備') == section_filter]
+            if employee_id_filter:
+                filtered_employees = [e for e in filtered_employees if str(e['employee_num']) == str(employee_id_filter)]
+            
+            if not filtered_employees:
+                return jsonify(format_response('error', message='該当する従業員が見つかりませんでした')), 400
+            
+            # 各従業員の各日付をチェック
+            results = []
+            total_errors = 0
+            total_warnings = 0
+            
+            for employee in filtered_employees:
+                emp_id = str(employee['employee_num'])
+                emp_name = employee['name']
+                emp_section = employee.get('section', '設備')
+                
+                # 該当月度のスケジュール日付を取得
+                conn = get_database_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT work_date
+                    FROM attend_schedule
+                    WHERE employee_id = ? AND work_date >= ? AND work_date <= ?
+                    ORDER BY work_date
+                """, (emp_id, start_date, end_date))
+                work_dates = [row[0] for row in cursor.fetchall()]
+                conn.close()
+                
+                employee_results = {
+                    'employee_id': emp_id,
+                    'employee_name': emp_name,
+                    'section': emp_section,
+                    'dates': [],
+                    'error_count': 0,
+                    'warning_count': 0
+                }
+                
+                for work_date in work_dates:
+                    try:
+                        result = check_attendance_vs_schedule(emp_id, work_date)
+                        if result['status'] == 'success':
+                            data = result['data']
+                            alerts = data.get('alerts', [])
+                            
+                            errors = [a for a in alerts if a['type'] == 'error']
+                            warnings = [a for a in alerts if a['type'] == 'warning']
+                            
+                            if errors or warnings:
+                                employee_results['dates'].append({
+                                    'date': work_date,
+                                    'schedule': data.get('schedule'),
+                                    'errors': errors,
+                                    'warnings': warnings
+                                })
+                                employee_results['error_count'] += len(errors)
+                                employee_results['warning_count'] += len(warnings)
+                                total_errors += len(errors)
+                                total_warnings += len(warnings)
+                    except Exception as e:
+                        print(f"[エラー] チェックエラー ({emp_id}, {work_date}): {e}")
+                
+                if employee_results['dates']:
+                    results.append(employee_results)
+            
+            return jsonify(format_response(
+                'success',
+                message=f'月度勤怠チェックが完了しました',
+                data={
+                    'search_month': search_month,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'total_errors': total_errors,
+                    'total_warnings': total_warnings,
+                    'results': results
+                }
+            ))
+            
+        except Exception as e:
+            print(f"[エラー] 月度勤怠チェックエラー: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/late_arrival', methods=['POST'])
