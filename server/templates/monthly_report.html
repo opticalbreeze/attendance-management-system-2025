@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月間集計レポート</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2em;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-right: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #dc3545;
+            display: none;
+        }
+        
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            display: none;
+        }
+        
+        .help-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 月間集計レポート</h1>
+        
+        <div id="error-message" class="error"></div>
+        <div id="success-message" class="success"></div>
+        <div id="loading" class="loading">処理中...</div>
+        
+        <div class="form-section">
+            <div class="form-group">
+                <label for="section-select">セクション</label>
+                <select id="section-select">
+                    <option value="">▼ セクションを選択</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="employee-id">従業員</label>
+                <select id="employee-id">
+                    <option value="">▼ 従業員を選択してください</option>
+                </select>
+                <div class="help-text">従業員を選択してください</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="search-month">検索月</label>
+                <input type="text" id="search-month" placeholder="YYYY/MM形式（例: 2025/12）" pattern="\d{4}/\d{2}">
+                <div class="help-text">前月16日〜当月15日の期間で集計されます</div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn" onclick="generateReport()">📥 Excel生成・ダウンロード</button>
+                <button class="btn btn-secondary" onclick="previewReport()">👁️ プレビュー</button>
+            </div>
+        </div>
+        
+        <div id="preview-section" style="display: none;">
+            <h2 style="margin-top: 30px; margin-bottom: 20px;">プレビュー</h2>
+            <div id="preview-content"></div>
+        </div>
+        
+        <a href="/" class="back-link">← トップページに戻る</a>
+    </div>
+    
+    <script>
+        let allEmployees = [];
+        
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadEmployees();
+            
+            // 検索月のデフォルト値を設定（現在の月）
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+            document.getElementById('search-month').value = currentMonth;
+            
+            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('section-select');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+        
+        // 従業員情報を読み込む
+        async function loadEmployees() {
+            try {
+                const response = await fetch('/api/employees');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    allEmployees = data.data;
+                    
+                    // セクション一覧を設定
+                    const sectionSelect = document.getElementById('section-select');
+                    const sections = [...new Set(data.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">▼ セクションを選択</option>';
+                    sections.forEach(section => {
+                        const option = document.createElement('option');
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
+                    });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                }
+            } catch (error) {
+                showError('従業員リストの取得に失敗しました');
+                console.error(error);
+            }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            const selectedSection = sectionSelect.value;
+            
+            employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+            
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            filteredEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.employee_num;
+                option.textContent = `${employee.employee_num} - ${employee.name}`;
+                employeeSelect.appendChild(option);
+            });
+        }
+        
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+        
+        // 成功表示
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // Excel生成・ダウンロード
+        async function generateReport() {
+            const employeeId = document.getElementById('employee-id').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            if (!employeeId) {
+                showError('従業員を選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            // バリデーション
+            if (!/^\d{4}\/\d{2}$/.test(searchMonth)) {
+                showError('検索月はYYYY/MM形式で入力してください（例: 2025/12）');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/monthly-report/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        search_month: searchMonth
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok && data.status === 'success') {
+                    showSuccess('レポートを生成しました。ダウンロードを開始します...');
+                    
+                    // ダウンロード
+                    window.location.href = data.download_url;
+                } else {
+                    showError(data.message || 'レポートの生成に失敗しました');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // プレビュー表示
+        async function previewReport() {
+            const employeeId = document.getElementById('employee-id').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            if (!employeeId) {
+                showError('従業員を選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            if (!/^\d{4}\/\d{2}$/.test(searchMonth)) {
+                showError('検索月はYYYY/MM形式で入力してください（例: 2025/12）');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/monthly-report/preview?employee_id=${employeeId}&search_month=${searchMonth}`);
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok && data.status === 'success') {
+                    displayPreview(data.data);
+                } else {
+                    showError(data.message || 'プレビューの取得に失敗しました');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // プレビュー表示
+        function displayPreview(data) {
+            const previewSection = document.getElementById('preview-section');
+            const previewContent = document.getElementById('preview-content');
+            
+            let html = `
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <h3>${data.search_month}月度 勤務実績表</h3>
+                    <p><strong>社員番号:</strong> ${data.employee_info.employee_num}</p>
+                    <p><strong>社員名:</strong> ${data.employee_info.name}</p>
+                    <p><strong>勤務先名:</strong> ${data.employee_info.workplace}</p>
+                    <p><strong>期間:</strong> ${data.start_date} 〜 ${data.end_date}</p>
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead>
+                        <tr style="background: #667eea; color: white;">
+                            <th style="padding: 10px; border: 1px solid #ddd;">日付</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">区分</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">開始時間</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">終了時間</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">時間外</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">基準</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            const dailyData = data.daily_data;
+            for (const dateStr of Object.keys(dailyData).sort()) {
+                const dayData = dailyData[dateStr];
+                const workDate = new Date(dayData.date);
+                
+                html += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${dayData.work_type || '-'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${dayData.start_time || '-'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${dayData.end_time || '-'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${(dayData.overtime.outer + dayData.overtime.inner).toFixed(1)}h</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">-</td>
+                    </tr>
+                `;
+            }
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            previewContent.innerHTML = html;
+            previewSection.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+

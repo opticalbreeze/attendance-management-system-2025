@@ -538,6 +538,81 @@ def get_attendance_for_schedule(cursor, employee_id, work_date):
     except sqlite3.Error as e:
         return []  # エラー時は空配列を返す
 
+def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
+    """
+    24勤・夜勤の終了時間を翌日の「明」勤務の打刻から取得する共通関数
+    
+    Args:
+        cursor: データベースカーソル
+        employee_id: 従業員番号
+        work_date: 24勤・夜勤の日付（YYYY-MM-DD形式の文字列）
+    
+    Returns:
+        str or None: 翌日の「明」勤務の最後の打刻時刻（HH:MM形式）、取得できない場合はNone
+    """
+    try:
+        from datetime import timedelta
+        
+        # employee_masterからIDmを取得
+        cursor.execute("""
+            SELECT idm FROM employee_master 
+            WHERE employee_num = ?
+        """, (employee_id,))
+        
+        idm_result = cursor.fetchone()
+        if not idm_result:
+            return None
+        
+        idm = idm_result[0]
+        
+        # 翌日の日付を計算
+        work_date_obj = datetime.strptime(work_date, '%Y-%m-%d').date()
+        next_date = (work_date_obj + timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        # 翌日の「明」勤務のスケジュールが存在するか確認
+        cursor.execute("""
+            SELECT work_date, work_type
+            FROM attend_schedule
+            WHERE employee_id = ? AND work_date = ? AND work_type LIKE '%明%'
+        """, (employee_id, next_date))
+        
+        next_day_schedule = cursor.fetchone()
+        if not next_day_schedule:
+            return None
+        
+        # 翌日の打刻データを取得（「明」勤務の日の打刻）
+        cursor.execute("""
+            SELECT timestamp
+            FROM attendance
+            WHERE idm = ? AND date(timestamp) = ?
+            ORDER BY timestamp ASC
+        """, (idm, next_date))
+        
+        next_day_attendance_rows = cursor.fetchall()
+        
+        if not next_day_attendance_rows:
+            return None
+        
+        # 最後の打刻時刻を取得（退勤時刻）
+        last_timestamp = next_day_attendance_rows[-1][0]
+        
+        # 時刻のみを抽出（HH:MM形式）
+        try:
+            if 'T' in last_timestamp:
+                time_part = last_timestamp.split('T')[1].split('.')[0]
+            else:
+                time_part = last_timestamp.split(' ')[1].split('.')[0] if ' ' in last_timestamp else last_timestamp
+            
+            # HH:MM形式に変換
+            time_only = ':'.join(time_part.split(':')[:2])
+            return time_only
+        except:
+            return None
+        
+    except Exception as e:
+        print(f"[DEBUG] 24勤・夜勤の終了時間取得エラー: {e}")
+        return None
+
 def get_employees():
     """従業員マスタから全従業員情報を取得"""
     try:
@@ -736,23 +811,10 @@ def check_attendance_vs_schedule(employee_id, check_date):
                 # 24勤A/B、夜勤: 一番早い時間が出勤、翌日の「明」の日の一番遅い時間が退勤
                 result['actual_clock_in'] = result['attendance_records'][0]['time']
                 
-                if next_day_attendance_rows:
-                    # 翌日の打刻データから時刻を抽出
-                    next_day_times = []
-                    for att_row in next_day_attendance_rows:
-                        timestamp_str = att_row[1]
-                        try:
-                            if 'T' in timestamp_str:
-                                time_part = timestamp_str.split('T')[1].split('.')[0]
-                            else:
-                                time_part = timestamp_str.split(' ')[1].split('.')[0] if ' ' in timestamp_str else timestamp_str
-                            time_only = ':'.join(time_part.split(':')[:2])
-                            next_day_times.append(time_only)
-                        except:
-                            pass
-                    
-                    if next_day_times:
-                        result['actual_clock_out'] = next_day_times[-1]  # 一番遅い時間
+                # 共通関数を使用して翌日の「明」勤務の打刻から終了時間を取得
+                end_time = get_night_shift_end_time_from_next_day(cursor, employee_id, check_date)
+                if end_time:
+                    result['actual_clock_out'] = end_time
             else:
                 # 日勤: 一番早い時間が出勤、一番遅い時間が退勤
                 if len(result['attendance_records']) > 0:

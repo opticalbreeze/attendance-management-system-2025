@@ -18,6 +18,7 @@ services:
       - ./utils.py:/app/utils.py
       - ./config.py:/app/config.py
       - ./auth.py:/app/auth.py
+      - ./monthly_report.py:/app/monthly_report.py
       - ./overtime.py:/app/overtime.py
       - ./leave_request.py:/app/leave_request.py
     environment:

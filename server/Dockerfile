@@ -18,6 +18,8 @@ COPY leave_request.py .
 COPY api_attendance.py .
 COPY api_overtime.py .
 COPY api_leave.py .
+COPY auth.py .
+COPY monthly_report.py .
 COPY templates/ templates/
 
 # データディレクトリの作成（マウントポイント）

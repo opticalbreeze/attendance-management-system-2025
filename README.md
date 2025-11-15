@@ -1,14 +1,13 @@
-# 勤怠打刻システム
+# 勤怠打刻システム（サーバーアプリ）
 
-ICカード打刻システムのサーバー＆クライアント統合プロジェクトです。NFCカードリーダーでの打刻、時間外申告、勤怠管理をWeb画面で一元管理できます。
+勤怠打刻データの管理、時間外申告、勤怠チェックをWeb画面で一元管理するサーバーアプリケーションです。
 
 ## 🎯 システム概要
 
 このシステムは以下のコンポーネントで構成されています：
 
 - **サーバー**: 打刻データの受信・保存・管理（Flask）
-- **クライアント**: NFCカードリーダーからの打刻送信（Python）
-- **Web UI**: 打刻データ検索、勤怠チェック、時間外申告管理
+- **Web UI**: 打刻データ検索、勤怠チェック、時間外申告管理、月間集計レポート
 
 ### 主な機能
 
@@ -39,11 +38,16 @@ ICカード打刻システムのサーバー＆クライアント統合プロジ
 
 ```
 work_attend_server/
-├── server/                         # サーバー側プログラム
+├── server/                         # サーバーアプリケーション
 │   ├── server.py                   # メインサーバー
-│   ├── api.py                      # APIエンドポイント
+│   ├── api_attendance.py           # 打刻API
+│   ├── api_overtime.py             # 時間外申告API
+│   ├── api_leave.py                # 休暇申請API
 │   ├── database.py                 # データベース操作
 │   ├── overtime.py                 # 時間外申告管理
+│   ├── leave_request.py            # 休暇申請管理
+│   ├── monthly_report.py           # 月間集計レポート
+│   ├── auth.py                     # 認証・認可
 │   ├── utils.py                    # ユーティリティ
 │   ├── config.py                   # 設定管理
 │   ├── templates/                  # HTMLテンプレート
@@ -51,16 +55,20 @@ work_attend_server/
 │   │   ├── search.html            # 打刻検索
 │   │   ├── check.html             # 勤怠チェック
 │   │   ├── overtime.html          # 時間外申告
-│   │   └── overtime_list.html     # 時間外一覧
+│   │   ├── overtime_list.html     # 時間外一覧
+│   │   ├── leave.html             # 休暇申請
+│   │   ├── leave_list.html        # 休暇一覧
+│   │   └── monthly_report.html    # 月間集計レポート
 │   ├── docker-compose.yml         # Docker設定
 │   ├── Dockerfile                 # Dockerイメージ
-│   └── requirements_server.txt    # Python依存パッケージ
+│   ├── requirements_server.txt    # Python依存パッケージ
+│   └── SECURITY_SETUP.md          # セキュリティ設定ガイド
 ├── data/                           # データベース（Dockerの外）
 │   └── attendance.db              # SQLiteデータベース
-└── docs/                           # ドキュメント
-    ├── DOCKER_GUIDE.md            # Docker環境構築ガイド
-    ├── SECURITY_IMPLEMENTATION_GUIDE.md  # セキュリティ実装ガイド
-    └── TROUBLESHOOTING.md         # トラブルシューティング
+├── DOCKER_GUIDE.md                # Docker環境構築ガイド
+├── QUICK_REFERENCE.md             # クイックリファレンス
+├── TROUBLESHOOTING.md             # トラブルシューティング
+└── LICENSE                        # ライセンス
 ```
 
 ---
@@ -78,6 +86,8 @@ start_docker.bat
 # または
 docker-compose up -d
 
+
+
 # 3. ブラウザでアクセス
 # http://localhost:5000
 ```
@@ -85,7 +95,7 @@ docker-compose up -d
 ### ローカル環境で起動
 
 ```bash
-# 1. 依存パッケージインストール
+# 1. 依存パッケージインストールｂｇ３ｈ
 cd server
 pip install -r requirements_server.txt
 
@@ -219,12 +229,11 @@ PAYROLL_END_DAY=15
 
 本番運用時のセキュリティ対策については以下を参照：
 
-📄 **[SECURITY_IMPLEMENTATION_GUIDE.md](./SECURITY_IMPLEMENTATION_GUIDE.md)**
+📄 **[server/SECURITY_SETUP.md](./server/SECURITY_SETUP.md)**
 
-- IP制限
-- 管理者認証
-- 監査ログ
-- 自動バックアップ
+- 管理者認証（パスワード保護）
+- データベースアクセス制御
+- セッション管理
 
 ---
 
@@ -331,9 +340,9 @@ ls -la ../data/attendance.db
 | ドキュメント | 内容 |
 |-------------|------|
 | [DOCKER_GUIDE.md](./DOCKER_GUIDE.md) | Docker環境構築の詳細ガイド |
-| [SECURITY_IMPLEMENTATION_GUIDE.md](./SECURITY_IMPLEMENTATION_GUIDE.md) | セキュリティ実装の詳細 |
-| [SYSTEM_OVERVIEW.md](./SYSTEM_OVERVIEW.md) | システム全体の概要 |
+| [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) | よく使うコマンドとURL一覧 |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 問題解決ガイド |
+| [server/SECURITY_SETUP.md](./server/SECURITY_SETUP.md) | セキュリティ設定ガイド |
 
 ---
 
@@ -350,13 +359,11 @@ ls -la ../data/attendance.db
 
 ```bash
 # 開発モード起動
+cd server
 FLASK_ENV=development FLASK_DEBUG=True python server.py
 
-# テスト実行
-python test_overtime_api.py
-
 # データベース確認
-python check_overtime.py
+python check_db.py
 ```
 
 ---
@@ -373,7 +380,7 @@ python check_overtime.py
 
 1. [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) を確認
 2. ログを確認: `docker-compose logs -f`
-3. データベース状態を確認: `python check_overtime.py`
+3. データベース状態を確認: `cd server && python check_db.py`
 
 ---
 
