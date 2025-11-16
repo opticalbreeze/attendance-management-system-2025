@@ -18,6 +18,7 @@ COPY leave_request.py .
 COPY api_attendance.py .
 COPY api_overtime.py .
 COPY api_leave.py .
+COPY api_monthly_report.py .
 COPY auth.py .
 COPY monthly_report.py .
 COPY templates/ templates/

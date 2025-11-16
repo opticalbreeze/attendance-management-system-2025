@@ -95,7 +95,7 @@ docker-compose up -d
 ### ローカル環境で起動
 
 ```bash
-# 1. 依存パッケージインストールｂｇ３ｈ
+# 1. 依存パッケージインストール
 cd server
 pip install -r requirements_server.txt
 

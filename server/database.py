@@ -551,8 +551,6 @@ def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
         str or None: 翌日の「明」勤務の最後の打刻時刻（HH:MM形式）、取得できない場合はNone
     """
     try:
-        from datetime import timedelta
-        
         # employee_masterからIDmを取得
         cursor.execute("""
             SELECT idm FROM employee_master 

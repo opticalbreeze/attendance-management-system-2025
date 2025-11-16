@@ -6,21 +6,13 @@ services:
       - "5000:5000"
     volumes:
       # データベースをDockerの外（attendance/dataフォルダ）に永続化
-      - ../../data:/app/data
+      - type: bind
+        source: ../../data
+        target: /app/data
       # テンプレートファイルを最新に保つ
-      - ./templates:/app/templates
-      # サーバーコード（リファクタリング版）を最新に保つ
-      - ./server.py:/app/server.py
-      - ./database.py:/app/database.py
-      - ./api_attendance.py:/app/api_attendance.py
-      - ./api_overtime.py:/app/api_overtime.py
-      - ./api_leave.py:/app/api_leave.py
-      - ./utils.py:/app/utils.py
-      - ./config.py:/app/config.py
-      - ./auth.py:/app/auth.py
-      - ./monthly_report.py:/app/monthly_report.py
-      - ./overtime.py:/app/overtime.py
-      - ./leave_request.py:/app/leave_request.py
+      - type: bind
+        source: ./templates
+        target: /app/templates
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

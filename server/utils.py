@@ -231,8 +231,6 @@ def update_request_status(table_name, request_id, status, updated_by=None):
     Returns:
         dict: {'success': bool, 'message': str}
     """
-    from datetime import datetime
-    
     try:
         conn = get_database_connection()
         cursor = conn.cursor()
@@ -339,7 +337,6 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
     """
     import os
     import re
-    from datetime import datetime
     
     try:
         # PDFフォルダのパスを取得（設定から）
