@@ -197,10 +197,28 @@
         document.addEventListener('DOMContentLoaded', async function() {
             await loadEmployees();
             
-            // 検索月のデフォルト値を設定（現在の月）
-            const now = new Date();
-            const currentMonth = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
-            document.getElementById('search-month').value = currentMonth;
+            // 検索月のデフォルト値を設定（現在の日付から月度を計算）
+            function calculateCurrentPayrollMonth() {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = today.getMonth() + 1; // 0ベースなので+1
+                const day = today.getDate();
+                
+                // 16日以降なら翌月度、15日以前なら当月度
+                if (day >= 16) {
+                    // 翌月度
+                    if (month === 12) {
+                        return `${year + 1}/01`;
+                    } else {
+                        return `${year}/${String(month + 1).padStart(2, '0')}`;
+                    }
+                } else {
+                    // 当月度
+                    return `${year}/${String(month).padStart(2, '0')}`;
+                }
+            }
+            
+            document.getElementById('search-month').value = calculateCurrentPayrollMonth();
             
             // セクション変更時に従業員リストを更新
             const sectionSelect = document.getElementById('section-select');
@@ -325,7 +343,9 @@
                 }
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
-                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+                const errorMessage = error && error.message ? error.message : 'サーバーとの通信エラーが発生しました';
+                showError('サーバーとの通信エラーが発生しました: ' + errorMessage);
+                console.error('レポート生成エラー:', error);
             }
         }
         
@@ -359,28 +379,48 @@
                 document.getElementById('loading').style.display = 'none';
                 
                 if (response.ok && data.status === 'success') {
-                    displayPreview(data.data);
+                    if (data.data) {
+                        displayPreview(data.data);
+                    } else {
+                        showError('データが取得できませんでした');
+                        console.error('レスポンスデータ:', data);
+                    }
                 } else {
                     showError(data.message || 'プレビューの取得に失敗しました');
+                    console.error('APIエラー:', data);
                 }
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
-                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+                const errorMessage = error && error.message ? error.message : 'サーバーとの通信エラーが発生しました';
+                showError('サーバーとの通信エラーが発生しました: ' + errorMessage);
+                console.error('プレビュー取得エラー:', error);
             }
         }
         
         // プレビュー表示
         function displayPreview(data) {
+            if (!data) {
+                showError('データの取得に失敗しました');
+                return;
+            }
+            
             const previewSection = document.getElementById('preview-section');
             const previewContent = document.getElementById('preview-content');
+            
+            // データの存在確認
+            if (!data.search_month || !data.employee_info || !data.daily_data) {
+                showError('データの形式が正しくありません');
+                console.error('データ構造:', data);
+                return;
+            }
             
             let html = `
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                     <h3>${data.search_month}月度 勤務実績表</h3>
-                    <p><strong>社員番号:</strong> ${data.employee_info.employee_num}</p>
-                    <p><strong>社員名:</strong> ${data.employee_info.name}</p>
-                    <p><strong>勤務先名:</strong> ${data.employee_info.workplace}</p>
-                    <p><strong>期間:</strong> ${data.start_date} 〜 ${data.end_date}</p>
+                    <p><strong>社員番号:</strong> ${data.employee_info.employee_num || '-'}</p>
+                    <p><strong>社員名:</strong> ${data.employee_info.name || '-'}</p>
+                    <p><strong>勤務先名:</strong> ${data.employee_info.workplace || '-'}</p>
+                    <p><strong>期間:</strong> ${data.start_date || '-'} 〜 ${data.end_date || '-'}</p>
                 </div>
                 
                 <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
@@ -397,21 +437,43 @@
                     <tbody>
             `;
             
-            const dailyData = data.daily_data;
-            for (const dateStr of Object.keys(dailyData).sort()) {
-                const dayData = dailyData[dateStr];
-                const workDate = new Date(dayData.date);
-                
+            const dailyData = data.daily_data || {};
+            const sortedDates = Object.keys(dailyData).sort();
+            
+            if (sortedDates.length === 0) {
                 html += `
                     <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${dayData.work_type || '-'}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${dayData.start_time || '-'}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${dayData.end_time || '-'}</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${(dayData.overtime.outer + dayData.overtime.inner).toFixed(1)}h</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">-</td>
+                        <td colspan="6" style="padding: 20px; text-align: center; color: #666;">
+                            データがありません
+                        </td>
                     </tr>
                 `;
+            } else {
+                for (const dateStr of sortedDates) {
+                    const dayData = dailyData[dateStr];
+                    if (!dayData) continue;
+                    
+                    let workDate;
+                    try {
+                        workDate = new Date(dateStr + 'T00:00:00');
+                    } catch (e) {
+                        workDate = new Date();
+                    }
+                    
+                    const overtime = dayData.overtime || { outer: 0, inner: 0 };
+                    const overtimeHours = (overtime.outer || 0) + (overtime.inner || 0);
+                    
+                    html += `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dayData.work_type || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dayData.start_time || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dayData.end_time || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${overtimeHours.toFixed(1)}h</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">-</td>
+                        </tr>
+                    `;
+                }
             }
             
             html += `

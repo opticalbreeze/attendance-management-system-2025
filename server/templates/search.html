@@ -312,7 +312,7 @@
                     </div>
                     <div class="form-group">
                         <label for="search-month">検索月（必須）</label>
-                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/10" value="2025/10" pattern="[0-9]{4}/[0-9]{1,2}" required>
+                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/12" value="" pattern="[0-9]{4}/[0-9]{1,2}" required>
                         <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
                             yyyy/mm形式で入力（前月16日〜当月15日を検索）
                         </small>
@@ -376,10 +376,28 @@
             // 従業員情報を動的に読み込み
             await loadEmployees();
             
-            // データが存在する期間：2025-09-16 から 2025-10-15（10月度検索が必要）
-            document.getElementById('search-month').value = '2025/10';
+        // 現在の日付から適切な月度を計算して設定
+        function calculateCurrentPayrollMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1; // 0ベースなので+1
+            const day = today.getDate();
             
-            // セクション変更時に従業員リストを更新
+            // 16日以降なら翌月度、15日以前なら当月度
+            if (day >= 16) {
+                // 翌月度
+                if (month === 12) {
+                    return `${year + 1}/1`;
+                } else {
+                    return `${year}/${month + 1}`;
+                }
+            } else {
+                // 当月度
+                return `${year}/${month}`;
+            }
+        }
+        
+        document.getElementById('search-month').value = calculateCurrentPayrollMonth();            // セクション変更時に従業員リストを更新
             const sectionSelect = document.getElementById('section-select');
             if (sectionSelect) {
                 sectionSelect.addEventListener('change', updateEmployeeList);

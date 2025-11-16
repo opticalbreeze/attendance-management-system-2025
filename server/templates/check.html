@@ -542,12 +542,30 @@
                 monthlySectionSelect.addEventListener('change', updateMonthlyEmployeeList);
             }
             
-            // 検索月のデフォルト値を設定（現在の月）
-            const now = new Date();
-            const currentMonth = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+            // 検索月のデフォルト値を設定（現在の日付から月度を計算）
+            function calculateCurrentPayrollMonth() {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = today.getMonth() + 1; // 0ベースなので+1
+                const day = today.getDate();
+                
+                // 16日以降なら翌月度、15日以前なら当月度
+                if (day >= 16) {
+                    // 翌月度
+                    if (month === 12) {
+                        return `${year + 1}/01`;
+                    } else {
+                        return `${year}/${String(month + 1).padStart(2, '0')}`;
+                    }
+                } else {
+                    // 当月度
+                    return `${year}/${String(month).padStart(2, '0')}`;
+                }
+            }
+            
             const searchMonthInput = document.getElementById('search-month');
             if (searchMonthInput) {
-                searchMonthInput.value = currentMonth;
+                searchMonthInput.value = calculateCurrentPayrollMonth();
             }
         });
         
