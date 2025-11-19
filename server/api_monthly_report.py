@@ -6,7 +6,6 @@
 """
 
 from flask import request, jsonify, send_file
-from functools import wraps
 import os
 
 from config import Config
@@ -95,7 +94,11 @@ def register_monthly_report_api_routes(app):
             if not data:
                 return jsonify(format_response('error', message='データが見つかりません')), 404
             
-            return jsonify(format_response('success', data=data))
+            # format_responseは辞書を直接マージするため、明示的に'data'キーでラップ
+            return jsonify({
+                'status': 'success',
+                'data': data
+            })
             
         except Exception as e:
             print(f"[エラー] プレビュー取得エラー: {e}")

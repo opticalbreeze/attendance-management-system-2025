@@ -4,8 +4,9 @@
 
 import sqlite3
 import os
+from config import Config
 
-DB_PATH = os.environ.get('DATABASE_PATH', './data/attendance.db')
+DB_PATH = Config.DATABASE_PATH
 
 print("=" * 80)
 print("📊 データベース内容確認")

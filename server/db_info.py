@@ -3,9 +3,10 @@
 簡単なデータベース操作コマンド
 """
 import sqlite3
+from config import Config
 
 def main():
-    conn = sqlite3.connect('/app/data/attendance.db')
+    conn = sqlite3.connect(Config.DATABASE_PATH)
     cursor = conn.cursor()
     
     print("=== データベース編集ツール ===")

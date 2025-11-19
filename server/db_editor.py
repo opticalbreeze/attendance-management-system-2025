@@ -5,10 +5,11 @@
 import sqlite3
 import sys
 from datetime import datetime
+from config import Config
 
 def connect_db():
     """データベースに接続"""
-    return sqlite3.connect('/app/data/attendance.db')
+    return sqlite3.connect(Config.DATABASE_PATH)
 
 def show_tables():
     """テーブル一覧を表示"""

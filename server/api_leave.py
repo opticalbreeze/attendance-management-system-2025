@@ -15,6 +15,7 @@ from leave_request import (
     approve_leave_request, reject_leave_request, withdraw_leave_request, get_leaves_for_date_range
 )
 from utils import format_response, safe_int, save_pdf_from_html
+from pdf_generator import generate_leave_html
 
 def register_leave_api_routes(app):
     """休暇願APIルートを登録"""
@@ -55,6 +56,32 @@ def register_leave_api_routes(app):
             )
             
             if leave_id:
+                # 自動でPDFを保存
+                try:
+                    html_content = generate_leave_html(
+                        employee_name=employee_name,
+                        application_date=application_date,
+                        leave_date_from=leave_date_from,
+                        leave_date_to=leave_date_to,
+                        leave_type=leave_type,
+                        leave_subtype=leave_subtype,
+                        substitute_work_date=substitute_work_date,
+                        other_reason=other_reason
+                    )
+                    
+                    pdf_result = save_pdf_from_html(
+                        html_content=html_content,
+                        filename_prefix='休暇願',
+                        employee_num=str(employee_num),
+                        date_str=leave_date_from,
+                        employee_name=employee_name
+                    )
+                    
+                    if pdf_result['success']:
+                        print(f"[自動PDF保存] 休暇願: {pdf_result['filename']}")
+                except Exception as pdf_error:
+                    print(f"[警告] PDF自動保存エラー（登録は成功）: {pdf_error}")
+                
                 return jsonify(format_response('success', message='休暇願を登録しました', leave_id=leave_id))
             else:
                 return jsonify(format_response('error', message='休暇願の登録に失敗しました')), 500

@@ -21,6 +21,7 @@ COPY api_leave.py .
 COPY api_monthly_report.py .
 COPY auth.py .
 COPY monthly_report.py .
+COPY pdf_generator.py .
 COPY templates/ templates/
 
 # データディレクトリの作成（マウントポイント）

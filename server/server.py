@@ -117,6 +117,11 @@ def register_web_routes(app):
     def admin_page():
         """管理者ページ"""
         return _add_no_cache_headers(make_response(render_template('admin.html')))
+    
+    @app.route('/debug-check')
+    def debug_check_page():
+        """検証用：24勤チェックページ"""
+        return _add_no_cache_headers(make_response(render_template('debug_check.html')))
 
 def register_auth_routes(app):
     """認証関連のAPIルートを登録"""
@@ -220,6 +225,7 @@ def print_startup_info():
     print("  - トップページ:   GET  /")
     print("  - 検索ページ:     GET  /search")
     print("  - 勤怠チェック:   GET  /check")
+    print("  - 検証用24勤チェック: GET  /debug-check")
     print("  - 時間外申告:     GET  /overtime")
     print("  - 時間外一覧:     GET  /overtime/list")
     print("  - 時間外確認:     GET  /overtime/check")

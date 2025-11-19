@@ -7,9 +7,10 @@ import csv
 import sqlite3
 from datetime import datetime
 import os
+from config import Config
 
-# データベース設定
-DATABASE_PATH = "/app/data/attendance.db"
+# データベース設定（config.pyから取得）
+DATABASE_PATH = Config.DATABASE_PATH
 
 def import_csv_to_schedule(csv_file_path):
     """CSVファイルをattend_scheduleテーブルにインポート"""

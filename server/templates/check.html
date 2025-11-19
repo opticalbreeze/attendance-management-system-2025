@@ -506,29 +506,25 @@
         // 全従業員データを保持
         let allEmployees = [];
         
+        // 給与計算期間を考慮した月度を計算
+        function calculateCurrentPayrollMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            
+            if (day >= 16) {
+                return month === 12 ? `${year + 1}/01` : `${year}/${String(month + 1).padStart(2, '0')}`;
+            } else {
+                return `${year}/${String(month).padStart(2, '0')}`;
+            }
+        }
+        
         document.addEventListener('DOMContentLoaded', async function() {
-            console.log('==============================================');
-            console.log('[DEBUG] 🚀 勤怠チェックページが読み込まれました');
-            console.log('[DEBUG] DOMContentLoaded triggered');
-            console.log('[DEBUG] 現在時刻:', new Date().toISOString());
-            console.log('==============================================');
-            
-            // フォーム要素の存在確認
-            const employeeSelect = document.getElementById('employee-id');
-            const checkDateInput = document.getElementById('check-date');
-            console.log('[DEBUG] Employee select element:', employeeSelect);
-            console.log('[DEBUG] Check date input element:', checkDateInput);
-            
-            // 従業員情報を動的に読み込み
             await loadEmployees();
-
+            
             // 今日の日付をデフォルトに設定
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('check-date').value = today;
-            console.log('[DEBUG] Default date set to:', today);
-            console.log('==============================================');
-            console.log('[DEBUG] 🎯 初期化完了 - ページ準備OK');
-            console.log('==============================================');
+            document.getElementById('check-date').value = new Date().toISOString().split('T')[0];
             
             // セクション変更時に従業員リストを更新
             const sectionSelect = document.getElementById('section-select');
@@ -542,27 +538,7 @@
                 monthlySectionSelect.addEventListener('change', updateMonthlyEmployeeList);
             }
             
-            // 検索月のデフォルト値を設定（現在の日付から月度を計算）
-            function calculateCurrentPayrollMonth() {
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = today.getMonth() + 1; // 0ベースなので+1
-                const day = today.getDate();
-                
-                // 16日以降なら翌月度、15日以前なら当月度
-                if (day >= 16) {
-                    // 翌月度
-                    if (month === 12) {
-                        return `${year + 1}/01`;
-                    } else {
-                        return `${year}/${String(month + 1).padStart(2, '0')}`;
-                    }
-                } else {
-                    // 当月度
-                    return `${year}/${String(month).padStart(2, '0')}`;
-                }
-            }
-            
+            // 検索月のデフォルト値を設定
             const searchMonthInput = document.getElementById('search-month');
             if (searchMonthInput) {
                 searchMonthInput.value = calculateCurrentPayrollMonth();
@@ -574,6 +550,17 @@
             const mode = document.querySelector('input[name="check-mode"]:checked').value;
             document.getElementById('daily-mode').style.display = mode === 'daily' ? 'block' : 'none';
             document.getElementById('monthly-mode').style.display = mode === 'monthly' ? 'block' : 'none';
+            
+            // 月度チェックモードに切り替えたとき、セクションが選択されていない場合は自動選択
+            if (mode === 'monthly') {
+                const monthlySectionSelect = document.getElementById('monthly-section-select');
+                if (monthlySectionSelect && !monthlySectionSelect.value && monthlySectionSelect.options.length > 1) {
+                    // 最初のセクション（空のオプションを除く）を選択
+                    monthlySectionSelect.selectedIndex = 1;
+                    // 従業員リストを更新
+                    updateMonthlyEmployeeList();
+                }
+            }
         }
         
         // 月度モードの従業員リスト更新
@@ -595,54 +582,51 @@
             }
         }
         
+        // セクション選択肢を設定する共通関数
+        function populateSectionSelect(selectElement, defaultText) {
+            const sections = [...new Set(allEmployees.map(emp => emp.section || '設備'))].sort();
+            console.log('[DEBUG] セクション一覧:', sections, '従業員数:', allEmployees.length);
+            selectElement.innerHTML = `<option value="">${defaultText}</option>`;
+            sections.forEach(section => {
+                const option = document.createElement('option');
+                option.value = section;
+                option.textContent = section;
+                selectElement.appendChild(option);
+            });
+            
+            // 月度チェックモードで、セクションが1つしかない場合は自動選択
+            if (selectElement.id === 'monthly-section-select' && sections.length === 1) {
+                selectElement.selectedIndex = 1;
+                updateMonthlyEmployeeList();
+            }
+        }
+        
         // 従業員情報を動的に読み込む
         async function loadEmployees() {
-            console.log('[DEBUG] loadEmployees called');
             const employeeSelect = document.getElementById('employee-id');
             const sectionSelect = document.getElementById('section-select');
 
             try {
-                console.log('[DEBUG] Fetching employees from /api/employees');
                 const response = await fetch('/api/employees');
                 const result = await response.json();
-                
-                console.log('[DEBUG] Employee API response:', result);
 
                 if (result.status === 'success' && result.data) {
-                    // 全従業員データを保存
                     allEmployees = result.data;
                     
-                    // セクション一覧を取得・設定
-                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
-                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
-                    sections.forEach(section => {
-                        const option = document.createElement('option');
-                        option.value = section;
-                        option.textContent = section;
-                        sectionSelect.appendChild(option);
-                    });
+                    // セクション選択を設定
+                    populateSectionSelect(sectionSelect, 'すべてのセクション');
                     
-                    // 従業員リストを更新
-                    updateEmployeeList();
-                    
-                    // 月度モードのセクション選択を設定
                     const monthlySectionSelect = document.getElementById('monthly-section-select');
                     if (monthlySectionSelect) {
-                        monthlySectionSelect.innerHTML = '<option value="">▼ セクションを選択</option>';
-                        sections.forEach(section => {
-                            const option = document.createElement('option');
-                            option.value = section;
-                            option.textContent = section;
-                            monthlySectionSelect.appendChild(option);
-                        });
+                        populateSectionSelect(monthlySectionSelect, '▼ セクションを選択');
                     }
                     
-                    console.log('[DEBUG] Employee options added:', result.data.length);
+                    updateEmployeeList();
                 } else {
                     throw new Error(result.message || '従業員データの読み込みに失敗');
                 }
             } catch (error) {
-                console.error('[DEBUG] Employee loading error:', error);
+                console.error('従業員データ読み込みエラー:', error);
                 employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
             }
         }
@@ -666,29 +650,18 @@
                 option.textContent = `${employee.employee_num} - ${employee.name}`;
                 employeeSelect.appendChild(option);
             });
-            
-            console.log('[DEBUG] Employee list updated:', filteredEmployees.length, 'employees');
         }
         
         // フォーム送信
         document.getElementById('check-form').addEventListener('submit', async (e) => {
-            console.log('[DEBUG] Form submit event triggered');
             e.preventDefault();
-            await performCheck();
-        });
-        
-        // チェック実行
-        async function performCheck() {
-            console.log('[DEBUG] 🔥 performCheck関数が呼び出されました！');
-            
             const mode = document.querySelector('input[name="check-mode"]:checked').value;
-            
             if (mode === 'monthly') {
                 await performMonthlyCheck();
             } else {
                 await performDailyCheck();
             }
-        }
+        });
         
         // 単日チェック実行
         async function performDailyCheck() {
@@ -718,41 +691,42 @@
             params.append('check_date', checkDate);
             
             const checkUrl = `/api/attendance_check?${params}`;
-            
-            console.log('[DEBUG] API URL:', checkUrl);
 
             try {
-                console.log('[DEBUG] Making fetch request to:', checkUrl);
+                console.log('[DEBUG] 単日チェックAPIリクエスト:', checkUrl);
                 const response = await fetch(checkUrl);
-                console.log('[DEBUG] Response status:', response.status);
-                console.log('[DEBUG] Response ok:', response.ok);
+                console.log('[DEBUG] レスポンスステータス:', response.status, response.statusText);
                 
-                // HTTPステータスコードに関係なく、レスポンスをJSONとして解析を試行
                 let data;
                 try {
-                    data = await response.json();
-                    console.log('[DEBUG] Response data:', data);
+                    const responseText = await response.text();
+                    console.log('[DEBUG] レスポンス本文:', responseText);
+                    data = JSON.parse(responseText);
                 } catch (jsonError) {
-                    console.error('[DEBUG] Failed to parse JSON:', jsonError);
+                    console.error('[DEBUG] JSON解析エラー:', jsonError);
                     throw new Error(`HTTP ${response.status}: JSONの解析に失敗しました`);
                 }
 
+                console.log('[DEBUG] パース後のデータ:', data);
+
                 document.getElementById('loading').style.display = 'none';
 
-                // ステータスコードとレスポンス内容の両方をチェック
                 if (response.ok && data.status === 'success') {
-                    console.log('[DEBUG] ✅ Success response, calling displayResults');
-                    displayResults(data.data);  // data.dataを渡す
+                    const resultData = data.data || data;
+                    console.log('[DEBUG] 結果データ:', resultData);
+                    
+                    if (!resultData || !resultData.employee_name) {
+                        console.error('[DEBUG] データ形式エラー - resultData:', resultData);
+                        showError('データの形式が正しくありません: employee_nameが見つかりません');
+                        return;
+                    }
+                    displayResults(resultData);
                 } else {
-                    // 400エラーや500エラーでも、サーバーからのエラーメッセージを表示
-                    console.log('[DEBUG] Server returned error (HTTP:', response.status, '):', data.message);
-                    const errorMessage = data.message || `サーバーエラーが発生しました (HTTP ${response.status})`;
-                    showError(errorMessage);
+                    console.error('[DEBUG] APIエラー:', data);
+                    showError(data.message || `サーバーエラーが発生しました (HTTP ${response.status})`);
                 }
             } catch (error) {
-                console.error('[DEBUG] Fetch error occurred:', error);
-                console.error('[DEBUG] Error type:', error.constructor.name);
-                console.error('[DEBUG] Error message:', error.message);
+                console.error('[DEBUG] 例外エラー:', error);
                 document.getElementById('loading').style.display = 'none';
                 showError('サーバーとの通信エラーが発生しました: ' + error.message);
             }
@@ -791,14 +765,11 @@
             
             const checkUrl = `/api/attendance_check?${params}`;
             
-            console.log('[DEBUG] Monthly API URL:', checkUrl);
-            
             try {
                 const response = await fetch(checkUrl);
                 let data;
                 try {
                     data = await response.json();
-                    console.log('[DEBUG] Monthly check response:', data);
                 } catch (jsonError) {
                     throw new Error(`HTTP ${response.status}: JSONの解析に失敗しました`);
                 }
@@ -806,33 +777,16 @@
                 document.getElementById('loading').style.display = 'none';
                 
                 if (response.ok && data.status === 'success') {
-                    // format_responseの実装により、dataが辞書の場合は直接マージされる
-                    // つまり、data.dataではなく、data自体にsearch_monthなどが含まれる
-                    const resultData = data.data ? data.data : data;
-                    console.log('[DEBUG] Monthly check result data:', resultData);
-                    
-                    // データ構造の確認とエラーハンドリング
-                    if (!resultData) {
-                        console.error('[DEBUG] resultData is null or undefined');
-                        showError('サーバーからのレスポンスにデータが含まれていません');
+                    const resultData = data.data || data;
+                    if (!resultData || !resultData.search_month) {
+                        showError('サーバーからのレスポンス形式が正しくありません');
                         return;
                     }
-                    
-                    if (!resultData.search_month) {
-                        console.error('[DEBUG] Invalid response structure:', resultData);
-                        console.error('[DEBUG] Available keys:', Object.keys(resultData));
-                        showError('サーバーからのレスポンス形式が正しくありません。コンソールを確認してください。');
-                        return;
-                    }
-                    
                     displayMonthlyResults(resultData);
                 } else {
-                    const errorMessage = data.message || `サーバーエラーが発生しました (HTTP ${response.status})`;
-                    showError(errorMessage);
+                    showError(data.message || `サーバーエラーが発生しました (HTTP ${response.status})`);
                 }
             } catch (error) {
-                console.error('[DEBUG] Monthly check error:', error);
-                console.error('[DEBUG] Error stack:', error.stack);
                 document.getElementById('loading').style.display = 'none';
                 showError('サーバーとの通信エラーが発生しました: ' + error.message);
             }
@@ -941,29 +895,11 @@
         
         // 結果を表示（単日チェック用）
         function displayResults(data) {
-            console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-            console.log('[DEBUG] ✨ displayResults関数が呼び出されました！');
-            console.log('[DEBUG] 受信データ:', data);
-            console.log('[DEBUG] employee_name:', data.employee_name);
-            console.log('[DEBUG] schedule:', data.schedule);
-            console.log('[DEBUG] attendance_records:', data.attendance_records);
-            console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-            
             try {
                 // 従業員情報を表示
-                console.log('[DEBUG] Setting employee name...');
-                const employeeNameElement = document.getElementById('employee-name');
-                console.log('[DEBUG] employee-name element:', employeeNameElement);
-                if (employeeNameElement) {
-                    employeeNameElement.textContent = `${data.employee_name} さんの勤怠チェック結果`;
-                    console.log('[DEBUG] Employee name set successfully');
-                } else {
-                    console.error('[DEBUG] employee-name element not found!');
-                }
-                
+                document.getElementById('employee-name').textContent = `${data.employee_name} さんの勤怠チェック結果`;
                 document.getElementById('employee-id-display').textContent = data.employee_id;
                 document.getElementById('check-date-display').textContent = formatDate(data.check_date);
-                console.log('[DEBUG] Basic info set successfully');
             
             // スケジュール情報を表示
             const scheduleBody = document.getElementById('schedule-body');
@@ -983,12 +919,20 @@
                 `;
                 scheduleBody.appendChild(row1);
                 
+                // 「明」勤務で前日の24勤・夜勤がある場合の処理
+                const isOffDayWithPrevNightShift = schedule.work_type && schedule.work_type.includes('明') && data.prev_day_night_shift;
+                
                 // 出勤時刻行
                 const row2 = document.createElement('tr');
-                const startDiff = calculateTimeDiff(data.schedule.start_time, data.actual_clock_in);
+                let scheduleStartTime = data.schedule.start_time;
+                // 「明」勤務の場合は出勤時刻のスケジュールなし
+                if (isOffDayWithPrevNightShift) {
+                    scheduleStartTime = null;
+                }
+                const startDiff = calculateTimeDiff(scheduleStartTime, data.actual_clock_in);
                 row2.innerHTML = `
                     <td><strong>出勤時刻</strong></td>
-                    <td>${formatTime(data.schedule.start_time) || '-'}</td>
+                    <td>${formatTime(scheduleStartTime) || '-'}</td>
                     <td>${formatTime(data.actual_clock_in) || '-'}</td>
                     <td>${startDiff ? `<span style="color: ${Math.abs(startDiff) >= 30 ? '#dc3545' : '#28a745'}">${startDiff > 0 ? '+' : ''}${startDiff}分</span>` : '-'}</td>
                 `;
@@ -996,10 +940,17 @@
                 
                 // 退勤時刻行
                 const row3 = document.createElement('tr');
-                const endDiff = calculateTimeDiff(data.schedule.end_time, data.actual_clock_out);
+                let scheduleEndTime = data.schedule.end_time;
+                let endTimeLabel = '退勤時刻';
+                // 「明」勤務で前日の24勤・夜勤がある場合、前日の終了時刻をスケジュールとして表示
+                if (isOffDayWithPrevNightShift) {
+                    scheduleEndTime = data.prev_day_night_shift.end_time;
+                    endTimeLabel = `退勤時刻（前日${data.prev_day_night_shift.work_date}の${data.prev_day_night_shift.work_type}）`;
+                }
+                const endDiff = calculateTimeDiff(scheduleEndTime, data.actual_clock_out);
                 row3.innerHTML = `
-                    <td><strong>退勤時刻</strong></td>
-                    <td>${formatTime(data.schedule.end_time) || '-'}</td>
+                    <td><strong>${endTimeLabel}</strong></td>
+                    <td>${formatTime(scheduleEndTime) || '-'}</td>
                     <td>${formatTime(data.actual_clock_out) || '-'}</td>
                     <td>${endDiff ? `<span style="color: ${Math.abs(endDiff) >= 30 ? '#dc3545' : '#28a745'}">${endDiff > 0 ? '+' : ''}${endDiff}分</span>` : '-'}</td>
                 `;
@@ -1017,10 +968,10 @@
                 scheduleBody.appendChild(row4);
                 
                 // 時間外申告データを取得・表示
-                fetchOvertimeData(data.employee_id, data.check_date, scheduleBody);
+                fetchOvertimeData(data.employee_id, data.check_date, scheduleBody, data.attendance_records);
                 
                 // 休暇願データを取得・表示
-                fetchLeaveData(data.employee_id, data.check_date, scheduleBody);
+                fetchLeaveData(data.employee_id, data.check_date, scheduleBody, data.attendance_records);
             } else {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -1053,23 +1004,12 @@
                 alertsContainer.appendChild(noAlertDiv);
             }
             
-            console.log('[DEBUG] 🌟 results-section を表示します');
             document.getElementById('results-section').style.display = 'block';
-            console.log('[DEBUG] ✅ displayResults関数が正常に完了しました');
             
             } catch (error) {
-                console.error('[DEBUG] ❌ displayResults関数でエラーが発生:', error);
-                console.error('[DEBUG] エラーの詳細:', error.message);
-                console.error('[DEBUG] スタックトレース:', error.stack);
-                
-                // エラーが発生した場合でも結果セクションを表示
+                console.error('データ表示エラー:', error);
                 document.getElementById('results-section').style.display = 'block';
-                
-                // エラーメッセージを表示
-                const employeeNameElement = document.getElementById('employee-name');
-                if (employeeNameElement) {
-                    employeeNameElement.textContent = `データ表示エラー: ${error.message}`;
-                }
+                document.getElementById('employee-name').textContent = `データ表示エラー: ${error.message}`;
             }
         }
         
@@ -1149,7 +1089,7 @@
         }
         
         // 時間外申告データを取得・表示
-        async function fetchOvertimeData(employeeId, checkDate, scheduleBody) {
+        async function fetchOvertimeData(employeeId, checkDate, scheduleBody, attendanceRecords = []) {
             try {
                 const response = await fetch(`/api/overtime?employee_num=${employeeId}&work_date=${checkDate}`);
                 const result = await response.json();
@@ -1171,19 +1111,18 @@
                     scheduleBody.appendChild(overtimeRow);
                     
                     // アラート: 時間外申告があるのに打刻がない
-                    const attendanceRecords = window.currentAttendanceRecords || [];
                     if (attendanceRecords.length === 0) {
                         addAlert('warning', '時間外申告がありますが、打刻記録がありません', 
                             '時間外作業を行った場合は打刻が必要です。打刻を確認してください。');
                     }
                 }
             } catch (error) {
-                console.error('[時間外データ取得エラー]', error);
+                console.error('時間外データ取得エラー:', error);
             }
         }
         
         // 休暇願データを取得・表示
-        async function fetchLeaveData(employeeId, checkDate, scheduleBody) {
+        async function fetchLeaveData(employeeId, checkDate, scheduleBody, attendanceRecords = []) {
             try {
                 const response = await fetch(`/api/leave?employee_num=${employeeId}&leave_date=${checkDate}`);
                 const result = await response.json();
@@ -1205,7 +1144,6 @@
                     scheduleBody.appendChild(leaveRow);
                     
                     // アラート: 休暇願があるのに打刻がある
-                    const attendanceRecords = window.currentAttendanceRecords || [];
                     if (attendanceRecords.length > 0) {
                         const leaveTypes = result.data.map(leave => leave.leave_type).join('、');
                         addAlert('warning', '休暇願がありますが、打刻記録があります', 
@@ -1213,7 +1151,7 @@
                     }
                 }
             } catch (error) {
-                console.error('[休暇願データ取得エラー]', error);
+                console.error('休暇願データ取得エラー:', error);
             }
         }
         
@@ -1337,7 +1275,7 @@
                     alert('遅刻申告を登録しました');
                     closeLateArrivalModal();
                     // チェックを再実行
-                    await performCheck();
+                    await performDailyCheck();
                 } else {
                     alert('エラー: ' + (result.message || '遅刻申告の登録に失敗しました'));
                 }
@@ -1386,7 +1324,7 @@
                     alert('早退申告を登録しました');
                     closeEarlyLeaveModal();
                     // チェックを再実行
-                    await performCheck();
+                    await performDailyCheck();
                 } else {
                     alert('エラー: ' + (result.message || '早退申告の登録に失敗しました'));
                 }

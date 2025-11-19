@@ -4,8 +4,10 @@
 特定従業員の詳細データ確認
 """
 import sqlite3
+from config import Config
 
-DATABASE_PATH = "../../data/attendance.db"
+# データベース設定（config.pyから取得）
+DATABASE_PATH = Config.DATABASE_PATH
 
 def check_specific_employee(employee_id, employee_name):
     """特定従業員の詳細データをチェック"""

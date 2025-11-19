@@ -11,6 +11,12 @@ from datetime import datetime, timedelta
 
 from config import Config
 from utils import calculate_time_diff_minutes, get_database_connection
+from work_type_constants import (
+    is_off_day_shift,
+    is_24hour_or_night_shift,
+    is_holiday_shift,
+    WORK_TYPE_OFF_DAY
+)
 
 # データベースファイルのパス（config.pyから取得）
 DB_FILE = Config.DATABASE_PATH
@@ -538,6 +544,105 @@ def get_attendance_for_schedule(cursor, employee_id, work_date):
     except sqlite3.Error as e:
         return []  # エラー時は空配列を返す
 
+def check_off_day_shift_attendance(cursor, employee_id, employee_num, idm, check_date, work_type, prev_day_night_shift_schedule, actual_end, prev_date):
+    """
+    「明」勤務の退勤時刻チェック処理
+    
+    「明」勤務の日の打刻は前日の24勤・夜勤の退勤時刻として扱い、
+    前日の24勤・夜勤のスケジュール退勤時刻と比較して差異をチェックする
+    
+    Args:
+        cursor: データベースカーソル
+        employee_id: 従業員ID
+        employee_num: 従業員番号
+        idm: IDm
+        check_date: チェック日付（「明」勤務の日）
+        work_type: 勤務タイプ
+        prev_day_night_shift_schedule: 前日の24勤・夜勤スケジュール（タプル）
+        actual_end: 「明」勤務の日の打刻時刻（前日の退勤時刻）
+        prev_date: 前日の日付
+        
+    Returns:
+        list: アラートのリスト
+    """
+    alerts = []
+    
+    if not prev_day_night_shift_schedule:
+        # 前日の24勤・夜勤スケジュールが見つからない場合の処理
+        # 「明」勤務なのに前日に24勤・夜勤がない場合は警告を出す
+        # （打刻がある場合のみ警告）
+        return alerts
+    
+    prev_schedule_start = prev_day_night_shift_schedule[2]  # start_time
+    prev_schedule_end = prev_day_night_shift_schedule[3]  # end_time
+    
+    # 前日の24勤・夜勤の出勤時刻をチェック（前日の最初の打刻時刻）
+    # 前日の打刻データを取得
+    cursor.execute("""
+        SELECT id, timestamp, terminal_id
+        FROM attendance
+        WHERE idm = ? AND date(timestamp) = ?
+        ORDER BY timestamp ASC
+    """, (idm, prev_date))
+    prev_day_attendance_rows = cursor.fetchall()
+    
+    if prev_day_attendance_rows and prev_schedule_start:
+        # 前日の最初の打刻時刻を取得
+        prev_first_timestamp = prev_day_attendance_rows[0][1]
+        try:
+            if 'T' in prev_first_timestamp:
+                prev_time_part = prev_first_timestamp.split('T')[1].split('.')[0]
+            else:
+                prev_time_part = prev_first_timestamp.split(' ')[1].split('.')[0] if ' ' in prev_first_timestamp else prev_first_timestamp
+            prev_actual_start = ':'.join(prev_time_part.split(':')[:2])
+            
+            # 前日の24勤・夜勤の出勤時刻の差異をチェック
+            diff_start = calculate_time_diff_minutes(prev_schedule_start, prev_actual_start)
+            if diff_start is not None:
+                # 前日の24勤・夜勤の日の遅刻申告を取得
+                from late_early_request import get_late_arrival_requests
+                prev_day_late = get_late_arrival_requests(employee_num=employee_num, work_date=prev_date, status='approved')
+                prev_day_late_adjustment = sum(req['late_minutes'] for req in prev_day_late)
+                adjusted_diff_start = diff_start - prev_day_late_adjustment
+                if abs(adjusted_diff_start) >= 30:
+                    alerts.append({
+                        'type': 'warning',
+                        'message': '出退勤時刻に差異あり',
+                        'details': f'出勤時刻（前日{prev_date}の{prev_day_night_shift_schedule[1]}）: スケジュール {prev_schedule_start} / 実際 {prev_actual_start} (差異: {diff_start:+d}分, 遅刻申告調整後: {adjusted_diff_start:+d}分)'
+                    })
+        except Exception as e:
+            print(f"[警告] 前日の出勤時刻チェックエラー: {e}")
+    
+    # 前日の24勤・夜勤の退勤時刻をチェック（「明」勤務の打刻）
+    # actual_endは「明」勤務の日の打刻時刻（前日の退勤時刻）
+    # 「明」勤務の日の打刻は前日の24勤・夜勤の退勤時刻として扱う
+    if prev_schedule_end:
+        # 前日の24勤・夜勤のスケジュール退勤時刻と、「明」勤務の実際の退勤打刻を比較
+        # actual_endがNoneの場合は、「明」勤務の日の打刻がないことを意味する
+        if actual_end:
+            diff_end = calculate_time_diff_minutes(prev_schedule_end, actual_end)
+            if diff_end is not None:
+                # 「明」勤務の日の早退申告を取得
+                from late_early_request import get_early_leave_requests
+                prev_day_early = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='approved')
+                prev_day_early_adjustment = sum(req['early_minutes'] for req in prev_day_early)
+                adjusted_diff_end = diff_end + prev_day_early_adjustment
+                if abs(adjusted_diff_end) >= 30:
+                    alerts.append({
+                        'type': 'warning',
+                        'message': '出退勤時刻に差異あり',
+                        'details': f'退勤時刻（前日{prev_date}の{prev_day_night_shift_schedule[1]}）: スケジュール {prev_schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)'
+                    })
+        else:
+            # 「明」勤務の日の打刻がない場合（前日の24勤・夜勤の退勤打刻がない）
+            alerts.append({
+                'type': 'warning',
+                'message': '退勤打刻なし',
+                'details': f'前日{prev_date}の{prev_day_night_shift_schedule[1]}の退勤時刻（翌日「明」の打刻）が見つかりません'
+            })
+    
+    return alerts
+
 def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
     """
     24勤・夜勤の終了時間を翌日の「明」勤務の打刻から取得する共通関数
@@ -571,8 +676,8 @@ def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
         cursor.execute("""
             SELECT work_date, work_type
             FROM attend_schedule
-            WHERE employee_id = ? AND work_date = ? AND work_type LIKE '%明%'
-        """, (employee_id, next_date))
+            WHERE employee_id = ? AND work_date = ? AND work_type LIKE ?
+        """, (employee_id, next_date, f'%{WORK_TYPE_OFF_DAY}%'))
         
         next_day_schedule = cursor.fetchone()
         if not next_day_schedule:
@@ -740,25 +845,15 @@ def check_attendance_vs_schedule(employee_id, check_date):
         
         attendance_rows = cursor.fetchall()
         
-        # 翌日の「明」勤務のスケジュールを取得（24勤A/B、夜勤用）
-        next_date = (datetime.strptime(check_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+        # 前日の24勤・夜勤のスケジュールを取得（「明」勤務で前日の退勤時刻をチェックするため）
+        prev_date = (datetime.strptime(check_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
         cursor.execute("""
-            SELECT work_date, work_type, end_time
+            SELECT work_date, work_type, start_time, end_time
             FROM attend_schedule
-            WHERE employee_id = ? AND work_date = ? AND work_type = '明'
-        """, (employee_id, next_date))
+            WHERE employee_id = ? AND work_date = ? AND (work_type LIKE '%24勤%' OR work_type LIKE '%夜勤%')
+        """, (employee_id, prev_date))
         
-        next_day_off_schedule = cursor.fetchone()
-        
-        # 翌日の打刻データを取得（24勤A/B、夜勤の退勤時刻用）
-        cursor.execute("""
-            SELECT id, timestamp, terminal_id
-            FROM attendance
-            WHERE idm = ? AND date(timestamp) = ?
-            ORDER BY timestamp ASC
-        """, (idm, next_date))
-        
-        next_day_attendance_rows = cursor.fetchall()
+        prev_day_night_shift_schedule = cursor.fetchone()
         
         # 結果を構築
         result = {
@@ -769,7 +864,8 @@ def check_attendance_vs_schedule(employee_id, check_date):
             'attendance_records': [],
             'actual_clock_in': None,
             'actual_clock_out': None,
-            'alerts': []
+            'alerts': [],
+            'prev_day_night_shift': None  # 前日の24勤・夜勤の情報（「明」勤務用）
         }
         
         # スケジュール情報
@@ -780,6 +876,15 @@ def check_attendance_vs_schedule(employee_id, check_date):
                 'work_type': schedule_row[2],
                 'start_time': schedule_row[3],
                 'end_time': schedule_row[4]
+            }
+        
+        # 前日の24勤・夜勤の情報を保存（「明」勤務の表示用）
+        if prev_day_night_shift_schedule:
+            result['prev_day_night_shift'] = {
+                'work_date': prev_day_night_shift_schedule[0],
+                'work_type': prev_day_night_shift_schedule[1],
+                'start_time': prev_day_night_shift_schedule[2],
+                'end_time': prev_day_night_shift_schedule[3]
             }
         
         # 打刻データを整形
@@ -805,14 +910,25 @@ def check_attendance_vs_schedule(employee_id, check_date):
         work_type = result['schedule']['work_type'] if result['schedule'] else None
         
         if result['attendance_records']:
-            if work_type and ('24勤' in work_type or '夜勤' in work_type):
-                # 24勤A/B、夜勤: 一番早い時間が出勤、翌日の「明」の日の一番遅い時間が退勤
+            if is_24hour_or_night_shift(work_type):
+                # 24勤・夜勤: 一番早い時間が出勤、翌日の「明」の日の一番遅い時間が退勤
                 result['actual_clock_in'] = result['attendance_records'][0]['time']
                 
                 # 共通関数を使用して翌日の「明」勤務の打刻から終了時間を取得
+                # 表示用には設定するが、退勤時刻の差異チェックでは使用しない（翌日の「明」勤務でチェックするため）
                 end_time = get_night_shift_end_time_from_next_day(cursor, employee_id, check_date)
                 if end_time:
-                    result['actual_clock_out'] = end_time
+                    result['actual_clock_out'] = end_time  # 表示用に設定
+            elif is_off_day_shift(work_type):
+                # 「明」勤務: 前日の24勤・夜勤の退勤時刻を表示（「明」勤務の日の打刻が前日の退勤時刻）
+                if len(result['attendance_records']) > 0:
+                    # 「明」勤務の日の打刻は前日の24勤・夜勤の退勤時刻として扱う
+                    result['actual_clock_in'] = None  # 「明」勤務には出勤時刻の概念がない
+                    result['actual_clock_out'] = result['attendance_records'][-1]['time']  # 最後の打刻が前日の退勤時刻
+                else:
+                    # 打刻がない場合も初期化
+                    result['actual_clock_in'] = None
+                    result['actual_clock_out'] = None
             else:
                 # 日勤: 一番早い時間が出勤、一番遅い時間が退勤
                 if len(result['attendance_records']) > 0:
@@ -838,11 +954,11 @@ def check_attendance_vs_schedule(employee_id, check_date):
             work_type = result['schedule']['work_type']
             # 休み以外で、出退勤スケジュールがあるのに打刻がない
             # 「明」勤務も打刻が必要な場合はチェック対象に含める
-            if work_type and '有' not in work_type and '所' not in work_type and '法' not in work_type:
+            if work_type and not is_holiday_shift(work_type):
                 # 「明」勤務の場合はstart_time/end_timeがなくても打刻チェックを行う
                 # その他の勤務タイプはstart_timeまたはend_timeがある場合のみチェック
                 should_check = False
-                if '明' in work_type:
+                if is_off_day_shift(work_type):
                     # 「明」勤務は常にチェック
                     should_check = True
                 elif result['schedule']['start_time'] or result['schedule']['end_time']:
@@ -922,7 +1038,7 @@ def check_attendance_vs_schedule(employee_id, check_date):
             early_minutes_adjustment = sum(req['early_minutes'] for req in approved_early)
         
         # 24勤や夜勤の場合、翌日の「明」の日に遅刻申告があるかチェック
-        if work_type and ('24勤' in work_type or '夜勤' in work_type):
+        if is_24hour_or_night_shift(work_type):
             next_date = (datetime.strptime(check_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
             next_day_late_requests = get_late_arrival_requests(employee_num=employee_num, work_date=next_date, status='approved')
             if next_day_late_requests:
@@ -936,9 +1052,17 @@ def check_attendance_vs_schedule(employee_id, check_date):
             actual_start = result['actual_clock_in']
             actual_end = result['actual_clock_out']
             
-            if schedule_start and actual_start:
+            # 24勤・夜勤の当日の場合、actual_clock_outをNoneにする（翌日の「明」勤務でチェックするため）
+            work_type = result['schedule']['work_type'] if result['schedule'] else None
+            is_night_shift_day = is_24hour_or_night_shift(work_type)
+            
+            if is_night_shift_day:
+                actual_end = None  # 24勤・夜勤の当日では退勤時刻チェックをスキップ
+            
+            # 出勤時刻の差異チェック
+            # 24勤・夜勤の場合は翌日の「明」勤務で出勤時刻をチェックするため、当日の出勤時刻チェックはスキップ
+            if schedule_start and actual_start and not is_night_shift_day:
                 diff_start = calculate_time_diff_minutes(schedule_start, actual_start)
-                # 遅刻申告がある場合は、その分数を引いて判定
                 if diff_start is not None:
                     adjusted_diff_start = diff_start - late_minutes_adjustment
                     if abs(adjusted_diff_start) >= 30:
@@ -948,25 +1072,55 @@ def check_attendance_vs_schedule(employee_id, check_date):
                             'details': f'出勤時刻: スケジュール {schedule_start} / 実際 {actual_start} (差異: {diff_start:+d}分, 遅刻申告調整後: {adjusted_diff_start:+d}分)'
                         })
             
-            if schedule_end and actual_end:
-                diff_end = calculate_time_diff_minutes(schedule_end, actual_end)
-                # 早退申告がある場合は、その分数を引いて判定
-                if diff_end is not None:
-                    adjusted_diff_end = diff_end + early_minutes_adjustment  # 早退は負の値なので加算
-                    if abs(adjusted_diff_end) >= 30:
-                        alerts.append({
-                            'type': 'warning',
-                            'message': '出退勤時刻に差異あり',
-                            'details': f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)'
-                        })
-            elif schedule_end and not actual_end:
-                # 退勤スケジュールがあるのに退勤打刻がない
-                if work_type and ('24勤' not in work_type and '夜勤' not in work_type):
+            # 退勤時刻の差異チェック
+            # 24勤・夜勤の場合は翌日の「明」で退勤するため、当日の退勤時刻はチェックしない
+            # 「明」勤務の場合は、前日の24勤・夜勤の退勤時刻をチェックする
+            
+            if is_off_day_shift(work_type):
+                # 「明」勤務の場合、前日に24勤・夜勤があった場合、その出勤時刻と退勤時刻をチェック
+                # 専用関数を使用してチェック処理を実行
+                off_day_alerts = check_off_day_shift_attendance(
+                    cursor=cursor,
+                    employee_id=employee_id,
+                    employee_num=employee_num,
+                    idm=idm,
+                    check_date=check_date,
+                    work_type=work_type,
+                    prev_day_night_shift_schedule=prev_day_night_shift_schedule,
+                    actual_end=actual_end,
+                    prev_date=prev_date
+                )
+                alerts.extend(off_day_alerts)
+                
+                # 前日の24勤・夜勤スケジュールが見つからない場合の警告（打刻がある場合のみ）
+                if not prev_day_night_shift_schedule and result['attendance_records']:
                     alerts.append({
                         'type': 'warning',
-                        'message': '出退勤時刻に差異あり',
-                        'details': f'退勤時刻: スケジュール {schedule_end} / 実際 打刻なし'
+                        'message': '「明」勤務ですが、前日の24勤・夜勤スケジュールが見つかりません',
+                        'details': f'前日({prev_date})のスケジュールを確認してください'
                     })
+            elif schedule_end and actual_end and not is_night_shift_day:
+                # 24勤・夜勤以外で、退勤時刻がある場合のみチェック
+                # 日勤の場合は退勤時刻をチェック
+                # 念のため、work_typeに「24勤」または「夜勤」が含まれている場合はスキップ
+                if not is_24hour_or_night_shift(work_type):
+                    # 24勤・夜勤以外の場合のみチェック
+                    diff_end = calculate_time_diff_minutes(schedule_end, actual_end)
+                    if diff_end is not None:
+                        adjusted_diff_end = diff_end + early_minutes_adjustment
+                        if abs(adjusted_diff_end) >= 30:
+                            alerts.append({
+                                'type': 'warning',
+                                'message': '出退勤時刻に差異あり',
+                                'details': f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)'
+                            })
+            elif schedule_end and not actual_end and not is_24hour_or_night_shift:
+                # 退勤スケジュールがあるのに退勤打刻がない（24勤・夜勤以外）
+                alerts.append({
+                    'type': 'warning',
+                    'message': '出退勤時刻に差異あり',
+                    'details': f'退勤時刻: スケジュール {schedule_end} / 実際 打刻なし'
+                })
         
         result['alerts'] = alerts
         

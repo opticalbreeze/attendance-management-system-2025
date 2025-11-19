@@ -7,9 +7,10 @@ import sqlite3
 from datetime import datetime, timedelta
 import sys
 import os
+from config import Config
 
-# データベース設定
-DATABASE_PATH = "../../data/attendance.db"
+# データベース設定（config.pyから取得）
+DATABASE_PATH = Config.DATABASE_PATH
 
 def check_schedule_coverage():
     """指定期間の勤務スケジュールカバレッジをチェック"""

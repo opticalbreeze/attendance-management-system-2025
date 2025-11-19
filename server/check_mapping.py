@@ -2,7 +2,13 @@
 import sqlite3
 
 # データベースに接続
-conn = sqlite3.connect('/app/data/attendance.db')
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import sqlite3
+from config import Config
+
+# データベース設定（config.pyから取得）
+conn = sqlite3.connect(Config.DATABASE_PATH)
 
 # テーブルスキーマ確認
 print("=== attend_schedule テーブルスキーマ ===")

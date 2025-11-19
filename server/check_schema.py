@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import sqlite3
 import sys
+from config import Config
 
 def check_schema():
     """テーブルスキーマの詳細情報を確認"""
     try:
-        conn = sqlite3.connect('/app/data/attendance.db')
+        conn = sqlite3.connect(Config.DATABASE_PATH)
         
         print("=== attend_schedule テーブルスキーマ ===")
         cursor = conn.execute('PRAGMA table_info(attend_schedule)')

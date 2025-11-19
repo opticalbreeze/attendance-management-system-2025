@@ -13,6 +13,19 @@ services:
       - type: bind
         source: ./templates
         target: /app/templates
+      # サーバーコードを最新に保つ
+      - type: bind
+        source: ./server.py
+        target: /app/server.py
+      - type: bind
+        source: ./pdf_generator.py
+        target: /app/pdf_generator.py
+      - type: bind
+        source: ./database.py
+        target: /app/database.py
+      - type: bind
+        source: ./api_attendance.py
+        target: /app/api_attendance.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

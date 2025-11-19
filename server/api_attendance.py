@@ -200,12 +200,22 @@ def register_attendance_api_routes(app):
             except ValueError:
                 return jsonify(format_response('error', message='日付形式が正しくありません')), 400
             
+            print(f"[DEBUG] 単日チェックAPI: employee_id={employee_id}, check_date={check_date}")
             result = check_attendance_vs_schedule(employee_id, check_date)
+            print(f"[DEBUG] check_attendance_vs_schedule結果: status={result.get('status')}, data keys={list(result.get('data', {}).keys()) if result.get('data') else 'None'}")
             
             if result['status'] == 'error':
+                print(f"[DEBUG] エラー: {result['message']}")
                 return jsonify(format_response('error', message=result['message'])), 400
             
-            return jsonify(format_response('success', message='勤怠チェックが完了しました', data=result['data']))
+            # format_responseは辞書を直接マージするため、明示的に'data'キーでラップ
+            response_data = {
+                'status': 'success',
+                'message': '勤怠チェックが完了しました',
+                'data': result['data']
+            }
+            print(f"[DEBUG] レスポンスデータ: employee_name={result['data'].get('employee_name') if result.get('data') else 'None'}")
+            return jsonify(response_data)
             
         except Exception as e:
             print(f"[エラー] 勤怠チェックエラー: {e}")

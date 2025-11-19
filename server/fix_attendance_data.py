@@ -5,8 +5,10 @@
 """
 import sqlite3
 import time
+from config import Config
 
-DATABASE_PATH = "../../data/attendance.db"
+# データベース設定（config.pyから取得）
+DATABASE_PATH = Config.DATABASE_PATH
 
 def fix_attendance_data():
     """勤務データの問題を修正"""

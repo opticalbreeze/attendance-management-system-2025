@@ -5,10 +5,11 @@
 import sqlite3
 import os
 from datetime import datetime
+from config import Config
 
 def test_database_permissions():
     """データベースの読み書き権限をテストする"""
-    db_path = '/app/data/attendance.db'
+    db_path = Config.DATABASE_PATH
     
     try:
         print('=== データベース編集権限テスト ===')
@@ -113,7 +114,7 @@ def simple_edit_test():
     print('\n=== 簡単な編集テスト ===')
     
     try:
-        conn = sqlite3.connect('/app/data/attendance.db')
+        conn = sqlite3.connect(Config.DATABASE_PATH)
         cursor = conn.cursor()
         
         # 従業員一覧表示

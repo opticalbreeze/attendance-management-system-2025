@@ -265,10 +265,23 @@
     <script>
         let employees = [];
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        // 給与計算期間を考慮した月度を計算
+        function calculateCurrentPayrollMonth() {
             const today = new Date();
-            const currentMonth = today.toISOString().slice(0, 7);
-            document.getElementById('searchMonth').value = currentMonth;
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            
+            if (day >= 16) {
+                return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+            } else {
+                return `${year}-${String(month).padStart(2, '0')}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 給与計算期間を考慮した月度を初期値として設定
+            document.getElementById('searchMonth').value = calculateCurrentPayrollMonth();
 
             await loadEmployees();
         });

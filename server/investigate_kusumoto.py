@@ -4,10 +4,11 @@
 """
 import sqlite3
 from datetime import datetime
+from config import Config
 
 def investigate_kusumoto_data():
     """楠本忠晴さんのデータを詳しく調査する"""
-    conn = sqlite3.connect('/app/data/attendance.db')
+    conn = sqlite3.connect(Config.DATABASE_PATH)
     cursor = conn.cursor()
     
     print("=== 楠本忠晴さんのデータ調査 ===\n")
@@ -96,7 +97,7 @@ def investigate_kusumoto_data():
 
 def fix_kusumoto_employee_number():
     """楠本忠晴さんの従業員番号を修正する"""
-    conn = sqlite3.connect('/app/data/attendance.db')
+    conn = sqlite3.connect(Config.DATABASE_PATH)
     cursor = conn.cursor()
     
     try:

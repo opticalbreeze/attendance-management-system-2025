@@ -201,19 +201,12 @@
             function calculateCurrentPayrollMonth() {
                 const today = new Date();
                 const year = today.getFullYear();
-                const month = today.getMonth() + 1; // 0ベースなので+1
+                const month = today.getMonth() + 1;
                 const day = today.getDate();
                 
-                // 16日以降なら翌月度、15日以前なら当月度
                 if (day >= 16) {
-                    // 翌月度
-                    if (month === 12) {
-                        return `${year + 1}/01`;
-                    } else {
-                        return `${year}/${String(month + 1).padStart(2, '0')}`;
-                    }
+                    return month === 12 ? `${year + 1}/01` : `${year}/${String(month + 1).padStart(2, '0')}`;
                 } else {
-                    // 当月度
                     return `${year}/${String(month).padStart(2, '0')}`;
                 }
             }
@@ -407,12 +400,11 @@
             const previewSection = document.getElementById('preview-section');
             const previewContent = document.getElementById('preview-content');
             
-            // データの存在確認
-            if (!data.search_month || !data.employee_info || !data.daily_data) {
-                showError('データの形式が正しくありません');
-                console.error('データ構造:', data);
-                return;
-            }
+               // データの存在確認
+               if (!data.search_month || !data.employee_info || !data.daily_data) {
+                   showError('データの形式が正しくありません');
+                   return;
+               }
             
             let html = `
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">

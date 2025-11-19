@@ -5,10 +5,11 @@
 import sqlite3
 import sys
 from datetime import datetime
+from config import Config
 
 class DatabaseEditor:
     def __init__(self):
-        self.db_path = '/app/data/attendance.db'
+        self.db_path = Config.DATABASE_PATH
         
     def connect(self):
         """データベースに接続"""

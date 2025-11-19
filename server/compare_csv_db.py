@@ -7,9 +7,10 @@ import csv
 import sqlite3
 from datetime import datetime
 import os
+from config import Config
 
-# データベース設定
-DATABASE_PATH = "../../data/attendance.db"
+# データベース設定（config.pyから取得）
+DATABASE_PATH = Config.DATABASE_PATH
 
 def read_csv_data(csv_file_path):
     """CSVファイルからデータを読み込み"""

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import sqlite3
+from config import Config
 
-conn = sqlite3.connect('/app/data/attendance.db')
+# データベース設定（config.pyから取得）
+conn = sqlite3.connect(Config.DATABASE_PATH)
 cursor = conn.cursor()
 
 print("=== attend_schedule テーブル構造 ===")

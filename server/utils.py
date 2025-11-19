@@ -150,7 +150,23 @@ def validate_search_month(search_month):
         return False, "検索月はyyyy/mm形式で入力してください（例: 2025/10）"
 
 def format_response(status, data=None, message=None, **kwargs):
-    """統一されたレスポンス形式を生成"""
+    """
+    統一されたレスポンス形式を生成
+    
+    Args:
+        status: ステータス ('success' or 'error')
+        data: データ（辞書の場合は直接マージ、それ以外は'data'キーに設定）
+        message: メッセージ
+        **kwargs: 追加パラメータ
+    
+    Returns:
+        dict: 統一されたレスポンス形式
+        
+    Note:
+        - dataが辞書の場合: 辞書の内容が直接レスポンスにマージされる
+        - dataが辞書以外の場合: response['data']に設定される
+        - 辞書を'data'キーでラップしたい場合は、明示的に{'data': dict}を返すこと
+    """
     response = {'status': status}
     
     if message:
@@ -158,8 +174,10 @@ def format_response(status, data=None, message=None, **kwargs):
     
     if data is not None:
         if isinstance(data, dict):
+            # 辞書の場合は直接マージ（既存の動作を維持）
             response.update(data)
         else:
+            # リストやその他の型の場合は'data'キーに設定
             response['data'] = data
     
     # 追加パラメータ
@@ -357,12 +375,16 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             safe_employee_name = re.sub(r'[<>:"/\\|?*]', '', employee_name)
             safe_employee_name = safe_employee_name.strip()
         
-        # ファイル名を生成（「休暇願」または「時間外」+ 従業員名 + 社員番号 + 日付）
-        date_str_clean = date_str.replace('-', '')
+        # ファイル名を生成（日付_名前_時刻形式）
+        from datetime import datetime
+        now = datetime.now()
+        timestamp_str = now.strftime('%H%M%S')  # 時刻のみ（HHMMSS形式）
+        date_str_clean = date_str.replace('-', '')  # YYYYMMDD形式
+        
         if safe_employee_name:
-            filename = f'{filename_prefix}{safe_employee_name}{employee_num}{date_str_clean}.pdf'
+            filename = f'{date_str_clean}_{safe_employee_name}_{timestamp_str}.pdf'
         else:
-            filename = f'{filename_prefix}{employee_num}{date_str_clean}.pdf'
+            filename = f'{date_str_clean}_{employee_num}_{timestamp_str}.pdf'
         pdf_path = os.path.join(pdf_dir, filename)
         
         # weasyprint を使用してPDF生成

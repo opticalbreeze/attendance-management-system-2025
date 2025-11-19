@@ -15,6 +15,7 @@ from overtime import (
     approve_overtime, reject_overtime, withdraw_overtime, get_monthly_overtime_summary
 )
 from utils import format_response, safe_int, save_pdf_from_html
+from pdf_generator import generate_overtime_html
 
 def register_overtime_api_routes(app):
     """時間外申告APIルートを登録"""
@@ -63,6 +64,29 @@ def register_overtime_api_routes(app):
                         created_ids.append(overtime_id)
             
             if created_ids:
+                # 自動でPDFを保存
+                try:
+                    html_content = generate_overtime_html(
+                        employee_name=employee_name,
+                        application_date=application_date,
+                        work_date=work_date,
+                        overtime_entries=overtime_entries
+                    )
+                    
+                    pdf_result = save_pdf_from_html(
+                        html_content=html_content,
+                        filename_prefix='時間外',
+                        employee_num=str(employee_num),
+                        date_str=work_date,
+                        employee_name=employee_name,
+                        additional_css='.overtime-item { border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }'
+                    )
+                    
+                    if pdf_result['success']:
+                        print(f"[自動PDF保存] 時間外申告: {pdf_result['filename']}")
+                except Exception as pdf_error:
+                    print(f"[警告] PDF自動保存エラー（登録は成功）: {pdf_error}")
+                
                 return jsonify(format_response('success',
                     message=f'{len(created_ids)}件の時間外作業申告を登録しました', overtime_ids=created_ids))
             else:
