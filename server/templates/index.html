@@ -154,13 +154,15 @@
         <div class="buttons">
             <a href="/overtime" class="btn btn-primary">⏰ 時間外作業申告<br><small style="font-size: 0.7em; opacity: 0.9;">Overtime Application</small></a>
             <a href="/overtime/check" class="btn btn-primary">👤 時間外確認（個人）<br><small style="font-size: 0.7em; opacity: 0.9;">Overtime Check (Personal)</small></a>
-            <a href="/overtime/list" class="btn btn-primary">📋 時間外一覧（管理）<br><small style="font-size: 0.7em; opacity: 0.9;">Overtime List (Admin)</small></a>
         </div>
         
         <div class="buttons">
             <a href="/leave" class="btn btn-leave">📄 休暇願申請<br><small style="font-size: 0.7em; opacity: 0.9;">Leave Request</small></a>
             <a href="/leave/check" class="btn btn-leave">👤 休暇願確認（個人）<br><small style="font-size: 0.7em; opacity: 0.9;">Leave Check (Personal)</small></a>
-            <a href="/leave/list" class="btn btn-leave">📋 休暇願一覧（管理）<br><small style="font-size: 0.7em; opacity: 0.9;">Leave List (Admin)</small></a>
+        </div>
+        
+        <div class="buttons" id="admin-menu" style="display: none;">
+            <a href="/admin" class="btn" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white;">⚙️ 管理者メニュー<br><small style="font-size: 0.7em; opacity: 0.9;">Admin Menu</small></a>
         </div>
         
         <div class="recent-activity">
@@ -182,10 +184,14 @@
                     document.getElementById('login-link').style.display = 'none';
                     document.getElementById('logout-link').style.display = 'inline-block';
                     document.getElementById('auth-status').textContent = '✅ ログイン中';
+                    // 管理者メニューを表示
+                    document.getElementById('admin-menu').style.display = 'flex';
                 } else {
                     document.getElementById('login-link').style.display = 'inline-block';
                     document.getElementById('logout-link').style.display = 'none';
                     document.getElementById('auth-status').textContent = '';
+                    // 管理者メニューを非表示
+                    document.getElementById('admin-menu').style.display = 'none';
                 }
             } catch (error) {
                 console.error('認証状態確認エラー:', error);

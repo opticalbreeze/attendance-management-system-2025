@@ -600,7 +600,7 @@ def check_off_day_shift_attendance(cursor, employee_id, employee_num, idm, check
             diff_start = calculate_time_diff_minutes(prev_schedule_start, prev_actual_start)
             if diff_start is not None:
                 # 前日の24勤・夜勤の日の遅刻申告を取得
-                from late_early_request import get_late_arrival_requests
+                # get_late_arrival_requestsはdatabase.py内で定義されているため、インポート不要
                 prev_day_late = get_late_arrival_requests(employee_num=employee_num, work_date=prev_date, status='approved')
                 prev_day_late_adjustment = sum(req['late_minutes'] for req in prev_day_late)
                 adjusted_diff_start = diff_start - prev_day_late_adjustment
@@ -623,7 +623,7 @@ def check_off_day_shift_attendance(cursor, employee_id, employee_num, idm, check
             diff_end = calculate_time_diff_minutes(prev_schedule_end, actual_end)
             if diff_end is not None:
                 # 「明」勤務の日の早退申告を取得
-                from late_early_request import get_early_leave_requests
+                # get_early_leave_requestsはdatabase.py内で定義されているため、インポート不要
                 prev_day_early = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='approved')
                 prev_day_early_adjustment = sum(req['early_minutes'] for req in prev_day_early)
                 adjusted_diff_end = diff_end + prev_day_early_adjustment

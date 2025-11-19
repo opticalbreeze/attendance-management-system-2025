@@ -26,6 +26,18 @@ services:
       - type: bind
         source: ./api_attendance.py
         target: /app/api_attendance.py
+      - type: bind
+        source: ./api_overtime.py
+        target: /app/api_overtime.py
+      - type: bind
+        source: ./api_leave.py
+        target: /app/api_leave.py
+      - type: bind
+        source: ./utils.py
+        target: /app/utils.py
+      - type: bind
+        source: ./work_type_constants.py
+        target: /app/work_type_constants.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

@@ -785,8 +785,16 @@
             document.getElementById('pageTitle').textContent = '時間外作業申告';
         }
 
+        // 送信中フラグ（重複送信防止）
+        let isSubmitting = false;
+
         // 登録とPDF保存と印刷を同時実行
         async function submitAndPrint() {
+            // 重複送信を防ぐ
+            if (isSubmitting) {
+                return;
+            }
+
             // 従業員名のチェック
             const employee = employees.find(emp => emp.employee_num == formData.employee_num);
             if (!employee || !employee.name || employee.name.trim() === '') {
@@ -799,6 +807,16 @@
                     printBtn.style.cursor = 'not-allowed';
                 }
                 return;
+            }
+
+            // 送信開始：ボタンを無効化
+            isSubmitting = true;
+            const printBtn = document.querySelector('button[onclick="submitAndPrint()"]');
+            if (printBtn) {
+                printBtn.disabled = true;
+                printBtn.style.opacity = '0.5';
+                printBtn.style.cursor = 'not-allowed';
+                printBtn.textContent = '送信中...';
             }
 
             try {
@@ -815,25 +833,18 @@
 
                 if (result.status !== 'success') {
                     showAlert('error', result.message || '申告の送信に失敗しました');
+                    // エラー時はボタンを再有効化
+                    isSubmitting = false;
+                    if (printBtn) {
+                        printBtn.disabled = false;
+                        printBtn.style.opacity = '1';
+                        printBtn.style.cursor = 'pointer';
+                        printBtn.textContent = '登録・印刷';
+                    }
                     return;
                 }
 
-                // 2. 確認画面のHTMLを取得してサーバーに送信（PDF保存用）
-                const confirmationHTML = document.querySelector('.container').outerHTML;
-                const employeeName = employee.name;
-                
-                await fetch('/api/overtime/save_pdf', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        html_content: confirmationHTML,
-                        employee_num: formData.employee_num,
-                        employee_name: employeeName,
-                        work_date: formData.work_date
-                    })
-                });
+                // 2. PDFはサーバー側で自動保存されるため、フロントエンドからの保存は不要
 
                 // 3. 登録完了メッセージとダイアログを表示
                 showAlert('success', '登録が完了しました。');
@@ -857,6 +868,14 @@
             } catch (error) {
                 console.error('エラー:', error);
                 showAlert('error', 'サーバーエラーが発生しました');
+                // エラー時はボタンを再有効化
+                isSubmitting = false;
+                if (printBtn) {
+                    printBtn.disabled = false;
+                    printBtn.style.opacity = '1';
+                    printBtn.style.cursor = 'pointer';
+                    printBtn.textContent = '登録・印刷';
+                }
             }
         }
 

@@ -56,8 +56,9 @@ def register_leave_api_routes(app):
             )
             
             if leave_id:
-                # 自動でPDFを保存
+                # 自動でPDFを保存（バックグラウンドで実行）
                 try:
+                    print(f"[自動PDF保存開始] 休暇願 - 従業員: {employee_name} ({employee_num}), 休暇日: {leave_date_from}～{leave_date_to}")
                     html_content = generate_leave_html(
                         employee_name=employee_name,
                         application_date=application_date,
@@ -78,9 +79,13 @@ def register_leave_api_routes(app):
                     )
                     
                     if pdf_result['success']:
-                        print(f"[自動PDF保存] 休暇願: {pdf_result['filename']}")
+                        print(f"[自動PDF保存成功] 休暇願: {pdf_result['filename']} -> {pdf_result.get('path', 'N/A')}")
+                    else:
+                        print(f"[自動PDF保存失敗] 休暇願: {pdf_result.get('message', '不明なエラー')}")
                 except Exception as pdf_error:
+                    import traceback
                     print(f"[警告] PDF自動保存エラー（登録は成功）: {pdf_error}")
+                    traceback.print_exc()
                 
                 return jsonify(format_response('success', message='休暇願を登録しました', leave_id=leave_id))
             else:

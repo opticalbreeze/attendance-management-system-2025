@@ -367,6 +367,7 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
         
         # フォルダが存在しない場合は作成
         os.makedirs(pdf_dir, exist_ok=True)
+        print(f"[PDF保存先] {pdf_dir}")
         
         # ファイル名に使用できない文字を除去（Windowsのファイル名に使用できない文字）
         safe_employee_name = ''
@@ -395,17 +396,25 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             font_config = FontConfiguration()
             base_css = '''
                 @page { size: A4; margin: 15mm; }
-                body { font-family: "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }
+                @font-face {
+                    font-family: "Noto Sans CJK JP";
+                    src: local("Noto Sans CJK JP Regular"), local("Noto Sans CJK JP");
+                }
+                body { font-family: "Noto Sans CJK JP", "Noto Sans CJK", "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }
                 .container { border: 2px solid #000; padding: 20mm; }
                 h1 { font-size: 20pt; text-align: center; border-bottom: 3px double #000; padding-bottom: 10pt; margin-bottom: 20pt; }
-                .confirmation-section { border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; }
+                .confirmation-section { border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; break-inside: avoid; }
                 .confirmation-section h3 { font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 5pt; margin-bottom: 10pt; }
-                .back-link, .button-group, .subtitle, #alert { display: none; }
+                .info-row { display: table; width: 100%; }
+                .info-label { display: table-cell; vertical-align: top; }
+                .info-value { display: table-cell; vertical-align: top; }
+                .back-link, .button-group, .subtitle, #alert { display: none !important; }
             '''
             css = CSS(string=base_css + additional_css, font_config=font_config)
             
             HTML(string=html_content).write_pdf(pdf_path, stylesheets=[css], font_config=font_config)
-            print(f"[PDF保存] {filename} を {pdf_dir} に保存しました")
+            print(f"[PDF保存成功] {filename} を {pdf_dir} に保存しました")
+            print(f"[PDF保存パス] {pdf_path}")
             return {
                 'success': True,
                 'filename': filename,

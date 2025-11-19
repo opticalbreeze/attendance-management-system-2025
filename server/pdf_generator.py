@@ -29,15 +29,19 @@ def generate_overtime_html(employee_name, application_date, work_date, overtime_
     <meta charset="UTF-8">
     <style>
         @page {{ size: A4; margin: 15mm; }}
-        body {{ font-family: "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }}
+        @font-face {{
+            font-family: "Noto Sans CJK JP";
+            src: local("Noto Sans CJK JP Regular"), local("Noto Sans CJK JP");
+        }}
+        body {{ font-family: "Noto Sans CJK JP", "Noto Sans CJK", "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }}
         .container {{ border: 2px solid #000; padding: 20mm; }}
         h1 {{ font-size: 20pt; text-align: center; border-bottom: 3px double #000; padding-bottom: 10pt; margin-bottom: 20pt; }}
-        .confirmation-section {{ border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; }}
+        .confirmation-section {{ border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; break-inside: avoid; }}
         .confirmation-section h3 {{ font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 5pt; margin-bottom: 10pt; }}
-        .info-row {{ padding: 8pt 0; border-bottom: 1px solid #666; font-size: 11pt; display: flex; }}
-        .info-label {{ font-weight: bold; color: #000; width: 120pt; }}
-        .info-value {{ color: #000; flex: 1; }}
-        .overtime-item {{ border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }}
+        .info-row {{ padding: 8pt 0; border-bottom: 1px solid #666; font-size: 11pt; display: table; width: 100%; }}
+        .info-label {{ font-weight: bold; color: #000; width: 120pt; display: table-cell; vertical-align: top; padding-right: 10pt; }}
+        .info-value {{ color: #000; display: table-cell; vertical-align: top; }}
+        .overtime-item {{ border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; break-inside: avoid; }}
         .overtime-item h4 {{ font-size: 12pt; color: #000; border-bottom: 1px solid #000; padding-bottom: 5pt; margin-bottom: 8pt; }}
         .pdf-footer {{ text-align: right; font-size: 9pt; margin-top: 15pt; padding-top: 10pt; border-top: 1px solid #000; }}
     </style>
@@ -125,14 +129,18 @@ def generate_leave_html(employee_name, application_date, leave_date_from, leave_
     <meta charset="UTF-8">
     <style>
         @page {{ size: A4; margin: 15mm; }}
-        body {{ font-family: "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }}
+        @font-face {{
+            font-family: "Noto Sans CJK JP";
+            src: local("Noto Sans CJK JP Regular"), local("Noto Sans CJK JP");
+        }}
+        body {{ font-family: "Noto Sans CJK JP", "Noto Sans CJK", "Yu Gothic", "YuGothic", "Meiryo", sans-serif; color: #000; background: #fff; }}
         .container {{ border: 2px solid #000; padding: 20mm; }}
         h1 {{ font-size: 20pt; text-align: center; border-bottom: 3px double #000; padding-bottom: 10pt; margin-bottom: 20pt; }}
-        .confirmation-section {{ border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; }}
+        .confirmation-section {{ border: 2px solid #000; margin-bottom: 15pt; padding: 12pt; page-break-inside: avoid; break-inside: avoid; }}
         .confirmation-section h3 {{ font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 5pt; margin-bottom: 10pt; }}
-        .info-row {{ padding: 8pt 0; border-bottom: 1px solid #666; font-size: 11pt; display: flex; }}
-        .info-label {{ font-weight: bold; color: #000; width: 120pt; }}
-        .info-value {{ color: #000; flex: 1; }}
+        .info-row {{ padding: 8pt 0; border-bottom: 1px solid #666; font-size: 11pt; display: table; width: 100%; }}
+        .info-label {{ font-weight: bold; color: #000; width: 120pt; display: table-cell; vertical-align: top; padding-right: 10pt; }}
+        .info-value {{ color: #000; display: table-cell; vertical-align: top; }}
         .pdf-footer {{ text-align: right; font-size: 9pt; margin-top: 15pt; padding-top: 10pt; border-top: 1px solid #000; }}
     </style>
 </head>

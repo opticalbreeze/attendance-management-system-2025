@@ -64,8 +64,9 @@ def register_overtime_api_routes(app):
                         created_ids.append(overtime_id)
             
             if created_ids:
-                # 自動でPDFを保存
+                # 自動でPDFを保存（バックグラウンドで実行）
                 try:
+                    print(f"[自動PDF保存開始] 時間外申告 - 従業員: {employee_name} ({employee_num}), 作業日: {work_date}")
                     html_content = generate_overtime_html(
                         employee_name=employee_name,
                         application_date=application_date,
@@ -83,9 +84,13 @@ def register_overtime_api_routes(app):
                     )
                     
                     if pdf_result['success']:
-                        print(f"[自動PDF保存] 時間外申告: {pdf_result['filename']}")
+                        print(f"[自動PDF保存成功] 時間外申告: {pdf_result['filename']} -> {pdf_result.get('path', 'N/A')}")
+                    else:
+                        print(f"[自動PDF保存失敗] 時間外申告: {pdf_result.get('message', '不明なエラー')}")
                 except Exception as pdf_error:
+                    import traceback
                     print(f"[警告] PDF自動保存エラー（登録は成功）: {pdf_error}")
+                    traceback.print_exc()
                 
                 return jsonify(format_response('success',
                     message=f'{len(created_ids)}件の時間外作業申告を登録しました', overtime_ids=created_ids))

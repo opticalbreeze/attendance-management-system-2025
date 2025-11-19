@@ -4,6 +4,19 @@ FROM python:3.11-slim
 # 作業ディレクトリ
 WORKDIR /app
 
+# WeasyPrintの依存関係と日本語フォントをインストール
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libgobject-2.0-0 \
+    libcairo2 \
+    libgdk-pixbuf-2.0-0 \
+    shared-mime-info \
+    fonts-noto-cjk \
+    fonts-noto-cjk-extra \
+    && rm -rf /var/lib/apt/lists/*
+
 # 依存パッケージのインストール
 COPY requirements_server.txt .
 RUN pip install --no-cache-dir -r requirements_server.txt

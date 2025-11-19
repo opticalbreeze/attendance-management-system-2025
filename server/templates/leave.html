@@ -642,7 +642,15 @@
             document.getElementById('backLink').style.display = 'inline-block';
         }
 
+        // 送信中フラグ（重複送信防止）
+        let isSubmitting = false;
+
         async function submitAndPrint() {
+            // 重複送信を防ぐ
+            if (isSubmitting) {
+                return;
+            }
+
             // 従業員名のチェック
             const employee = employees.find(emp => emp.employee_num == formData.employee_num);
             if (!employee || !employee.name || employee.name.trim() === '') {
@@ -657,6 +665,16 @@
                 return;
             }
 
+            // 送信開始：ボタンを無効化
+            isSubmitting = true;
+            const printBtn = document.querySelector('button[onclick="submitAndPrint()"]');
+            if (printBtn) {
+                printBtn.disabled = true;
+                printBtn.style.opacity = '0.5';
+                printBtn.style.cursor = 'not-allowed';
+                printBtn.textContent = '送信中...';
+            }
+
             try {
                 // 1. データベースに登録
                 const response = await fetch('/api/leave', {
@@ -668,23 +686,18 @@
                 const result = await response.json();
                 if (result.status !== 'success') {
                     showAlert('error', result.message || '申請の送信に失敗しました');
+                    // エラー時はボタンを再有効化
+                    isSubmitting = false;
+                    if (printBtn) {
+                        printBtn.disabled = false;
+                        printBtn.style.opacity = '1';
+                        printBtn.style.cursor = 'pointer';
+                        printBtn.textContent = '登録・印刷';
+                    }
                     return;
                 }
 
-                // 2. PDF保存
-                const confirmationHTML = document.querySelector('.container').outerHTML;
-                const employeeName = employee.name;
-                
-                await fetch('/api/leave/save_pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        html_content: confirmationHTML,
-                        employee_num: formData.employee_num,
-                        employee_name: employeeName,
-                        leave_date: formData.leave_date_from
-                    })
-                });
+                // 2. PDFはサーバー側で自動保存されるため、フロントエンドからの保存は不要
 
                 // 3. 印刷確認
                 showAlert('success', '登録が完了しました。');
@@ -700,6 +713,14 @@
             } catch (error) {
                 console.error('エラー:', error);
                 showAlert('error', 'サーバーエラーが発生しました');
+                // エラー時はボタンを再有効化
+                isSubmitting = false;
+                if (printBtn) {
+                    printBtn.disabled = false;
+                    printBtn.style.opacity = '1';
+                    printBtn.style.cursor = 'pointer';
+                    printBtn.textContent = '登録・印刷';
+                }
             }
         }
 
