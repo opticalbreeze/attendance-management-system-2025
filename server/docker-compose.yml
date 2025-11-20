@@ -33,6 +33,12 @@ services:
         source: ./api_leave.py
         target: /app/api_leave.py
       - type: bind
+        source: ./api_monthly_report.py
+        target: /app/api_monthly_report.py
+      - type: bind
+        source: ./monthly_report.py
+        target: /app/monthly_report.py
+      - type: bind
         source: ./utils.py
         target: /app/utils.py
       - type: bind

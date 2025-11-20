@@ -420,8 +420,8 @@
                         <tr style="background: #667eea; color: white;">
                             <th style="padding: 10px; border: 1px solid #ddd;">日付</th>
                             <th style="padding: 10px; border: 1px solid #ddd;">区分</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">開始時間</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">終了時間</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">開始時間<br>出勤時間</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">終了時間<br>退勤時間</th>
                             <th style="padding: 10px; border: 1px solid #ddd;">時間外</th>
                             <th style="padding: 10px; border: 1px solid #ddd;">基準</th>
                         </tr>
@@ -452,16 +452,145 @@
                         workDate = new Date();
                     }
                     
-                    const overtime = dayData.overtime || { outer: 0, inner: 0 };
+                    const overtime = dayData.overtime || { outer: 0, inner: 0, night: 0, applications: [] };
                     const overtimeHours = (overtime.outer || 0) + (overtime.inner || 0);
+                    const hasOvertime = overtimeHours > 0 || (overtime.night || 0) > 0;
+                    const overtimeApplications = overtime.applications || [];
+                    
+                    // デバッグ用（開発時のみ）
+                    if (hasOvertime) {
+                        console.log(`[DEBUG] ${dateStr}: 時間外データ`, {
+                            hasOvertime,
+                            applications数: overtimeApplications.length,
+                            applications: overtimeApplications,
+                            overtime: overtime
+                        });
+                        if (overtimeApplications.length > 0) {
+                            overtimeApplications.forEach((app, idx) => {
+                                console.log(`[DEBUG] ${dateStr} 申請[${idx}]:`, {
+                                    start_time: app.start_time,
+                                    end_time: app.end_time,
+                                    description: app.description,
+                                    outer: app.outer,
+                                    inner: app.inner,
+                                    night: app.night
+                                });
+                            });
+                        }
+                    }
+                    
+                    // 時間外時間の表示文字列を生成（開始時間・終了時間を含む）
+                    let overtimeDisplay = '-';
+                    if (hasOvertime) {
+                        if (overtimeApplications.length > 0) {
+                            // 各時間外申告の詳細を表示（開始時間・終了時間と作業内容を含む）
+                            const appParts = overtimeApplications.map(app => {
+                                const timeStr = `${app.start_time || '-'}～${app.end_time || '-'}`;
+                                const typeParts = [];
+                                if (app.inner > 0) {
+                                    typeParts.push(`内${app.inner.toFixed(1)}h`);
+                                }
+                                if (app.outer > 0) {
+                                    typeParts.push(`外${app.outer.toFixed(1)}h`);
+                                }
+                                if (app.night > 0) {
+                                    typeParts.push(`深夜${app.night.toFixed(1)}h`);
+                                }
+                                // 開始時間・終了時間、時間外時間、作業内容を表示
+                                let displayStr = timeStr;
+                                if (typeParts.length > 0) {
+                                    displayStr += ` (${typeParts.join(' ')})`;
+                                }
+                                if (app.description && app.description.trim()) {
+                                    displayStr += `<br><span style="font-size: 0.85em; color: #666;">${app.description}</span>`;
+                                }
+                                return displayStr;
+                            });
+                            overtimeDisplay = appParts.join('<br><br>'); // 複数の申告がある場合は改行で区切る
+                        } else {
+                            // applicationsが空の場合でも、時間外時間を表示
+                            const parts = [];
+                            if (overtime.inner > 0) {
+                                parts.push(`内${overtime.inner.toFixed(1)}h`);
+                            }
+                            if (overtime.outer > 0) {
+                                parts.push(`外${overtime.outer.toFixed(1)}h`);
+                            }
+                            if (overtime.night > 0) {
+                                parts.push(`深夜${overtime.night.toFixed(1)}h`);
+                            }
+                            overtimeDisplay = parts.length > 0 ? parts.join(' ') : `${overtimeHours.toFixed(1)}h`;
+                            console.log(`[DEBUG] ${dateStr}: applicationsが空だが時間外あり`, overtime);
+                        }
+                    }
+                    
+                    // 打刻データから出勤時間・退勤時間を取得（検索画面と同じロジック）
+                    const clock_times = dayData.clock_times || [];
+                    const work_type = dayData.work_type || '';
+                    const work_type_str = String(work_type || '');
+                    
+                    let clock_start = null;
+                    let clock_end = null;
+                    let startTime = '-';
+                    let endTime = '-';
+                    
+                    // 「明」勤務の場合は、前日の24勤・夜勤の終了時間（スケジュール）と打刻の中で一番遅い時間を退勤時刻として表示
+                    if (work_type_str.includes('明')) {
+                        // スケジュールの終了時間（前日の24勤・夜勤から移動されたもの）を表示
+                        endTime = dayData.end_time || '-';
+                        
+                        // 打刻の中で一番遅い時間を退勤時刻として表示
+                        if (clock_times.length > 0) {
+                            // 時刻を比較して一番遅い時間を取得
+                            const sortedTimes = clock_times.map(time => {
+                                const parts = time.split(':');
+                                return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                            }).sort((a, b) => b - a);
+                            const latestTimeIndex = clock_times.findIndex(time => {
+                                const parts = time.split(':');
+                                return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0) === sortedTimes[0];
+                            });
+                            clock_end = clock_times[latestTimeIndex];
+                        }
+                        // 「明」勤務は開始時間・出勤時間を表示しない
+                        startTime = '-';
+                        clock_start = null;
+                    } else if (work_type_str && (work_type_str.includes('24勤A') || work_type_str.includes('24勤B') || work_type_str.includes('夜勤'))) {
+                        // 24勤・夜勤の場合は、開始時間と出勤時間のみ表示、終了時間は翌日の「明」に移動済み
+                        clock_start = clock_times[0] || null;
+                        startTime = dayData.start_time || '-';
+                        // 終了時間は表示しない（翌日の「明」に移動済み）
+                        endTime = '-';
+                        clock_end = null;
+                    } else {
+                        // 通常の場合は、最初の打刻が出勤、最後の打刻が退勤
+                        clock_start = clock_times[0] || null;
+                        clock_end = clock_times.length > 1 ? clock_times[clock_times.length - 1] : null;
+                        startTime = dayData.start_time || '-';
+                        endTime = dayData.end_time || '-';
+                    }
+                    
+                    // 開始時間と出勤時間を表示
+                    const clockStartStr = clock_start ? (clock_start.length >= 5 ? clock_start.substring(0, 5) : clock_start) : '-';
+                    
+                    // 終了時間と退勤時間を表示
+                    const clockEndStr = clock_end ? (clock_end.length >= 5 ? clock_end.substring(0, 5) : clock_end) : '-';
                     
                     html += `
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${dayData.work_type || '-'}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${dayData.start_time || '-'}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${dayData.end_time || '-'}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${overtimeHours.toFixed(1)}h</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${work_type || '-'}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; line-height: 1.5;">
+                                ${startTime}<br>
+                                <span style="color: #666; font-size: 0.9em;">${clockStartStr}</span>
+                            </td>
+                            <td style="padding: 8px; border: 1px solid #ddd; line-height: 1.5;">
+                                ${endTime}<br>
+                                <span style="color: #666; font-size: 0.9em;">${clockEndStr}</span>
+                            </td>
+                            <td style="padding: 8px; border: 1px solid #ddd; ${hasOvertime ? 'color: #e74c3c; font-weight: bold;' : ''}; line-height: 1.5;">
+                                ${overtimeDisplay}
+                            </td>
                             <td style="padding: 8px; border: 1px solid #ddd;">-</td>
                         </tr>
                     `;

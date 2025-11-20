@@ -14,6 +14,48 @@ from config import Config
 from database import get_database_connection, get_night_shift_end_time_from_next_day
 from utils import calculate_date_range
 
+def normalize_date_to_str(date_value):
+    """
+    日付をYYYY-MM-DD形式の文字列に正規化
+    
+    Args:
+        date_value: 日付（str, date, datetimeなど）
+    
+    Returns:
+        str: YYYY-MM-DD形式の文字列、変換失敗時はNone
+    """
+    if isinstance(date_value, str):
+        date_str = date_value.strip()
+        # YYYY/MM/DD形式をYYYY-MM-DDに変換
+        if len(date_str) == 10 and date_str.count('/') == 2:
+            date_str = date_str.replace('/', '-')
+        # 既にYYYY-MM-DD形式か確認
+        if len(date_str) == 10 and date_str.count('-') == 2:
+            return date_str
+        # パースを試みる
+        try:
+            work_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            return work_date.isoformat()
+        except:
+            try:
+                work_date = datetime.strptime(date_str, '%Y/%m/%d').date()
+                return work_date.isoformat()
+            except:
+                return None
+    elif isinstance(date_value, datetime):
+        return date_value.date().isoformat()
+    elif isinstance(date_value, date):
+        return date_value.isoformat()
+    elif hasattr(date_value, 'isoformat'):
+        return date_value.isoformat()
+    else:
+        try:
+            date_str = str(date_value).strip()
+            work_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            return work_date.isoformat()
+        except:
+            return None
+
 def get_monthly_attendance_data(employee_id, search_month):
     """
     月間勤務データを取得（前月16日〜当月15日）
@@ -107,26 +149,50 @@ def get_monthly_attendance_data(employee_id, search_month):
         
         print(f"[DEBUG] 打刻データ: {len(attendance_rows)}件")
         
-        # 時間外申告データを取得
+        # 時間外申告データを取得（日付を正規化、作業内容も含める）
+        # COALESCEを使用してNULLの場合は空文字列に変換
+        # 注意: DATE()関数を使うと列の順序が変わる可能性があるため、明示的に列を指定
         cursor.execute("""
-            SELECT work_date, start_time, end_time, inner_overtime_minutes,
-                   outer_overtime_minutes, night_overtime_minutes
+            SELECT 
+                DATE(work_date) as work_date, 
+                start_time, 
+                end_time, 
+                inner_overtime_minutes,
+                outer_overtime_minutes, 
+                night_overtime_minutes, 
+                COALESCE(description, '') as description
             FROM overtime_applications
             WHERE employee_num = ?
-            AND work_date >= ?
-            AND work_date <= ?
+            AND DATE(work_date) >= DATE(?)
+            AND DATE(work_date) <= DATE(?)
             AND status = 'approved'
             ORDER BY work_date ASC
         """, (employee_id, start_date, end_date))
         
+        # デバッグ: カラム名を確認
+        if cursor.description:
+            column_names = [desc[0] for desc in cursor.description]
+            print(f"[DEBUG] SQLクエリ結果のカラム名: {column_names}")
+        
         overtime_rows = cursor.fetchall()
         print(f"[DEBUG] 時間外申告データ: {len(overtime_rows)}件")
         print(f"[DEBUG] 検索期間: {start_date} 〜 {end_date}")
+        if overtime_rows:
+            print(f"[DEBUG] 時間外申告データ詳細（取得時点）:")
+            for i, row in enumerate(overtime_rows):
+                print(f"  [{i+1}] row長={len(row)}, work_date={row[0]} (type={type(row[0])}), start={row[1]}, end={row[2]}, 内={row[3]}, 外={row[4]}, 深夜={row[5]}")
+                if len(row) > 6:
+                    print(f"      作業内容={row[6]} (type={type(row[6])})")
+                else:
+                    print(f"      警告: row[6]が存在しません（row長={len(row)}）")
         
         conn.close()
+        print(f"[DEBUG] データベース接続を閉じました")
         
         # 日付ごとのデータを整理
         daily_data = {}
+        print(f"[DEBUG] daily_data初期化開始: {start_date} 〜 {end_date}")
+        print(f"[DEBUG] overtime_rows保持確認: {len(overtime_rows) if 'overtime_rows' in locals() else '変数が存在しません'}件")
         start = datetime.strptime(start_date, '%Y-%m-%d').date()
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
         
@@ -142,52 +208,35 @@ def get_monthly_attendance_data(employee_id, search_month):
                     'outer': 0,
                     'inner': 0,
                     'night': 0,
-                    'transportation_fee': 0
+                    'transportation_fee': 0,
+                    'applications': []  # 時間外申告の詳細リスト
                 }
             }
             current += timedelta(days=1)
         
+        print(f"[DEBUG] daily_data初期化完了: {len(daily_data)}日分")
+        
         # スケジュールデータを設定
+        print(f"[DEBUG] スケジュールデータ設定開始: {len(schedule_rows)}件")
         for row in schedule_rows:
-            work_date = row[0]
-            if isinstance(work_date, str):
-                # 複数の日付形式に対応
-                try:
-                    work_date = datetime.strptime(work_date, '%Y-%m-%d').date()
-                except:
-                    try:
-                        work_date = datetime.strptime(work_date, '%Y/%m/%d').date()
-                    except:
-                        print(f"[DEBUG] 日付解析エラー: {work_date}")
-                        continue
-            elif isinstance(work_date, datetime):
-                work_date = work_date.date()
-            
-            date_str = work_date.isoformat()
+            date_str = normalize_date_to_str(row[0])
+            if not date_str:
+                print(f"[DEBUG] スケジュール日付解析エラー: {row[0]}")
+                continue
             
             if date_str in daily_data:
                 daily_data[date_str]['work_type'] = row[1]
                 daily_data[date_str]['start_time'] = row[2]
                 daily_data[date_str]['end_time'] = row[3]
             else:
-                print(f"[DEBUG] 警告: 日付 {date_str} が範囲外です")
+                print(f"[DEBUG] 警告: スケジュール日付 {date_str} が範囲外です")
         
         # 打刻データを設定
         for row in attendance_rows:
-            work_date = row[0]
-            if isinstance(work_date, str):
-                try:
-                    work_date = datetime.strptime(work_date, '%Y-%m-%d').date()
-                except:
-                    try:
-                        work_date = datetime.strptime(work_date, '%Y/%m/%d').date()
-                    except:
-                        print(f"[DEBUG] 打刻日付解析エラー: {work_date}")
-                        continue
-            elif isinstance(work_date, datetime):
-                work_date = work_date.date()
-            
-            date_str = work_date.isoformat()
+            date_str = normalize_date_to_str(row[0])
+            if not date_str:
+                print(f"[DEBUG] 打刻日付解析エラー: {row[0]}")
+                continue
             
             if date_str in daily_data:
                 clock_time = row[1]
@@ -198,68 +247,106 @@ def get_monthly_attendance_data(employee_id, search_month):
             else:
                 print(f"[DEBUG] 警告: 打刻日付 {date_str} が範囲外です")
         
-        # 時間外申告データを設定
-        for row in overtime_rows:
-            work_date = row[0]
-            if isinstance(work_date, str):
-                try:
-                    work_date = datetime.strptime(work_date, '%Y-%m-%d').date()
-                except:
-                    try:
-                        work_date = datetime.strptime(work_date, '%Y/%m/%d').date()
-                    except:
-                        print(f"[DEBUG] 時間外日付解析エラー: {work_date}")
-                        continue
-            elif isinstance(work_date, datetime):
-                work_date = work_date.date()
-            
-            date_str = work_date.isoformat()
-            
-            if date_str in daily_data:
-                daily_data[date_str]['overtime']['outer'] = (row[4] or 0) / 60  # 分→時間
-                daily_data[date_str]['overtime']['inner'] = (row[3] or 0) / 60
-                daily_data[date_str]['overtime']['night'] = (row[5] or 0) / 60
-                daily_data[date_str]['overtime']['transportation_fee'] = 0  # カラムが存在しないため0
+        print(f"[DEBUG] 打刻データ設定完了")
         
-        # 24勤・夜勤の終了時間を翌日の「明」勤務に設定（共通関数を使用）
-        # データベース接続を再取得（カーソルが必要）
-        conn = get_database_connection()
-        cursor = conn.cursor()
+        # 時間外申告データを設定（1日に複数の申告がある場合は合計）
+        print(f"[DEBUG] ===== 時間外申告処理開始 =====")
+        print(f"[DEBUG] overtime_rows変数確認: {'存在' if 'overtime_rows' in locals() else '不存在'}")
+        if 'overtime_rows' in locals():
+            print(f"[DEBUG] overtime_rows件数: {len(overtime_rows)}")
+            print(f"[DEBUG] overtime_rows内容: {overtime_rows}")
+        else:
+            print(f"[DEBUG] エラー: overtime_rows変数が存在しません")
+        print(f"[DEBUG] overtime_rows件数: {len(overtime_rows)}")
+        print(f"[DEBUG] overtime_rows内容: {overtime_rows}")
+        print(f"[DEBUG] daily_dataキー数: {len(daily_data)}")
+        print(f"[DEBUG] daily_dataサンプルキー: {list(daily_data.keys())[:5]}")
         
-        # 日付をソートして処理
+        for row_idx, row in enumerate(overtime_rows):
+            print(f"[DEBUG] --- 時間外申告処理 [{row_idx+1}/{len(overtime_rows)}] ---")
+            work_date_raw = row[0]
+            date_str = normalize_date_to_str(work_date_raw)
+            
+            if not date_str:
+                print(f"[DEBUG] 時間外日付解析エラー: {work_date_raw} (type: {type(work_date_raw)})")
+                continue
+            
+            print(f"[DEBUG] 時間外申告処理: date_str={date_str}, daily_dataに存在={date_str in daily_data}")
+            
+            if date_str not in daily_data:
+                sample_dates = list(daily_data.keys())[:3]
+                print(f"[DEBUG] 警告: 時間外申告の日付 {date_str} が範囲外です（サンプル: {sample_dates}）")
+                continue
+            
+            # 時間外申告の詳細を保存
+            start_time = row[1]  # HH:MM形式
+            end_time = row[2]    # HH:MM形式
+            inner_minutes = (row[3] or 0) / 60  # 分→時間
+            outer_minutes = (row[4] or 0) / 60
+            night_minutes = (row[5] or 0) / 60
+            # 作業内容を取得（row[6]が存在する場合）
+            description = ''
+            print(f"[DEBUG] 時間外申告処理: row長={len(row)}, row内容={row}")
+            if len(row) > 6:
+                description = row[6] or ''
+                print(f"[DEBUG] description取得: '{description}'")
+            else:
+                print(f"[DEBUG] 警告: row[6]が存在しません（row長={len(row)}）")
+            
+            # 時間外申告の詳細をリストに追加
+            app_data = {
+                'start_time': start_time,
+                'end_time': end_time,
+                'inner': inner_minutes,
+                'outer': outer_minutes,
+                'night': night_minutes,
+                'description': description  # 作業内容を追加
+            }
+            daily_data[date_str]['overtime']['applications'].append(app_data)
+            print(f"[DEBUG] 時間外申告追加成功: {date_str} {start_time}～{end_time} (外{outer_minutes:.1f}h), 作業内容='{description}', applications数={len(daily_data[date_str]['overtime']['applications'])}")
+            
+            # 複数の時間外申告がある場合は合計する
+            daily_data[date_str]['overtime']['outer'] += outer_minutes
+            daily_data[date_str]['overtime']['inner'] += inner_minutes
+            daily_data[date_str]['overtime']['night'] += night_minutes
+        
+        # デバッグ: 時間外申告データの確認
+        overtime_days = [date_str for date_str, data in daily_data.items() 
+                         if data['overtime']['outer'] + data['overtime']['inner'] > 0]
+        if overtime_days:
+            print(f"[DEBUG] 時間外がある日: {overtime_days}")
+            for date_str in overtime_days[:3]:
+                ot_data = daily_data[date_str]['overtime']
+                apps = ot_data.get('applications', [])
+                print(f"[DEBUG] {date_str}: 外{ot_data['outer']:.1f}h, 内{ot_data['inner']:.1f}h, 申請数{len(apps)}")
+                if apps:
+                    print(f"[DEBUG]   申請詳細: {apps[0] if apps else 'なし'}")
+                else:
+                    print(f"[DEBUG]   警告: applicationsが空です（outer={ot_data['outer']:.1f}h）")
+        
+        # 24勤・夜勤の終了時間を翌日の「明」勤務に移動（検索画面と同じロジック）
         sorted_dates = sorted(daily_data.keys())
-        for i, date_str in enumerate(sorted_dates):
+        for date_str in sorted_dates:
             day_data = daily_data[date_str]
             work_type = day_data.get('work_type', '')
             
-            # 24勤A、24勤B、夜勤の場合、終了時間を翌日の「明」勤務から取得
+            # 24勤A、24勤B、夜勤の場合、スケジュールの終了時間を翌日の「明」勤務に移動
             if work_type and ('24勤A' in work_type or '24勤B' in work_type or '夜勤' in work_type):
-                # 共通関数を使用して翌日の「明」勤務の打刻から終了時間を取得
-                end_time = get_night_shift_end_time_from_next_day(cursor, employee_id, date_str)
-                
-                if end_time:
-                    # 翌日の日付を計算
+                schedule_end_time = day_data.get('end_time')
+                if schedule_end_time:
                     current_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                    next_date = current_date + timedelta(days=1)
-                    next_date_str = next_date.isoformat()
+                    next_date_str = (current_date + timedelta(days=1)).isoformat()
                     
-                    # 翌日のデータが存在し、かつ「明」勤務の場合
                     if next_date_str in daily_data:
                         next_day_data = daily_data[next_date_str]
                         if next_day_data.get('work_type') and '明' in next_day_data['work_type']:
-                            # 翌日の「明」勤務の終了時間に設定
-                            next_day_data['end_time'] = end_time
-                            print(f"[DEBUG] {date_str}の{work_type}の終了時間 {end_time} を翌日{next_date_str}の「明」勤務に設定")
+                            next_day_data['end_time'] = schedule_end_time
+                            day_data['end_time'] = None
         
-        conn.close()
-        
-        # デバッグ: データが存在する日付を確認
-        data_exists_days = [date_str for date_str, data in daily_data.items() 
-                           if data['work_type'] or data['clock_times'] or 
-                           (data['overtime']['outer'] + data['overtime']['inner'] > 0)]
-        print(f"[DEBUG] データが存在する日数: {len(data_exists_days)}日")
-        if len(data_exists_days) == 0:
-            print(f"[DEBUG] 警告: 期間内にデータが存在しません")
+        # dateオブジェクトを文字列に変換（JSONシリアライズ対応）
+        for date_str, day_data in daily_data.items():
+            if isinstance(day_data.get('date'), date):
+                day_data['date'] = day_data['date'].isoformat()
         
         return {
             'employee_info': employee_info,
@@ -451,7 +538,10 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             schedule_end = day_data.get('end_time')
             
             # スケジュール開始時間（列4）
-            if schedule_start:
+            # 「明」勤務の場合は表示しない
+            if work_type and '明' in work_type:
+                ws.cell(row=row, column=4).value = '-'
+            elif schedule_start:
                 if isinstance(schedule_start, str):
                     schedule_start_str = schedule_start[:5] if len(schedule_start) >= 5 else schedule_start
                     ws.cell(row=row, column=4).value = schedule_start_str
@@ -463,7 +553,8 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             ws.cell(row=row, column=4).border = thin_border
             
             # スケジュール終了時間（列5）
-            # 24勤・夜勤の場合は翌日の「明」勤務に表示されるため、ここでは空欄
+            # 24勤・夜勤の場合は翌日の「明」勤務に移動済みのため、ここでは空欄
+            # 「明」勤務の場合は前日の24勤・夜勤から移動された終了時間を表示
             if work_type and ('24勤A' in work_type or '24勤B' in work_type or '夜勤' in work_type):
                 ws.cell(row=row, column=5).value = '-'
             elif schedule_end:
@@ -477,23 +568,31 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             ws.cell(row=row, column=5).alignment = center_align
             ws.cell(row=row, column=5).border = thin_border
             
-            # 打刻データから開始時間・終了時間を取得
+            # 打刻データから開始時間・終了時間を取得（検索画面と同じロジック）
             clock_times = day_data.get('clock_times', [])
-            clock_start = clock_times[0] if clock_times else None
+            clock_start = None
             clock_end = None
             
-            # 24勤・夜勤の場合は、翌日の「明」勤務の打刻から終了時間を取得
-            if work_type and ('24勤A' in work_type or '24勤B' in work_type or '夜勤' in work_type):
-                # 翌日の「明」勤務の終了時間が設定されているか確認
-                current_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                next_date = current_date + timedelta(days=1)
-                next_date_str = next_date.isoformat()
-                if next_date_str in daily_data:
-                    next_day_data = daily_data[next_date_str]
-                    if next_day_data.get('work_type') and '明' in next_day_data['work_type']:
-                        clock_end = next_day_data.get('end_time')  # 共通関数で設定された終了時間
+            # 「明」勤務の場合は、打刻の中で一番遅い時間を退勤時刻として表示
+            if work_type and '明' in work_type:
+                if clock_times:
+                    # 時刻を比較して一番遅い時間を取得
+                    def time_to_minutes(time_str):
+                        parts = time_str.split(':')
+                        return int(parts[0]) * 60 + int(parts[1] if len(parts) > 1 else 0)
+                    
+                    sorted_times = sorted(clock_times, key=time_to_minutes, reverse=True)
+                    clock_end = sorted_times[0]  # 一番遅い時間
+                # 「明」勤務は開始時間・出勤時間を表示しない
+                clock_start = None
+            elif work_type and ('24勤A' in work_type or '24勤B' in work_type or '夜勤' in work_type):
+                # 24勤・夜勤の場合は、最初の打刻が出勤、終了時間は翌日の「明」に移動済み
+                clock_start = clock_times[0] if clock_times else None
+                # 終了時間は表示しない（翌日の「明」に移動済み）
+                clock_end = None
             else:
-                # 通常の場合は、その日の最後の打刻が終了時間
+                # 通常の場合は、最初の打刻が出勤、最後の打刻が退勤
+                clock_start = clock_times[0] if clock_times else None
                 clock_end = clock_times[-1] if len(clock_times) > 1 else None
             
             # 打刻開始時間（列6：出勤時間）
@@ -522,12 +621,76 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                 clock_times
             )
             
-            # 時間外（列8）
-            overtime_hours = day_data['overtime']['outer'] + day_data['overtime']['inner']
-            if overtime_hours > 0:
-                ws.cell(row=row, column=8).value = f"{int(overtime_hours)}:{int((overtime_hours % 1) * 60):02d}"
-            ws.cell(row=row, column=8).alignment = center_align
-            ws.cell(row=row, column=8).border = thin_border
+            # 時間外（列8）- 開始時間・終了時間と内残業・外残業・深夜時間の詳細を表示
+            overtime = day_data.get('overtime', {})
+            overtime_hours = overtime.get('outer', 0) + overtime.get('inner', 0)
+            overtime_night = overtime.get('night', 0)
+            overtime_applications = overtime.get('applications', [])
+            
+            overtime_cell = ws.cell(row=row, column=8)
+            if overtime_hours > 0 or overtime_night > 0:
+                # 時間外申告の詳細がある場合は、開始時間・終了時間を含めて表示
+                if overtime_applications:
+                    app_lines = []
+                    for app in overtime_applications:
+                        start_time = app.get('start_time', '-')
+                        end_time = app.get('end_time', '-')
+                        time_str = f"{start_time}～{end_time}"
+                        description = app.get('description', '').strip()
+                        
+                        type_parts = []
+                        if app.get('inner', 0) > 0:
+                            inner_h = app['inner']
+                            type_parts.append(f"内{int(inner_h)}:{int((inner_h % 1) * 60):02d}")
+                        if app.get('outer', 0) > 0:
+                            outer_h = app['outer']
+                            type_parts.append(f"外{int(outer_h)}:{int((outer_h % 1) * 60):02d}")
+                        if app.get('night', 0) > 0:
+                            night_h = app['night']
+                            type_parts.append(f"深夜{int(night_h)}:{int((night_h % 1) * 60):02d}")
+                        
+                        # 時間外時間と作業内容を表示
+                        if type_parts:
+                            line = f"{time_str} ({' '.join(type_parts)})"
+                        else:
+                            line = time_str
+                        
+                        if description:
+                            line += f"\n{description}"
+                        
+                        app_lines.append(line)
+                    
+                    overtime_cell.value = '\n'.join(app_lines)
+                    # 複数行表示のため、セルの高さを調整し、折り返しを有効化
+                    from openpyxl.styles import Alignment
+                    overtime_cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                    if len(app_lines) > 1:
+                        ws.row_dimensions[row].height = 30 * len(app_lines)  # 行の高さを調整
+                else:
+                    # 時間外申告の詳細がない場合は合計のみ表示
+                    parts = []
+                    if overtime.get('inner', 0) > 0:
+                        inner_h = overtime['inner']
+                        parts.append(f"内{int(inner_h)}:{int((inner_h % 1) * 60):02d}")
+                    if overtime.get('outer', 0) > 0:
+                        outer_h = overtime['outer']
+                        parts.append(f"外{int(outer_h)}:{int((outer_h % 1) * 60):02d}")
+                    if overtime_night > 0:
+                        night_h = overtime_night
+                        parts.append(f"深夜{int(night_h)}:{int((night_h % 1) * 60):02d}")
+                    
+                    if parts:
+                        overtime_cell.value = '\n'.join(parts)
+                        from openpyxl.styles import Alignment
+                        overtime_cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                        if len(parts) > 1:
+                            ws.row_dimensions[row].height = 30 * len(parts)
+                    else:
+                        overtime_cell.value = f"{int(overtime_hours)}:{int((overtime_hours % 1) * 60):02d}"
+            else:
+                overtime_cell.value = '-'
+            overtime_cell.alignment = center_align
+            overtime_cell.border = thin_border
             total_overtime += overtime_hours
             
             # 外深夜（列9）

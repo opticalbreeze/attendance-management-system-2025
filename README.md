@@ -200,28 +200,61 @@ POST   /api/cleanup_duplicates   # 重複削除
 
 ## ⚙️ 設定
 
+### ネットワーク設定
+
+サーバー用PCのIPアドレスを固定する方法については、以下を参照：
+
+📄 **[NETWORK_SETUP.md](./NETWORK_SETUP.md)**
+
+- WindowsでのIPアドレス固定手順
+- ネットワーク設定の確認方法
+- トラブルシューティング
+
 ### 環境変数
 
-```bash
-# サーバー設定
-SERVER_HOST=0.0.0.0
-SERVER_PORT=5000
-FLASK_DEBUG=False
+**重要:** これらの環境変数は、**Docker環境では既に`docker-compose.yml`で設定済み**です。通常は変更不要です。
 
-# データベース
-DATABASE_PATH=/app/data/attendance.db
+#### Docker環境の場合
 
-# チャタリング防止
-CHATTERING_THRESHOLD=10
+環境変数は `server/docker-compose.yml` の `environment` セクションで自動的に設定されます。変更する場合は、`docker-compose.yml` を編集してください。
 
-# 給与計算期間
-PAYROLL_START_DAY=16
-PAYROLL_END_DAY=15
+```yaml
+environment:
+  - SERVER_HOST=0.0.0.0
+  - SERVER_PORT=5000
+  - FLASK_DEBUG=False
+  # ... その他の設定
 ```
 
-### Docker環境変数
+#### ローカル環境で直接実行する場合のみ
 
-`server/docker-compose.yml` で設定を変更できます。
+Dockerを使わずに直接Pythonで実行する場合のみ、環境変数を設定する必要があります：
+
+**Windows (PowerShell):**
+```powershell
+$env:SERVER_HOST="0.0.0.0"
+$env:SERVER_PORT="5000"
+$env:FLASK_DEBUG="False"
+$env:DATABASE_PATH="../../data/attendance.db"
+$env:CHATTERING_THRESHOLD="10"
+$env:PAYROLL_START_DAY="16"
+$env:PAYROLL_END_DAY="15"
+python server.py
+```
+
+**Windows (コマンドプロンプト):**
+```cmd
+set SERVER_HOST=0.0.0.0
+set SERVER_PORT=5000
+set FLASK_DEBUG=False
+set DATABASE_PATH=../../data/attendance.db
+set CHATTERING_THRESHOLD=10
+set PAYROLL_START_DAY=16
+set PAYROLL_END_DAY=15
+python server.py
+```
+
+**注意:** 通常はDocker環境を使用するため、環境変数の手動設定は不要です。
 
 ---
 
