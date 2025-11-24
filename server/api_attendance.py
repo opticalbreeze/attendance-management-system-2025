@@ -11,14 +11,18 @@ from datetime import datetime
 from config import Config
 from database import (
     insert_attendance, search_schedule, get_stats, cleanup_duplicates,
-    get_employees, check_attendance_vs_schedule, get_database_connection,
+    get_employees, check_attendance_vs_schedule,
     insert_late_arrival_request, insert_early_leave_request,
     get_late_arrival_requests, get_early_leave_requests
 )
 from utils import (
     check_duplicate_attendance, calculate_date_range,
-    validate_employee_id, validate_search_month, format_response, safe_int
+    validate_employee_id, validate_search_month, format_response, safe_int,
+    get_db_connection
 )
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 def register_attendance_api_routes(app):
     """打刻・勤怠APIルートを登録"""
@@ -51,16 +55,14 @@ def register_attendance_api_routes(app):
             # チャタリング防止チェック
             duplicate_check = check_duplicate_attendance(idm, timestamp, terminal_id)
             if duplicate_check['is_duplicate']:
-                print(f"[チャタリング検出] IDm:{idm} | 差:{duplicate_check['time_diff']:.1f}秒")
                 return jsonify(format_response('duplicate', message='重複データ', time_diff=duplicate_check['time_diff'])), 200
             
             attendance_id = insert_attendance(idm, timestamp, terminal_id)
-            print(f"[打刻受信] ID:{attendance_id} | IDm:{idm}")
             
             return jsonify(format_response('success', message='打刻データを保存しました', attendance_id=attendance_id))
             
         except Exception as e:
-            print(f"[エラー] 打刻データ受信エラー: {e}")
+            logger.error(f"打刻データ受信エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/search', methods=['GET'])
@@ -97,7 +99,7 @@ def register_attendance_api_routes(app):
             ))
             
         except Exception as e:
-            print(f"[エラー] 検索エラー: {e}")
+            logger.error(f"検索エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'検索エラー: {str(e)}')), 500
 
     @app.route('/api/stats', methods=['GET'])
@@ -107,7 +109,7 @@ def register_attendance_api_routes(app):
             stats = get_stats()
             return jsonify(stats)
         except Exception as e:
-            print(f"[エラー] 統計情報取得エラー: {e}")
+            logger.error(f"統計情報取得エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/cleanup_duplicates', methods=['POST'])
@@ -125,37 +127,7 @@ def register_attendance_api_routes(app):
                 removed_count=removed_count, threshold_seconds=threshold))
             
         except Exception as e:
-            print(f"[エラー] クリーンアップエラー: {e}")
-            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
-
-    @app.route('/api/sample_data', methods=['POST'])
-    def add_sample_data_api():
-        """サンプルデータ追加API（開発・テスト用）"""
-        try:
-            sample_data = [
-                ('A1B2C3D4', '2025-10-24T09:00:00', 'TERMINAL_01'),
-                ('E5F6G7H8', '2025-10-24T09:05:00', 'TERMINAL_01'),
-                ('I9J0K1L2', '2025-10-24T09:10:00', 'TERMINAL_02'),
-            ]
-            
-            conn = get_database_connection()
-            cursor = conn.cursor()
-            
-            added_count = 0
-            for idm, timestamp, terminal_id in sample_data:
-                duplicate_check = check_duplicate_attendance(idm, timestamp, terminal_id)
-                if not duplicate_check['is_duplicate']:
-                    attendance_id = insert_attendance(idm, timestamp, terminal_id)
-                    added_count += 1
-                    print(f"[サンプルデータ] 追加: ID={attendance_id}, IDm={idm}")
-            
-            conn.close()
-            
-            return jsonify(format_response('success',
-                message=f'{added_count}件のサンプルデータを追加しました', added_count=added_count))
-            
-        except Exception as e:
-            print(f"[エラー] サンプルデータ追加エラー: {e}")
+            logger.error(f"クリーンアップエラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/employees', methods=['GET'])
@@ -167,7 +139,7 @@ def register_attendance_api_routes(app):
                 message=f'{len(employees)}名の従業員情報を取得しました', data=employees))
             
         except Exception as e:
-            print(f"[エラー] 従業員情報取得エラー: {e}")
+            logger.error(f"従業員情報取得エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/attendance_check', methods=['GET'])
@@ -178,10 +150,11 @@ def register_attendance_api_routes(app):
             check_date = request.args.get('check_date', '').strip()
             search_month = request.args.get('search_month', '').strip()
             section = request.args.get('section', '').strip()
+            check_all = request.args.get('check_all', '').strip().lower() == 'true'
             
             # 月度検索モード
             if search_month:
-                return attendance_check_monthly_api(search_month, employee_id, section)
+                return attendance_check_monthly_api(search_month, employee_id, section, check_all)
             
             # 単日検索モード（既存の処理）
             if not employee_id:
@@ -200,12 +173,9 @@ def register_attendance_api_routes(app):
             except ValueError:
                 return jsonify(format_response('error', message='日付形式が正しくありません')), 400
             
-            print(f"[DEBUG] 単日チェックAPI: employee_id={employee_id}, check_date={check_date}")
             result = check_attendance_vs_schedule(employee_id, check_date)
-            print(f"[DEBUG] check_attendance_vs_schedule結果: status={result.get('status')}, data keys={list(result.get('data', {}).keys()) if result.get('data') else 'None'}")
             
             if result['status'] == 'error':
-                print(f"[DEBUG] エラー: {result['message']}")
                 return jsonify(format_response('error', message=result['message'])), 400
             
             # format_responseは辞書を直接マージするため、明示的に'data'キーでラップ
@@ -214,18 +184,18 @@ def register_attendance_api_routes(app):
                 'message': '勤怠チェックが完了しました',
                 'data': result['data']
             }
-            print(f"[DEBUG] レスポンスデータ: employee_name={result['data'].get('employee_name') if result.get('data') else 'None'}")
             return jsonify(response_data)
             
         except Exception as e:
-            print(f"[エラー] 勤怠チェックエラー: {e}")
+            logger.error(f"勤怠チェックエラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
     
-    def attendance_check_monthly_api(search_month, employee_id_filter=None, section_filter=None):
+    def attendance_check_monthly_api(search_month, employee_id_filter=None, section_filter=None, check_all=False):
         """月度勤怠チェックAPI（複数従業員・複数日）"""
         try:
-            from database import get_database_connection, get_employees
-            from utils import calculate_date_range, validate_search_month
+            from database import get_employees
+            from utils import calculate_date_range, validate_search_month, get_db_connection
+            from datetime import date
             
             # 月度バリデーション
             valid, search_month_or_error = validate_search_month(search_month)
@@ -233,11 +203,25 @@ def register_attendance_api_routes(app):
                 return jsonify(format_response('error', message=search_month_or_error)), 400
             search_month = search_month_or_error
             
+            # 実行日（今日）を取得（未来の日付を除外するため）
+            today = date.today()
+            
             # 日付範囲を計算
             try:
-                start_date, end_date = calculate_date_range(search_month)
+                start_date_str, end_date_str = calculate_date_range(search_month)
+                # 文字列をdateオブジェクトに変換
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             except ValueError as e:
                 return jsonify(format_response('error', message=str(e))), 400
+            
+            # 未来の日付を除外するため、end_dateを今日までに制限
+            if end_date > today:
+                end_date = today
+            
+            # SQLクエリ用に文字列形式に戻す
+            start_date_str = start_date.strftime('%Y-%m-%d')
+            end_date_str = end_date.strftime('%Y-%m-%d')
             
             # 従業員一覧を取得
             all_employees = get_employees()
@@ -263,16 +247,15 @@ def register_attendance_api_routes(app):
                 emp_section = employee.get('section', '設備')
                 
                 # 該当月度のスケジュール日付を取得
-                conn = get_database_connection()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT DISTINCT work_date
-                    FROM attend_schedule
-                    WHERE employee_id = ? AND work_date >= ? AND work_date <= ?
-                    ORDER BY work_date
-                """, (emp_id, start_date, end_date))
-                work_dates = [row[0] for row in cursor.fetchall()]
-                conn.close()
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT DISTINCT work_date
+                        FROM attend_schedule
+                        WHERE employee_id = ? AND work_date >= ? AND work_date <= ?
+                        ORDER BY work_date
+                    """, (emp_id, start_date_str, end_date_str))
+                    work_dates = [row[0] for row in cursor.fetchall()]
                 
                 employee_results = {
                     'employee_id': emp_id,
@@ -283,7 +266,34 @@ def register_attendance_api_routes(app):
                     'warning_count': 0
                 }
                 
+                checked_count = 0
+                skipped_count = 0
+                
                 for work_date in work_dates:
+                    # 未来の日付はスキップ（実行日より後の日付はチェックしない）
+                    try:
+                        # work_dateをdateオブジェクトに変換
+                        if isinstance(work_date, str):
+                            work_date_obj = datetime.strptime(work_date, '%Y-%m-%d').date()
+                        elif isinstance(work_date, date):
+                            work_date_obj = work_date
+                        else:
+                            # その他の型の場合は文字列に変換してからパース
+                            work_date_str = str(work_date)
+                            work_date_obj = datetime.strptime(work_date_str, '%Y-%m-%d').date()
+                        
+                        # 今日より後の日付はスキップ
+                        if work_date_obj > today:
+                            skipped_count += 1
+                            continue
+                    except Exception as e:
+                        # パースエラーの場合はログを出力してスキップ
+                        logger.warning(f"日付パースエラー: 従業員ID={emp_id}, 日付={work_date}, 型={type(work_date)}, エラー={e}")
+                        skipped_count += 1
+                        continue
+                    
+                    checked_count += 1
+                    
                     try:
                         result = check_attendance_vs_schedule(emp_id, work_date)
                         if result['status'] == 'success':
@@ -305,7 +315,7 @@ def register_attendance_api_routes(app):
                                 total_errors += len(errors)
                                 total_warnings += len(warnings)
                     except Exception as e:
-                        print(f"[エラー] チェックエラー ({emp_id}, {work_date}): {e}")
+                        pass  # エラーは無視して続行
                 
                 if employee_results['dates']:
                     results.append(employee_results)
@@ -324,9 +334,7 @@ def register_attendance_api_routes(app):
             ))
             
         except Exception as e:
-            print(f"[エラー] 月度勤怠チェックエラー: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"月度勤怠チェックエラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/late_arrival', methods=['POST'])
@@ -362,7 +370,7 @@ def register_attendance_api_routes(app):
                 return jsonify(format_response('error', message='遅刻申告の登録に失敗しました')), 500
                 
         except Exception as e:
-            print(f"[エラー] 遅刻申告エラー: {e}")
+            logger.error(f"遅刻申告エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/early_leave', methods=['POST'])
@@ -398,7 +406,7 @@ def register_attendance_api_routes(app):
                 return jsonify(format_response('error', message='早退申告の登録に失敗しました')), 500
                 
         except Exception as e:
-            print(f"[エラー] 早退申告エラー: {e}")
+            logger.error(f"早退申告エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/late_arrival', methods=['GET'])
@@ -424,7 +432,7 @@ def register_attendance_api_routes(app):
             return jsonify(format_response('success', data=requests))
             
         except Exception as e:
-            print(f"[エラー] 遅刻申告取得エラー: {e}")
+            logger.error(f"遅刻申告取得エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/early_leave', methods=['GET'])
@@ -450,6 +458,6 @@ def register_attendance_api_routes(app):
             return jsonify(format_response('success', data=requests))
             
         except Exception as e:
-            print(f"[エラー] 早退申告取得エラー: {e}")
+            logger.error(f"早退申告取得エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 

@@ -35,6 +35,15 @@ COPY api_monthly_report.py .
 COPY auth.py .
 COPY monthly_report.py .
 COPY pdf_generator.py .
+COPY logger_config.py .
+COPY database_utils.py .
+COPY time_utils.py .
+COPY validation_utils.py .
+COPY api_utils.py .
+COPY pdf_utils.py .
+COPY admin.py .
+COPY work_type_constants.py .
+COPY import_schedule_csv.py .
 COPY templates/ templates/
 
 # データディレクトリの作成（マウントポイント）

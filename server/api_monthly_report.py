@@ -12,6 +12,9 @@ from config import Config
 from auth import login_required
 from monthly_report import generate_monthly_report_excel, get_monthly_attendance_data
 from utils import format_response
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 def register_monthly_report_api_routes(app):
     """月間集計レポートAPIルートを登録"""
@@ -49,9 +52,7 @@ def register_monthly_report_api_routes(app):
                 download_url=f'/api/monthly-report/download/{filename}'))
             
         except Exception as e:
-            print(f"[エラー] 月間レポート生成エラー: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"月間レポート生成エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
     
     @app.route('/api/monthly-report/download/<filename>', methods=['GET'])
@@ -60,10 +61,18 @@ def register_monthly_report_api_routes(app):
         """月間集計レポートダウンロードAPI"""
         try:
             # ファイルパス構築
-            output_dir = Config.PDF_SAVE_DIR.replace('PDF', 'reports')
+            if Config.PDF_SAVE_DIR:
+                output_dir = Config.PDF_SAVE_DIR.replace('PDF', 'reports')
+            else:
+                # データベースパスと同じディレクトリのreportsフォルダ
+                db_dir = os.path.dirname(Config.DATABASE_PATH)
+                output_dir = os.path.join(db_dir, 'reports')
+            
             file_path = os.path.join(output_dir, filename)
+            logger.debug(f"ダウンロードファイルパス: {file_path}")
             
             if not os.path.exists(file_path):
+                logger.warning(f"ファイルが見つかりません: {file_path}")
                 return jsonify(format_response('error', message='ファイルが見つかりません')), 404
             
             return send_file(
@@ -74,7 +83,7 @@ def register_monthly_report_api_routes(app):
             )
             
         except Exception as e:
-            print(f"[エラー] ファイルダウンロードエラー: {e}")
+            logger.error(f"ファイルダウンロードエラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
     
     @app.route('/api/monthly-report/preview', methods=['GET'])
@@ -101,6 +110,6 @@ def register_monthly_report_api_routes(app):
             })
             
         except Exception as e:
-            print(f"[エラー] プレビュー取得エラー: {e}")
+            logger.error(f"プレビュー取得エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 

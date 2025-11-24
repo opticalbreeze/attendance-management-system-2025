@@ -8,7 +8,10 @@
 import sqlite3
 from datetime import datetime, time, timedelta
 from config import Config
-from utils import get_database_connection
+from utils import get_database_connection, get_db_connection, time_to_minutes, calculate_duration_minutes
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 def init_overtime_table():
     """
@@ -19,14 +22,11 @@ def init_overtime_table():
     """
     from database import init_overtime_table_internal
     
-    conn = get_database_connection()
-    cursor = conn.cursor()
-    
-    # database.pyの内部関数を呼び出し
-    init_overtime_table_internal(cursor)
-    
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # database.pyの内部関数を呼び出し
+        init_overtime_table_internal(cursor)
 
 def calculate_overtime_categories(employee_num, work_date, start_time, end_time):
     """
@@ -46,17 +46,16 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
             'night_overtime_minutes': 深夜時間（分）
         }
     """
-    conn = get_database_connection()
-    cursor = conn.cursor()
-    
-    # スケジュールから予定勤務時間を取得（employee_numを文字列に変換）
-    cursor.execute("""
-        SELECT start_time, end_time FROM attend_schedule
-        WHERE employee_id = ? AND work_date = ?
-    """, (str(employee_num), work_date))
-    
-    schedule = cursor.fetchone()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # スケジュールから予定勤務時間を取得（employee_numを文字列に変換）
+        cursor.execute("""
+            SELECT start_time, end_time FROM attend_schedule
+            WHERE employee_id = ? AND work_date = ?
+        """, (str(employee_num), work_date))
+        
+        schedule = cursor.fetchone()
     
     if not schedule or not schedule[0] or not schedule[1]:
         # スケジュールがない場合は全て外残業
@@ -157,22 +156,7 @@ def calculate_night_overtime(start_time, end_time):
     
     return 0
 
-def time_to_minutes(time_str):
-    """HH:MM形式の時刻を分に変換"""
-    if not time_str:
-        return 0
-    parts = time_str.split(':')
-    return int(parts[0]) * 60 + int(parts[1])
-
-def calculate_duration_minutes(start_time, end_time):
-    """開始時刻と終了時刻から時間（分）を計算"""
-    start_min = time_to_minutes(start_time)
-    end_min = time_to_minutes(end_time)
-    
-    if end_min < start_min:
-        end_min += 1440  # 日をまたぐ
-    
-    return end_min - start_min
+# time_to_minutesとcalculate_duration_minutesはutils.pyからインポート（重複を避けるため）
 
 def insert_overtime_application(employee_num, employee_name, application_date, work_date, 
                                  start_time, end_time, description=''):
@@ -200,39 +184,34 @@ def insert_overtime_application(employee_num, employee_name, application_date, w
         # 時間外の分類を計算
         categories = calculate_overtime_categories(employee_num, work_date, start_time, end_time)
         
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        now = datetime.now().isoformat()
-        
-        cursor.execute("""
-            INSERT INTO overtime_applications (
-                employee_num, employee_name, application_date, work_date,
-                start_time, end_time, description, status,
-                overtime_type, inner_overtime_minutes, outer_overtime_minutes, night_overtime_minutes,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
-        """, (
-            str(employee_num), employee_name, application_date, work_date,
-            start_time, end_time, description,
-            categories['overtime_type'],
-            categories['inner_overtime_minutes'],
-            categories['outer_overtime_minutes'],
-            categories['night_overtime_minutes'],
-            now, now
-        ))
-        
-        overtime_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        print(f"[時間外申告] ID:{overtime_id} | {employee_name} | {work_date} {start_time}-{end_time}")
-        return overtime_id
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            now = datetime.now().isoformat()
+            
+            cursor.execute("""
+                INSERT INTO overtime_applications (
+                    employee_num, employee_name, application_date, work_date,
+                    start_time, end_time, description, status,
+                    overtime_type, inner_overtime_minutes, outer_overtime_minutes, night_overtime_minutes,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+            """, (
+                str(employee_num), employee_name, application_date, work_date,
+                start_time, end_time, description,
+                categories['overtime_type'],
+                categories['inner_overtime_minutes'],
+                categories['outer_overtime_minutes'],
+                categories['night_overtime_minutes'],
+                now, now
+            ))
+            
+            overtime_id = cursor.lastrowid
+            logger.info(f"時間外申告登録: ID={overtime_id}, 従業員={employee_name}, 作業日={work_date}, 時間={start_time}-{end_time}")
+            return overtime_id
         
     except Exception as e:
-        print(f"[エラー] 時間外申告登録エラー: {e}")
-        if conn:
-            conn.close()
+        logger.error(f"時間外申告登録エラー: {e}", exc_info=True)
         return None
 
 def get_overtime_applications(employee_num=None, work_date=None, status=None, limit=100):
@@ -249,43 +228,40 @@ def get_overtime_applications(employee_num=None, work_date=None, status=None, li
         list: 時間外申告のリスト
     """
     try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        query = "SELECT * FROM overtime_applications WHERE 1=1"
-        params = []
-        
-        if employee_num:
-            query += " AND employee_num = ?"
-            params.append(employee_num)
-        
-        if work_date:
-            query += " AND work_date = ?"
-            params.append(work_date)
-        
-        if status:
-            query += " AND status = ?"
-            params.append(status)
-        
-        query += " ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
-        
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        
-        # 結果を辞書形式に変換
-        columns = [desc[0] for desc in cursor.description]
-        results = []
-        for row in rows:
-            results.append(dict(zip(columns, row)))
-        
-        conn.close()
-        return results
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = "SELECT * FROM overtime_applications WHERE 1=1"
+            params = []
+            
+            if employee_num:
+                query += " AND employee_num = ?"
+                params.append(employee_num)
+            
+            if work_date:
+                query += " AND work_date = ?"
+                params.append(work_date)
+            
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+            
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            # 結果を辞書形式に変換
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in rows:
+                results.append(dict(zip(columns, row)))
+            
+            return results
         
     except Exception as e:
-        print(f"[エラー] 時間外申告取得エラー: {e}")
-        if conn:
-            conn.close()
+        logger.error(f"時間外申告取得エラー: {e}", exc_info=True)
         return []
 
 def approve_overtime(overtime_id, approved_by):
@@ -300,7 +276,7 @@ def approve_overtime(overtime_id, approved_by):
     )
     
     if result['success']:
-        print(f"[時間外申告承認] ID:{overtime_id} を承認しました")
+        logger.info(f"時間外申告承認: ID={overtime_id}")
     
     return result['success']
 
@@ -316,7 +292,7 @@ def reject_overtime(overtime_id, rejected_by):
     )
     
     if result['success']:
-        print(f"[時間外申告却下] ID:{overtime_id} を却下しました")
+        logger.info(f"時間外申告却下: ID={overtime_id}")
     
     return result['success']
 
@@ -340,9 +316,9 @@ def withdraw_overtime(overtime_id):
     )
     
     if result['success']:
-        print(f"[時間外申告取り下げ] ID:{overtime_id} を取り下げました")
+        logger.info(f"時間外申告取り下げ: ID={overtime_id}")
     else:
-        print(f"[エラー] {result['message']}")
+        logger.error(f"時間外申告取り下げ失敗: {result['message']}")
     
     return result['success']
 
@@ -369,42 +345,39 @@ def get_monthly_overtime_summary(employee_num, year, month):
         
         end_date = date(year, month, Config.PAYROLL_END_DAY)
         
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total_count,
-                SUM(inner_overtime_minutes) as total_inner,
-                SUM(outer_overtime_minutes) as total_outer,
-                SUM(night_overtime_minutes) as total_night,
-                SUM(inner_overtime_minutes + outer_overtime_minutes) as total_all
-            FROM overtime_applications
-            WHERE employee_num = ?
-              AND work_date >= ?
-              AND work_date <= ?
-              AND status = 'approved'
-        """, (employee_num, start_date.isoformat(), end_date.isoformat()))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row:
-            return {
-                'period_start': start_date.isoformat(),
-                'period_end': end_date.isoformat(),
-                'total_count': row[0] or 0,
-                'inner_overtime_hours': round((row[1] or 0) / 60, 2),
-                'outer_overtime_hours': round((row[2] or 0) / 60, 2),
-                'night_overtime_hours': round((row[3] or 0) / 60, 2),
-                'total_overtime_hours': round((row[4] or 0) / 60, 2)
-            }
-        
-        return None
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_count,
+                    SUM(inner_overtime_minutes) as total_inner,
+                    SUM(outer_overtime_minutes) as total_outer,
+                    SUM(night_overtime_minutes) as total_night,
+                    SUM(inner_overtime_minutes + outer_overtime_minutes) as total_all
+                FROM overtime_applications
+                WHERE employee_num = ?
+                  AND work_date >= ?
+                  AND work_date <= ?
+                  AND status = 'approved'
+            """, (employee_num, start_date.isoformat(), end_date.isoformat()))
+            
+            row = cursor.fetchone()
+            
+            if row:
+                return {
+                    'period_start': start_date.isoformat(),
+                    'period_end': end_date.isoformat(),
+                    'total_count': row[0] or 0,
+                    'inner_overtime_hours': round((row[1] or 0) / 60, 2),
+                    'outer_overtime_hours': round((row[2] or 0) / 60, 2),
+                    'night_overtime_hours': round((row[3] or 0) / 60, 2),
+                    'total_overtime_hours': round((row[4] or 0) / 60, 2)
+                }
+            
+            return None
         
     except Exception as e:
-        print(f"[エラー] 月次集計エラー: {e}")
-        if conn:
-            conn.close()
+        logger.error(f"月次集計エラー: {e}", exc_info=True)
         return None
 

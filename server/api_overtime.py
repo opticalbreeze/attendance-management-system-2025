@@ -16,6 +16,9 @@ from overtime import (
 )
 from utils import format_response, safe_int, save_pdf_from_html
 from pdf_generator import generate_overtime_html
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 def register_overtime_api_routes(app):
     """時間外申告APIルートを登録"""
@@ -66,7 +69,7 @@ def register_overtime_api_routes(app):
             if created_ids:
                 # 自動でPDFを保存（バックグラウンドで実行）
                 try:
-                    print(f"[自動PDF保存開始] 時間外申告 - 従業員: {employee_name} ({employee_num}), 作業日: {work_date}")
+                    logger.info(f"自動PDF保存開始: 時間外申告 - 従業員={employee_name} ({employee_num}), 作業日={work_date}")
                     html_content = generate_overtime_html(
                         employee_name=employee_name,
                         application_date=application_date,
@@ -84,13 +87,11 @@ def register_overtime_api_routes(app):
                     )
                     
                     if pdf_result['success']:
-                        print(f"[自動PDF保存成功] 時間外申告: {pdf_result['filename']} -> {pdf_result.get('path', 'N/A')}")
+                        logger.info(f"自動PDF保存成功: 時間外申告 - {pdf_result['filename']} -> {pdf_result.get('path', 'N/A')}")
                     else:
-                        print(f"[自動PDF保存失敗] 時間外申告: {pdf_result.get('message', '不明なエラー')}")
+                        logger.warning(f"自動PDF保存失敗: 時間外申告 - {pdf_result.get('message', '不明なエラー')}")
                 except Exception as pdf_error:
-                    import traceback
-                    print(f"[警告] PDF自動保存エラー（登録は成功）: {pdf_error}")
-                    traceback.print_exc()
+                    logger.warning(f"PDF自動保存エラー（登録は成功）: {pdf_error}", exc_info=True)
                 
                 return jsonify(format_response('success',
                     message=f'{len(created_ids)}件の時間外作業申告を登録しました', overtime_ids=created_ids))
@@ -98,7 +99,7 @@ def register_overtime_api_routes(app):
                 return jsonify(format_response('error', message='時間外作業申告の登録に失敗しました')), 500
             
         except Exception as e:
-            print(f"[エラー] 時間外申告エラー: {e}")
+            logger.error(f"時間外申告エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime', methods=['GET'])
@@ -118,7 +119,7 @@ def register_overtime_api_routes(app):
                 message=f'{len(applications)}件の時間外申告を取得しました', data=applications))
             
         except Exception as e:
-            print(f"[エラー] 時間外申告取得エラー: {e}")
+            logger.error(f"時間外申告取得エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime/<int:overtime_id>/approve', methods=['POST'])
@@ -136,7 +137,7 @@ def register_overtime_api_routes(app):
                 return jsonify(format_response('error', message='承認処理に失敗しました')), 500
             
         except Exception as e:
-            print(f"[エラー] 時間外承認エラー: {e}")
+            logger.error(f"時間外承認エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime/<int:overtime_id>/reject', methods=['POST'])
@@ -154,7 +155,7 @@ def register_overtime_api_routes(app):
                 return jsonify(format_response('error', message='却下処理に失敗しました')), 500
             
         except Exception as e:
-            print(f"[エラー] 時間外却下エラー: {e}")
+            logger.error(f"時間外却下エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime/<int:overtime_id>/withdraw', methods=['POST'])
@@ -169,7 +170,7 @@ def register_overtime_api_routes(app):
                 return jsonify(format_response('error', message='取り下げ処理に失敗しました。承認前の申請のみ取り下げ可能です。')), 400
             
         except Exception as e:
-            print(f"[エラー] 時間外取り下げエラー: {e}")
+            logger.error(f"時間外取り下げエラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime/monthly_summary', methods=['GET'])
@@ -191,7 +192,7 @@ def register_overtime_api_routes(app):
                 return jsonify(format_response('error', message='集計データが見つかりません')), 404
             
         except Exception as e:
-            print(f"[エラー] 月次集計エラー: {e}")
+            logger.error(f"月次集計エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/overtime/save_pdf', methods=['POST'])
@@ -229,8 +230,6 @@ def register_overtime_api_routes(app):
                 return jsonify(format_response('error', message=result['message'])), 500
             
         except Exception as e:
-            print(f"[エラー] PDF保存エラー: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"PDF保存エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 

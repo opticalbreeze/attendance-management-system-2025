@@ -8,6 +8,9 @@ import sqlite3
 from datetime import datetime
 import os
 from config import Config
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 # データベース設定（config.pyから取得）
 DATABASE_PATH = Config.DATABASE_PATH
@@ -21,7 +24,7 @@ def import_csv_to_schedule(csv_file_path):
     # 既存データの確認
     cursor.execute("SELECT COUNT(*) FROM attend_schedule")
     before_count = cursor.fetchone()[0]
-    print(f"インポート前のレコード数: {before_count}")
+    logger.info(f"インポート前のレコード数: {before_count}")
     
     imported_count = 0
     error_count = 0
@@ -42,7 +45,7 @@ def import_csv_to_schedule(csv_file_path):
                     
                     # 必須項目チェック
                     if not employee_id or not date_str:
-                        print(f"行 {row_num}: 必須項目が不足 (ID: {employee_id}, 日付: {date_str})")
+                        logger.warning(f"行 {row_num}: 必須項目が不足 (ID: {employee_id}, 日付: {date_str})")
                         error_count += 1
                         continue
                     
@@ -51,21 +54,13 @@ def import_csv_to_schedule(csv_file_path):
                         date_obj = datetime.strptime(date_str, '%Y/%m/%d')
                         work_date = date_obj.strftime('%Y-%m-%d')
                     except ValueError:
-                        print(f"行 {row_num}: 日付フォーマットエラー ({date_str})")
+                        logger.warning(f"行 {row_num}: 日付フォーマットエラー ({date_str})")
                         error_count += 1
                         continue
                     
-                    # 勤務区分マッピング
-                    work_type_mapping = {
-                        '日勤': '通常',
-                        '夜勤': '夜勤',
-                        '法': '法定休日',
-                        '所': '所定休日',
-                        '有': '有給',
-                        '代': '代休',
-                        '特': '特休'
-                    }
-                    mapped_work_type = work_type_mapping.get(work_type, work_type)
+                    # 勤務区分マッピング（work_type_constants.pyから取得）
+                    from work_type_constants import map_csv_work_type
+                    mapped_work_type = map_csv_work_type(work_type)
                     
                     # 時間データの処理 (空の場合はNULLにする)
                     start_time_value = start_time if start_time else None
@@ -85,22 +80,22 @@ def import_csv_to_schedule(csv_file_path):
                             WHERE employee_id = ? AND work_date = ?
                         """, (start_time_value, end_time_value, mapped_work_type, 
                               employee_id, work_date))
-                        print(f"更新: {employee_name} ({employee_id}) - {work_date} - {mapped_work_type}")
+                        logger.debug(f"更新: {employee_name} ({employee_id}) - {work_date} - {mapped_work_type}")
                     else:
                         # 新規データを挿入（sheet_numberにデフォルト値を設定）
-                        sheet_number = "1"  # デフォルトのシート番号
+                        sheet_number = Config.DEFAULT_SHEET_NUMBER
                         cursor.execute("""
                             INSERT INTO attend_schedule 
                             (sheet_number, employee_id, employee_name, work_date, start_time, end_time, work_type)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, (sheet_number, employee_id, employee_name, work_date, start_time_value, 
                               end_time_value, mapped_work_type))
-                        print(f"追加: {employee_name} ({employee_id}) - {work_date} - {mapped_work_type}")
+                        logger.debug(f"追加: {employee_name} ({employee_id}) - {work_date} - {mapped_work_type}")
                     
                     imported_count += 1
                     
                 except Exception as e:
-                    print(f"行 {row_num}: エラー - {e}")
+                    logger.error(f"行 {row_num}: エラー - {e}", exc_info=True)
                     error_count += 1
                     continue
         
@@ -110,36 +105,14 @@ def import_csv_to_schedule(csv_file_path):
         cursor.execute("SELECT COUNT(*) FROM attend_schedule")
         after_count = cursor.fetchone()[0]
         
-        print(f"\n=== インポート完了 ===")
-        print(f"ファイル: {os.path.basename(csv_file_path)}")
-        print(f"処理済み: {imported_count} 件")
-        print(f"エラー: {error_count} 件")
-        print(f"インポート後のレコード数: {after_count}")
-        print(f"増加数: {after_count - before_count}")
+        logger.info(f"インポート完了: ファイル={os.path.basename(csv_file_path)}, 処理済み={imported_count}件, エラー={error_count}件")
+        logger.info(f"インポート後のレコード数: {after_count}, 増加数: {after_count - before_count}")
         
     except Exception as e:
-        print(f"ファイル読み込みエラー: {e}")
+        logger.error(f"ファイル読み込みエラー: {e}", exc_info=True)
         conn.rollback()
     finally:
         conn.close()
 
-def main():
-    """メイン処理"""
-    csv_files = [
-        "/tmp/統合勤怠データ_20251116_100558.csv",
-        "/tmp/統合勤怠データ_20251116_100700.csv"
-    ]
-    
-    print("=== attend_schedule CSVインポート開始 ===")
-    
-    for csv_file in csv_files:
-        if os.path.exists(csv_file):
-            print(f"\n--- {os.path.basename(csv_file)} の処理開始 ---")
-            import_csv_to_schedule(csv_file)
-        else:
-            print(f"ファイルが見つかりません: {csv_file}")
-    
-    print("\n=== 全ての処理完了 ===")
-
-if __name__ == "__main__":
-    main()
+# このファイルはコマンドラインから直接実行する場合のユーティリティスクリプトです
+# 通常はadmin.pyのimport_csv_to_schedule関数を使用してください

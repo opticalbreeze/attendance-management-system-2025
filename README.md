@@ -39,17 +39,20 @@
 ```
 work_attend_server/
 ├── server/                         # サーバーアプリケーション
-│   ├── server.py                   # メインサーバー
+│   ├── server.py                   # メインサーバー（ルート定義）
 │   ├── api_attendance.py           # 打刻API
 │   ├── api_overtime.py             # 時間外申告API
 │   ├── api_leave.py                # 休暇申請API
-│   ├── database.py                 # データベース操作
+│   ├── api_monthly_report.py       # 月間集計レポートAPI
+│   ├── database.py                 # データベース操作（コアロジック）
 │   ├── overtime.py                 # 時間外申告管理
 │   ├── leave_request.py            # 休暇申請管理
-│   ├── monthly_report.py           # 月間集計レポート
+│   ├── monthly_report.py           # 月間集計レポート生成
 │   ├── auth.py                     # 認証・認可
-│   ├── utils.py                    # ユーティリティ
+│   ├── utils.py                    # ユーティリティ関数
 │   ├── config.py                   # 設定管理
+│   ├── work_type_constants.py      # 勤務タイプ定数・判定関数
+│   ├── pdf_generator.py            # PDF生成
 │   ├── templates/                  # HTMLテンプレート
 │   │   ├── index.html             # トップページ
 │   │   ├── search.html            # 打刻検索
@@ -58,18 +61,42 @@ work_attend_server/
 │   │   ├── overtime_list.html     # 時間外一覧
 │   │   ├── leave.html             # 休暇申請
 │   │   ├── leave_list.html        # 休暇一覧
-│   │   └── monthly_report.html    # 月間集計レポート
+│   │   ├── monthly_report.html    # 月間集計レポート
+│   │   └── admin.html             # 管理者メニュー
 │   ├── docker-compose.yml         # Docker設定
 │   ├── Dockerfile                 # Dockerイメージ
 │   ├── requirements_server.txt    # Python依存パッケージ
 │   └── SECURITY_SETUP.md          # セキュリティ設定ガイド
 ├── data/                           # データベース（Dockerの外）
 │   └── attendance.db              # SQLiteデータベース
-├── DOCKER_GUIDE.md                # Docker環境構築ガイド
-├── QUICK_REFERENCE.md             # クイックリファレンス
+├── NETWORK_SETUP.md               # ネットワーク設定ガイド
 ├── TROUBLESHOOTING.md             # トラブルシューティング
-└── LICENSE                        # ライセンス
+└── README.md                       # このファイル
 ```
+
+### コード構造の設計原則
+
+#### 1. 定数の一元管理
+- **`work_type_constants.py`**: 勤務タイプの文字列定数と判定関数を一元管理
+  - `WORK_TYPE_OFF_DAY = '明'`
+  - `is_off_day_shift()`, `is_24hour_or_night_shift()` などの判定関数
+  - ハードコーディングを避け、変更時の影響範囲を最小化
+
+#### 2. モジュールの責務分離
+- **`database.py`**: データベース操作のコアロジック
+- **`api_*.py`**: APIエンドポイントの定義（HTTPリクエスト/レスポンス処理）
+- **`utils.py`**: 共通ユーティリティ関数（日付計算、バリデーションなど）
+- **`monthly_report.py`**: 月間レポート生成ロジック
+
+#### 3. 重複コードの排除
+- 日付正規化: `monthly_report.py`の`normalize_date_to_str()`を使用
+- 勤務タイプ判定: `work_type_constants.py`の関数を使用
+- 24勤・夜勤の終了時間処理: `database.py`の`get_night_shift_end_time_from_next_day()`を使用
+
+#### 4. デバッグコードの管理
+- 本番環境ではデバッグ用の`print()`や`console.log()`は削除
+- エラーログは残す（`print(f"[エラー] ...")`）
+- 検証用ファイル（`debug_check.html`など）は削除
 
 ---
 

@@ -8,7 +8,10 @@
 import sqlite3
 from datetime import datetime
 from config import Config
-from utils import get_database_connection
+from utils import get_database_connection, get_db_connection
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 def init_leave_request_table():
     """
@@ -19,14 +22,11 @@ def init_leave_request_table():
     """
     from database import init_leave_request_table_internal
     
-    conn = get_database_connection()
-    cursor = conn.cursor()
-    
-    # database.pyの内部関数を呼び出し
-    init_leave_request_table_internal(cursor)
-    
-    conn.commit()
-    conn.close()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # database.pyの内部関数を呼び出し
+        init_leave_request_table_internal(cursor)
 
 def insert_leave_request(employee_num, employee_name, application_date, 
                          leave_date_from, leave_date_to, leave_type,
@@ -49,36 +49,31 @@ def insert_leave_request(employee_num, employee_name, application_date,
         int: 登録されたIDまたはNone
     """
     try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        now = datetime.now().isoformat()
-        
-        cursor.execute("""
-            INSERT INTO leave_requests (
-                employee_num, employee_name, application_date,
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            now = datetime.now().isoformat()
+            
+            cursor.execute("""
+                INSERT INTO leave_requests (
+                    employee_num, employee_name, application_date,
+                    leave_date_from, leave_date_to, leave_type,
+                    leave_subtype, substitute_work_date, other_reason,
+                    status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            """, (
+                str(employee_num), employee_name, application_date,
                 leave_date_from, leave_date_to, leave_type,
                 leave_subtype, substitute_work_date, other_reason,
-                status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-        """, (
-            str(employee_num), employee_name, application_date,
-            leave_date_from, leave_date_to, leave_type,
-            leave_subtype, substitute_work_date, other_reason,
-            now, now
-        ))
-        
-        leave_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        print(f"[休暇願] ID:{leave_id} | {employee_name} | {leave_type} | {leave_date_from}～{leave_date_to}")
-        return leave_id
+                now, now
+            ))
+            
+            leave_id = cursor.lastrowid
+            logger.info(f"休暇願登録: ID={leave_id}, 従業員={employee_name}, 種類={leave_type}, 期間={leave_date_from}～{leave_date_to}")
+            return leave_id
         
     except Exception as e:
-        print(f"[エラー] 休暇願登録エラー: {e}")
-        if conn:
-            conn.close()
+        logger.error(f"休暇願登録エラー: {e}", exc_info=True)
         return None
 
 def get_leave_requests(employee_num=None, leave_date=None, status=None, limit=100):
@@ -95,44 +90,41 @@ def get_leave_requests(employee_num=None, leave_date=None, status=None, limit=10
         list: 休暇願のリスト
     """
     try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        query = "SELECT * FROM leave_requests WHERE 1=1"
-        params = []
-        
-        if employee_num:
-            query += " AND employee_num = ?"
-            params.append(employee_num)
-        
-        if leave_date:
-            query += " AND leave_date_from <= ? AND leave_date_to >= ?"
-            params.append(leave_date)
-            params.append(leave_date)
-        
-        if status:
-            query += " AND status = ?"
-            params.append(status)
-        
-        query += " ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
-        
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        
-        # 結果を辞書形式に変換
-        columns = [desc[0] for desc in cursor.description]
-        results = []
-        for row in rows:
-            results.append(dict(zip(columns, row)))
-        
-        conn.close()
-        return results
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = "SELECT * FROM leave_requests WHERE 1=1"
+            params = []
+            
+            if employee_num:
+                query += " AND employee_num = ?"
+                params.append(employee_num)
+            
+            if leave_date:
+                query += " AND leave_date_from <= ? AND leave_date_to >= ?"
+                params.append(leave_date)
+                params.append(leave_date)
+            
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+            
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            # 結果を辞書形式に変換
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in rows:
+                results.append(dict(zip(columns, row)))
+            
+            return results
         
     except Exception as e:
-        print(f"[エラー] 休暇願取得エラー: {e}")
-        if conn:
-            conn.close()
+        logger.error(f"休暇願取得エラー: {e}", exc_info=True)
         return []
 
 def approve_leave_request(leave_id, approved_by):
@@ -147,7 +139,7 @@ def approve_leave_request(leave_id, approved_by):
     )
     
     if result['success']:
-        print(f"[休暇願承認] ID:{leave_id} を承認しました")
+        logger.info(f"休暇願承認: ID={leave_id}")
     
     return result['success']
 
@@ -163,7 +155,7 @@ def reject_leave_request(leave_id, rejected_by):
     )
     
     if result['success']:
-        print(f"[休暇願却下] ID:{leave_id} を却下しました")
+        logger.info(f"休暇願却下: ID={leave_id}")
     
     return result['success']
 
@@ -187,9 +179,9 @@ def withdraw_leave_request(leave_id):
     )
     
     if result['success']:
-        print(f"[休暇願取り下げ] ID:{leave_id} を取り下げました")
+        logger.info(f"休暇願取り下げ: ID={leave_id}")
     else:
-        print(f"[エラー] {result['message']}")
+        logger.error(f"休暇願取り下げ失敗: {result['message']}")
     
     return result['success']
 
@@ -233,7 +225,7 @@ def get_leaves_for_date_range(employee_num, start_date, end_date):
         return results
         
     except Exception as e:
-        print(f"[エラー] 休暇願取得エラー: {e}")
+        logger.error(f"休暇願取得エラー: {e}", exc_info=True)
         if conn:
             conn.close()
         return []

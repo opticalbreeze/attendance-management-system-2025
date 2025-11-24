@@ -24,10 +24,10 @@ class Config:
     DATABASE_PATH = os.environ.get('DATABASE_PATH', '../../data/attendance.db')
     
     # ==================== PDF保存設定 ====================
-    # PDF保存先パス
-    # ローカル開発: C:\Users\take_me_hospital\attendance\data\PDF
+    # PDF保存先パス（環境変数から取得、未設定の場合はデータベースと同じディレクトリのPDFフォルダを使用）
     # Docker環境: /app/data/PDF（ホストの attendance/data/PDF にマウント）
-    PDF_SAVE_DIR = os.environ.get('PDF_SAVE_DIR', r'C:\Users\take_me_hospital\attendance\data\PDF')
+    # ローカル環境: データベースパスと同じディレクトリのPDFフォルダ
+    PDF_SAVE_DIR = os.environ.get('PDF_SAVE_DIR', '')  # 空の場合はutils.pyで自動計算
     
     # ==================== チャタリング防止設定 ====================
     CHATTERING_THRESHOLD_SECONDS = int(os.environ.get('CHATTERING_THRESHOLD', '10'))
@@ -40,6 +40,13 @@ class Config:
     # ==================== 給与計算期間設定 ====================
     PAYROLL_START_DAY = int(os.environ.get('PAYROLL_START_DAY', '16'))  # 前月16日
     PAYROLL_END_DAY = int(os.environ.get('PAYROLL_END_DAY', '15'))      # 当月15日
+    
+    # ==================== CSVインポート設定 ====================
+    DEFAULT_SHEET_NUMBER = os.environ.get('DEFAULT_SHEET_NUMBER', '1')  # デフォルトのシート番号
+    
+    # ==================== ログ設定 ====================
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')  # ログレベル（DEBUG, INFO, WARNING, ERROR, CRITICAL）
+    LOG_FILE_PATH = os.environ.get('LOG_FILE_PATH', '')  # ログファイルパス（空の場合はファイル出力なし）
     
     # ==================== バリデーション設定 ====================
     EMPLOYEE_ID_MIN_LENGTH = int(os.environ.get('EMPLOYEE_ID_MIN_LENGTH', '3'))

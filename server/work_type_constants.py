@@ -72,3 +72,29 @@ def is_holiday_shift(work_type):
     """
     return work_type and ('有' in work_type or '所' in work_type or '法' in work_type)
 
+# CSVインポート用の勤務区分マッピング（一元管理）
+CSV_WORK_TYPE_MAPPING = {
+    '日勤': '通常',
+    '夜勤': '夜勤',
+    '法': '法定休日',
+    '所': '所定休日',
+    '有': '有給',
+    '代': '代休',
+    '特': '特休',
+    '明': '明',
+    '24勤A': '24勤A',
+    '24勤B': '24勤B'
+}
+
+def map_csv_work_type(csv_work_type):
+    """
+    CSVファイルの勤務区分をデータベース用の勤務区分にマッピング
+    
+    Args:
+        csv_work_type: CSVファイルの勤務区分文字列
+        
+    Returns:
+        str: マッピング後の勤務区分、マッピングがない場合はそのまま返す
+    """
+    return CSV_WORK_TYPE_MAPPING.get(csv_work_type, csv_work_type)
+

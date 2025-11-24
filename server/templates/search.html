@@ -247,14 +247,14 @@
         }
         
         .attendance-time.valid-clock-in {
-            background: #28a745;
-            color: white;
+            background: #e3f2fd;
+            color: #3498db;
             font-weight: bold;
         }
         
         .attendance-time.valid-clock-out {
-            background: #dc3545;
-            color: white;
+            background: #e3f2fd;
+            color: #3498db;
             font-weight: bold;
         }
         
@@ -665,7 +665,7 @@
             // 明の行で、前日24勤の退勤時刻がある場合
             if (item.work_type === '明' && item.night_shift_end_time) {
                 const timeStr = formatTime(item.night_shift_end_time);
-                return `${timeStr} <span style="color: #dc3545; font-size: 0.8em;">(${item.night_shift_work_type}退勤)</span>`;
+                return `${timeStr} <span style="color: #3498db; font-size: 0.8em;">(${item.night_shift_work_type}退勤)</span>`;
             }
             
             // 24勤の場合は退勤時刻を表示しない（翌日明に移動済み）

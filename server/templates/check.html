@@ -319,14 +319,18 @@
         
         <div class="check-form">
             <form id="check-form">
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 20px; display: flex; align-items: flex-start; gap: 20px;">
                     <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                         <input type="radio" name="check-mode" value="daily" id="mode-daily" checked onchange="toggleCheckMode()">
                         <span>単日チェック</span>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-left: 20px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
                         <input type="radio" name="check-mode" value="monthly" id="mode-monthly" onchange="toggleCheckMode()">
                         <span>月度チェック（係員ごと）</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="check-mode" value="monthly-all" id="mode-monthly-all" onchange="toggleCheckMode()">
+                        <span>月度チェック（全員）</span>
                     </label>
                 </div>
                 
@@ -382,6 +386,28 @@
                             </select>
                             <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
                                 特定の従業員のみチェック
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="monthly-all-mode" class="check-mode-section" style="display: none;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="monthly-all-section-select">セクション（必須）</label>
+                            <select id="monthly-all-section-select">
+                                <option value="">▼ セクションを選択</option>
+                            </select>
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                セクション全員を一括チェック
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-month-all">検索月（必須）</label>
+                            <input type="text" id="search-month-all" name="search_month_all" placeholder="2025/10" pattern="\d{4}/\d{1,2}">
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                YYYY/MM形式（例: 2025/10）<br>
+                                <span style="color: #e74c3c;">※実行日より後の日付はチェックしません</span>
                             </small>
                         </div>
                     </div>
@@ -543,6 +569,11 @@
             if (searchMonthInput) {
                 searchMonthInput.value = calculateCurrentPayrollMonth();
             }
+            
+            const searchMonthAllInput = document.getElementById('search-month-all');
+            if (searchMonthAllInput) {
+                searchMonthAllInput.value = calculateCurrentPayrollMonth();
+            }
         });
         
         // チェックモードの切り替え
@@ -550,15 +581,47 @@
             const mode = document.querySelector('input[name="check-mode"]:checked').value;
             document.getElementById('daily-mode').style.display = mode === 'daily' ? 'block' : 'none';
             document.getElementById('monthly-mode').style.display = mode === 'monthly' ? 'block' : 'none';
+            document.getElementById('monthly-all-mode').style.display = mode === 'monthly-all' ? 'block' : 'none';
             
-            // 月度チェックモードに切り替えたとき、セクションが選択されていない場合は自動選択
-            if (mode === 'monthly') {
-                const monthlySectionSelect = document.getElementById('monthly-section-select');
+            // required属性を動的に設定（表示されているモードの要素のみrequiredにする）
+            const monthlySectionSelect = document.getElementById('monthly-section-select');
+            const monthlyAllSectionSelect = document.getElementById('monthly-all-section-select');
+            const checkDateInput = document.getElementById('check-date');
+            const employeeSelect = document.getElementById('employee-id');
+            const searchMonthInput = document.getElementById('search-month');
+            const searchMonthAllInput = document.getElementById('search-month-all');
+            
+            if (mode === 'daily') {
+                if (checkDateInput) checkDateInput.required = true;
+                if (employeeSelect) employeeSelect.required = true;
+                if (monthlySectionSelect) monthlySectionSelect.required = false;
+                if (monthlyAllSectionSelect) monthlyAllSectionSelect.required = false;
+                if (searchMonthInput) searchMonthInput.required = false;
+                if (searchMonthAllInput) searchMonthAllInput.required = false;
+            } else if (mode === 'monthly') {
+                if (checkDateInput) checkDateInput.required = false;
+                if (employeeSelect) employeeSelect.required = false;
+                if (monthlySectionSelect) monthlySectionSelect.required = true;
+                if (monthlyAllSectionSelect) monthlyAllSectionSelect.required = false;
+                if (searchMonthInput) searchMonthInput.required = true;
+                if (searchMonthAllInput) searchMonthAllInput.required = false;
+                
+                // セクションが選択されていない場合は自動選択
                 if (monthlySectionSelect && !monthlySectionSelect.value && monthlySectionSelect.options.length > 1) {
-                    // 最初のセクション（空のオプションを除く）を選択
                     monthlySectionSelect.selectedIndex = 1;
-                    // 従業員リストを更新
                     updateMonthlyEmployeeList();
+                }
+            } else if (mode === 'monthly-all') {
+                if (checkDateInput) checkDateInput.required = false;
+                if (employeeSelect) employeeSelect.required = false;
+                if (monthlySectionSelect) monthlySectionSelect.required = false;
+                if (monthlyAllSectionSelect) monthlyAllSectionSelect.required = true;
+                if (searchMonthInput) searchMonthInput.required = false;
+                if (searchMonthAllInput) searchMonthAllInput.required = true;
+                
+                // セクションが選択されていない場合は自動選択
+                if (monthlyAllSectionSelect && !monthlyAllSectionSelect.value && monthlyAllSectionSelect.options.length > 1) {
+                    monthlyAllSectionSelect.selectedIndex = 1;
                 }
             }
         }
@@ -585,7 +648,6 @@
         // セクション選択肢を設定する共通関数
         function populateSectionSelect(selectElement, defaultText) {
             const sections = [...new Set(allEmployees.map(emp => emp.section || '設備'))].sort();
-            console.log('[DEBUG] セクション一覧:', sections, '従業員数:', allEmployees.length);
             selectElement.innerHTML = `<option value="">${defaultText}</option>`;
             sections.forEach(section => {
                 const option = document.createElement('option');
@@ -619,6 +681,11 @@
                     const monthlySectionSelect = document.getElementById('monthly-section-select');
                     if (monthlySectionSelect) {
                         populateSectionSelect(monthlySectionSelect, '▼ セクションを選択');
+                    }
+                    
+                    const monthlyAllSectionSelect = document.getElementById('monthly-all-section-select');
+                    if (monthlyAllSectionSelect) {
+                        populateSectionSelect(monthlyAllSectionSelect, '▼ セクションを選択');
                     }
                     
                     updateEmployeeList();
@@ -658,6 +725,8 @@
             const mode = document.querySelector('input[name="check-mode"]:checked').value;
             if (mode === 'monthly') {
                 await performMonthlyCheck();
+            } else if (mode === 'monthly-all') {
+                await performMonthlyAllCheck();
             } else {
                 await performDailyCheck();
             }
@@ -693,40 +762,31 @@
             const checkUrl = `/api/attendance_check?${params}`;
 
             try {
-                console.log('[DEBUG] 単日チェックAPIリクエスト:', checkUrl);
                 const response = await fetch(checkUrl);
-                console.log('[DEBUG] レスポンスステータス:', response.status, response.statusText);
                 
                 let data;
                 try {
                     const responseText = await response.text();
-                    console.log('[DEBUG] レスポンス本文:', responseText);
                     data = JSON.parse(responseText);
                 } catch (jsonError) {
-                    console.error('[DEBUG] JSON解析エラー:', jsonError);
                     throw new Error(`HTTP ${response.status}: JSONの解析に失敗しました`);
                 }
-
-                console.log('[DEBUG] パース後のデータ:', data);
 
                 document.getElementById('loading').style.display = 'none';
 
                 if (response.ok && data.status === 'success') {
                     const resultData = data.data || data;
-                    console.log('[DEBUG] 結果データ:', resultData);
                     
                     if (!resultData || !resultData.employee_name) {
-                        console.error('[DEBUG] データ形式エラー - resultData:', resultData);
                         showError('データの形式が正しくありません: employee_nameが見つかりません');
                         return;
                     }
                     displayResults(resultData);
                 } else {
-                    console.error('[DEBUG] APIエラー:', data);
                     showError(data.message || `サーバーエラーが発生しました (HTTP ${response.status})`);
                 }
             } catch (error) {
-                console.error('[DEBUG] 例外エラー:', error);
+                console.error('勤怠チェックエラー:', error);
                 document.getElementById('loading').style.display = 'none';
                 showError('サーバーとの通信エラーが発生しました: ' + error.message);
             }
@@ -762,6 +822,63 @@
             if (employeeId) {
                 params.append('employee_id', employeeId);
             }
+            
+            const checkUrl = `/api/attendance_check?${params}`;
+            
+            try {
+                const response = await fetch(checkUrl);
+                let data;
+                try {
+                    data = await response.json();
+                } catch (jsonError) {
+                    throw new Error(`HTTP ${response.status}: JSONの解析に失敗しました`);
+                }
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok && data.status === 'success') {
+                    const resultData = data.data || data;
+                    if (!resultData || !resultData.search_month) {
+                        showError('サーバーからのレスポンス形式が正しくありません');
+                        return;
+                    }
+                    displayMonthlyResults(resultData);
+                } else {
+                    showError(data.message || `サーバーエラーが発生しました (HTTP ${response.status})`);
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('サーバーとの通信エラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // 月度チェック（全員）実行
+        async function performMonthlyAllCheck() {
+            const section = document.getElementById('monthly-all-section-select').value.trim();
+            const searchMonth = document.getElementById('search-month-all').value.trim();
+            
+            // バリデーション
+            if (!section) {
+                showError('セクションを選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            // UIリセット
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            // クエリパラメータ構築
+            const params = new URLSearchParams();
+            params.append('search_month', searchMonth);
+            params.append('section', section);
+            params.append('check_all', 'true');  // 全員チェックフラグ
             
             const checkUrl = `/api/attendance_check?${params}`;
             

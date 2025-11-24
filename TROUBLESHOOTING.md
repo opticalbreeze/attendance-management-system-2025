@@ -461,5 +461,151 @@ python check_overtime.py > db_status.txt
 
 ---
 
-**更新日**: 2025-11-06
+---
+
+## 🔧 コード変更時の注意事項
+
+### Volumeマウントの確認
+
+**問題:** コードを変更しても反映されない
+
+**原因:** `docker-compose.yml`の`volumes`セクションにファイルがマウントされていない
+
+**解決策:**
+```yaml
+# docker-compose.yml の volumes セクションに追加
+volumes:
+  - ./server.py:/app/server.py
+  - ./database.py:/app/database.py
+  - ./api_attendance.py:/app/api_attendance.py
+  # ... その他の変更するファイル
+```
+
+変更後は必ず `docker-compose restart` を実行
+
+### モジュールインポートエラー
+
+**問題:** `ModuleNotFoundError: No module named 'xxx'`
+
+**原因:** 
+- 新しいPythonファイルを作成したが、`docker-compose.yml`にマウントされていない
+- インポートパスが間違っている
+
+**解決策:**
+1. 新しいファイルを`docker-compose.yml`の`volumes`に追加
+2. `docker-compose restart`で再起動
+3. それでもエラーの場合は`docker-compose down && docker-compose up -d --build`で完全再ビルド
+
+### ハードコーディングの問題
+
+**問題:** 勤務タイプの判定ロジックが複数箇所に散在している
+
+**解決策:**
+- `work_type_constants.py`の定数と関数を使用
+- `'明'`, `'24勤A'`などの文字列を直接書かない
+- `is_off_day_shift()`, `is_24hour_or_night_shift()`などの関数を使用
+
+**例:**
+```python
+# ❌ 悪い例
+if '明' in work_type:
+    ...
+
+# ✅ 良い例
+from work_type_constants import is_off_day_shift
+if is_off_day_shift(work_type):
+    ...
+```
+
+### デバッグコードの削除
+
+**問題:** 本番環境にデバッグコードが残っている
+
+**確認方法:**
+```bash
+# デバッグコードを検索
+grep -r "\[DEBUG\]" server/
+grep -r "console.log.*DEBUG" server/templates/
+```
+
+**削除対象:**
+- `print(f"[DEBUG] ...")` などのデバッグ用print文
+- `console.log('[DEBUG] ...')` などのJavaScriptデバッグコード
+- 検証用のHTMLファイル（`debug_check.html`など）
+- 調査用のPythonスクリプト（`investigate_*.py`など）
+
+**注意:** エラーログ（`print(f"[エラー] ...")`）は本番環境でも必要なので削除しない
+
+### 日付正規化関数の重複
+
+**問題:** 日付を文字列に変換する処理が複数箇所にある
+
+**解決策:**
+- `monthly_report.py`の`normalize_date_to_str()`関数を使用
+- 他のファイルでも同様の処理が必要な場合は、`utils.py`に共通関数として移動
+
+### 24勤・夜勤の終了時間処理
+
+**問題:** 「明」勤務の終了時間が正しく表示されない
+
+**原因:** 24勤・夜勤の終了時間を翌日の「明」勤務に移動するロジックが複数箇所に散在
+
+**解決策:**
+- `database.py`の`get_night_shift_end_time_from_next_day()`関数を使用
+- `work_type_constants.py`の判定関数を使用して統一
+
+### Excel出力エラー
+
+**問題:** `cannot access local variable 'Alignment' where it is not associated with a value`
+
+**原因:** `Alignment`オブジェクトが関数内で定義されていない
+
+**解決策:**
+- `generate_monthly_report_excel()`の冒頭で`Alignment`オブジェクトを定義
+- `center_align_wrap = Alignment(horizontal='center', vertical='center', wrap_text=True)`など
+
+**問題:** `'str' object has no attribute 'month'`
+
+**原因:** 日付が文字列のまま`.month`属性にアクセスしている
+
+**解決策:**
+```python
+# 日付をdateオブジェクトに変換
+if isinstance(work_date, str):
+    work_date = datetime.strptime(work_date, '%Y-%m-%d').date()
+```
+
+### PDF生成エラー
+
+**問題:** PDFが生成されない、または日本語が表示されない
+
+**原因:**
+- WeasyPrintの依存ライブラリが不足
+- 日本語フォントがインストールされていない
+
+**解決策:**
+1. `Dockerfile`に以下を追加：
+```dockerfile
+RUN apt-get update && apt-get install -y \
+    libpango-1.0-0 libpangoft2-1.0-0 libgobject-2.0-0 \
+    libcairo2 libgdk-pixbuf-2.0-0 shared-mime-info \
+    fonts-noto-cjk fonts-noto-cjk-extra
+```
+
+2. `pdf_generator.py`と`utils.py`のCSSでフォントを指定：
+```css
+font-family: "Noto Sans CJK JP", "MS Gothic", sans-serif;
+```
+
+### 複数回送信の問題
+
+**問題:** フォーム送信ボタンを連続クリックすると複数回送信される
+
+**解決策:**
+- JavaScriptで`isSubmitting`フラグを使用
+- ボタンをクリックしたら即座に無効化し、送信完了まで待機
+
+---
+
+**更新日**: 2025-11-20
 

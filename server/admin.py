@@ -13,7 +13,8 @@ from flask import request, jsonify, flash
 from werkzeug.utils import secure_filename
 
 from config import Config
-from utils import get_database_connection
+from utils import get_database_connection, get_db_connection
+from auth import login_required
 
 # アップロード設定
 UPLOAD_FOLDER = '/tmp/uploads'
@@ -31,128 +32,116 @@ def allowed_file(filename):
 def import_csv_to_schedule(csv_file_path):
     """CSVファイルをattend_scheduleテーブルにインポート"""
     
-    conn = get_database_connection()
-    cursor = conn.cursor()
-    
-    # 既存データの確認
-    cursor.execute("SELECT COUNT(*) FROM attend_schedule")
-    before_count = cursor.fetchone()[0]
-    
-    imported_count = 0
-    error_count = 0
-    error_messages = []
-    
-    try:
-        with open(csv_file_path, 'r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            
-            for row_num, row in enumerate(reader, start=2):  # ヘッダー行の次から
-                try:
-                    # データの取得と検証
-                    employee_id = row.get('ID', '').strip()
-                    employee_name = row.get('名前', '').strip()
-                    date_str = row.get('日付', '').strip()
-                    work_type = row.get('区分', '').strip()
-                    start_time = row.get('開始時間', '').strip()
-                    end_time = row.get('終了時間', '').strip()
-                    
-                    # 必須項目チェック
-                    if not employee_id or not date_str:
-                        error_messages.append(f"行 {row_num}: 必須項目が不足 (ID: {employee_id}, 日付: {date_str})")
-                        error_count += 1
-                        continue
-                    
-                    # 日付フォーマット変換 (YYYY/MM/DD -> YYYY-MM-DD)
-                    try:
-                        date_obj = datetime.strptime(date_str, '%Y/%m/%d')
-                        work_date = date_obj.strftime('%Y-%m-%d')
-                    except ValueError:
-                        error_messages.append(f"行 {row_num}: 日付フォーマットエラー ({date_str})")
-                        error_count += 1
-                        continue
-                    
-                    # 勤務区分マッピング
-                    work_type_mapping = {
-                        '日勤': '通常',
-                        '夜勤': '夜勤',
-                        '法': '法定休日',
-                        '所': '所定休日',
-                        '有': '有給',
-                        '代': '代休',
-                        '特': '特休'
-                    }
-                    mapped_work_type = work_type_mapping.get(work_type, work_type)
-                    
-                    # 時間データの処理 (空の場合はNULLにする)
-                    start_time_value = start_time if start_time else None
-                    end_time_value = end_time if end_time else None
-                    
-                    # 重複チェック
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM attend_schedule 
-                        WHERE employee_id = ? AND work_date = ?
-                    """, (employee_id, work_date))
-                    
-                    if cursor.fetchone()[0] > 0:
-                        # 既存データを更新
-                        cursor.execute("""
-                            UPDATE attend_schedule 
-                            SET start_time = ?, end_time = ?, work_type = ?
-                            WHERE employee_id = ? AND work_date = ?
-                        """, (start_time_value, end_time_value, mapped_work_type, 
-                              employee_id, work_date))
-                    else:
-                        # 新規データを挿入（sheet_numberにデフォルト値を設定）
-                        sheet_number = "1"  # デフォルトのシート番号
-                        cursor.execute("""
-                            INSERT INTO attend_schedule 
-                            (sheet_number, employee_id, employee_name, work_date, start_time, end_time, work_type)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """, (sheet_number, employee_id, employee_name, work_date, start_time_value, 
-                              end_time_value, mapped_work_type))
-                    
-                    imported_count += 1
-                    
-                except Exception as e:
-                    error_messages.append(f"行 {row_num}: エラー - {str(e)}")
-                    error_count += 1
-                    continue
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
         
-        conn.commit()
-        
-        # 結果確認
+        # 既存データの確認
         cursor.execute("SELECT COUNT(*) FROM attend_schedule")
-        after_count = cursor.fetchone()[0]
+        before_count = cursor.fetchone()[0]
         
-        result = {
-            'success': True,
-            'message': f'インポート完了: {imported_count}件処理, {error_count}件エラー',
-            'details': {
-                'processed': imported_count,
-                'errors': error_count,
-                'before_count': before_count,
-                'after_count': after_count,
-                'increase': after_count - before_count,
-                'error_messages': error_messages[:10]  # 最初の10個のエラーメッセージのみ
+        imported_count = 0
+        error_count = 0
+        error_messages = []
+        
+        try:
+            with open(csv_file_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                
+                for row_num, row in enumerate(reader, start=2):  # ヘッダー行の次から
+                    try:
+                        # データの取得と検証
+                        employee_id = row.get('ID', '').strip()
+                        employee_name = row.get('名前', '').strip()
+                        date_str = row.get('日付', '').strip()
+                        work_type = row.get('区分', '').strip()
+                        start_time = row.get('開始時間', '').strip()
+                        end_time = row.get('終了時間', '').strip()
+                        
+                        # 必須項目チェック
+                        if not employee_id or not date_str:
+                            error_messages.append(f"行 {row_num}: 必須項目が不足 (ID: {employee_id}, 日付: {date_str})")
+                            error_count += 1
+                            continue
+                        
+                        # 日付フォーマット変換 (YYYY/MM/DD -> YYYY-MM-DD)
+                        try:
+                            date_obj = datetime.strptime(date_str, '%Y/%m/%d')
+                            work_date = date_obj.strftime('%Y-%m-%d')
+                        except ValueError:
+                            error_messages.append(f"行 {row_num}: 日付フォーマットエラー ({date_str})")
+                            error_count += 1
+                            continue
+                        
+                        # 勤務区分マッピング（work_type_constants.pyから取得）
+                        from work_type_constants import map_csv_work_type
+                        mapped_work_type = map_csv_work_type(work_type)
+                        
+                        # 時間データの処理 (空の場合はNULLにする)
+                        start_time_value = start_time if start_time else None
+                        end_time_value = end_time if end_time else None
+                        
+                        # 重複チェック
+                        cursor.execute("""
+                            SELECT COUNT(*) FROM attend_schedule 
+                            WHERE employee_id = ? AND work_date = ?
+                        """, (employee_id, work_date))
+                        
+                        if cursor.fetchone()[0] > 0:
+                            # 既存データを更新
+                            cursor.execute("""
+                                UPDATE attend_schedule 
+                                SET start_time = ?, end_time = ?, work_type = ?
+                                WHERE employee_id = ? AND work_date = ?
+                            """, (start_time_value, end_time_value, mapped_work_type, 
+                                  employee_id, work_date))
+                        else:
+                            # 新規データを挿入（sheet_numberにデフォルト値を設定）
+                            sheet_number = Config.DEFAULT_SHEET_NUMBER
+                            cursor.execute("""
+                                INSERT INTO attend_schedule 
+                                (sheet_number, employee_id, employee_name, work_date, start_time, end_time, work_type)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, (sheet_number, employee_id, employee_name, work_date, start_time_value, 
+                                  end_time_value, mapped_work_type))
+                        
+                        imported_count += 1
+                        
+                    except Exception as e:
+                        error_messages.append(f"行 {row_num}: エラー - {str(e)}")
+                        error_count += 1
+                        continue
+            
+            # 結果確認
+            cursor.execute("SELECT COUNT(*) FROM attend_schedule")
+            after_count = cursor.fetchone()[0]
+            
+            result = {
+                'success': True,
+                'message': f'インポート完了: {imported_count}件処理, {error_count}件エラー',
+                'details': {
+                    'processed': imported_count,
+                    'errors': error_count,
+                    'before_count': before_count,
+                    'after_count': after_count,
+                    'increase': after_count - before_count,
+                    'error_messages': error_messages[:10]  # 最初の10個のエラーメッセージのみ
+                }
             }
-        }
+            
+        except Exception as e:
+            result = {
+                'success': False,
+                'message': f'ファイル読み込みエラー: {str(e)}',
+                'details': {'error_messages': [str(e)]}
+            }
         
-    except Exception as e:
-        conn.rollback()
-        result = {
-            'success': False,
-            'message': f'ファイル読み込みエラー: {str(e)}',
-            'details': {'error_messages': [str(e)]}
-        }
-    finally:
-        conn.close()
-    
-    return result
+        return result
 
 def register_admin_api_routes(app):
     """管理者機能のAPIルートを登録"""
     
     @app.route('/api/admin/csv/upload', methods=['POST'])
+    @login_required
     def upload_csv():
         """CSVファイルアップロード＆インポート"""
         try:
@@ -204,11 +193,12 @@ def register_admin_api_routes(app):
             })
     
     @app.route('/api/admin/database/stats', methods=['GET'])
+    @login_required
     def get_database_stats():
         """データベース統計情報を取得"""
         try:
-            conn = get_database_connection()
-            cursor = conn.cursor()
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
             
             # 基本統計
             cursor.execute("""
@@ -241,8 +231,6 @@ def register_admin_api_routes(app):
                 LIMIT 12
             """)
             monthly_stats = cursor.fetchall()
-            
-            conn.close()
             
             return jsonify({
                 'success': True,
