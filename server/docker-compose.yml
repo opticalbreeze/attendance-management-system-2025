@@ -44,6 +44,9 @@ services:
       - type: bind
         source: ./work_type_constants.py
         target: /app/work_type_constants.py
+      - type: bind
+        source: ./attendance_check_service.py
+        target: /app/attendance_check_service.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

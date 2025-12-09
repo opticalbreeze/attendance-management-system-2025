@@ -90,6 +90,32 @@ def register_attendance_api_routes(app):
             
             results = search_schedule(employee_id, start_date, end_date, limit)
             
+            # 各日付に対してアラート情報を取得
+            from database import check_attendance_vs_schedule
+            total_alerts_count = 0
+            for item in results:
+                try:
+                    check_result = check_attendance_vs_schedule(employee_id, item['work_date'])
+                    if check_result.get('status') == 'success' and check_result.get('data'):
+                        alerts = check_result['data'].get('alerts', [])
+                        item['alerts'] = alerts
+                        if alerts:
+                            total_alerts_count += len(alerts)
+                            logger.info(f"アラート取得: {item['work_date']} - {len(alerts)}件")
+                            for alert in alerts:
+                                logger.debug(f"  アラート: {alert.get('type')} - {alert.get('message')}")
+                    else:
+                        item['alerts'] = []
+                        logger.debug(f"アラートなし: {item['work_date']} (status={check_result.get('status')})")
+                except Exception as e:
+                    logger.error(f"アラート取得エラー ({item['work_date']}): {e}", exc_info=True)
+                    item['alerts'] = []
+            
+            if total_alerts_count > 0:
+                logger.info(f"検索結果: {len(results)}件中、合計{total_alerts_count}件のアラートを検出")
+            else:
+                logger.debug(f"検索結果: {len(results)}件中、アラートなし")
+            
             return jsonify(format_response(
                 'success',
                 count=len(results),

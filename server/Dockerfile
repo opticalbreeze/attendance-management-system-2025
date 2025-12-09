@@ -43,6 +43,7 @@ COPY api_utils.py .
 COPY pdf_utils.py .
 COPY admin.py .
 COPY work_type_constants.py .
+COPY attendance_check_service.py .
 COPY import_schedule_csv.py .
 COPY templates/ templates/
 

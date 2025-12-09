@@ -247,20 +247,57 @@
         }
         
         .attendance-time.valid-clock-in {
-            background: #e3f2fd;
-            color: #3498db;
+            background: #e8f5e9;
+            color: #2e7d32;
             font-weight: bold;
+            border: 2px solid #4caf50;
         }
         
         .attendance-time.valid-clock-out {
-            background: #e3f2fd;
-            color: #3498db;
+            background: #fff3e0;
+            color: #e65100;
             font-weight: bold;
+            border: 2px solid #ff9800;
         }
         
         .no-attendance {
             color: #999;
             font-style: italic;
+        }
+        
+        .alert-item {
+            display: block;
+            padding: 4px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            font-size: 0.85em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+        
+        .alert-item.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 3px solid #dc3545;
+        }
+        
+        .alert-item.warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .alert-item.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 3px solid #17a2b8;
+        }
+        
+        .alert-icon {
+            margin-right: 4px;
+            font-weight: bold;
         }
         
         .loading, .no-results {
@@ -344,6 +381,7 @@
                             <th>開始時刻</th>
                             <th>終了時刻</th>
                             <th>実際の打刻時間 🕐</th>
+                            <th>エラー・警告</th>
                             <th>時間外申告</th>
                             <th>休暇願</th>
                         </tr>
@@ -534,6 +572,16 @@
 
                 if (data.status === 'success') {
                     searchResults = data.results;
+                    // デバッグ用：アラート情報を確認
+                    console.log('検索結果データ:', data.results);
+                    const totalAlerts = data.results.reduce((sum, item) => {
+                        const alertCount = item.alerts ? item.alerts.length : 0;
+                        if (alertCount > 0) {
+                            console.log(`日付 ${item.work_date}: ${alertCount}件のアラート`, item.alerts);
+                        }
+                        return sum + alertCount;
+                    }, 0);
+                    console.log(`検索結果: ${data.results.length}件中、合計${totalAlerts}件のアラートを検出`);
                     displayResults(data.results, data.search_params);
                 } else {
                     showError(data.message || '検索エラーが発生しました');
@@ -570,6 +618,15 @@
                 const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || [], item.work_type, item.work_date, results);
                 
                 // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
+                // アラート情報を表示
+                const alerts = item.alerts || [];
+                const alertsHtml = formatAlerts(alerts);
+                
+                // デバッグ用（開発時のみ）
+                if (alerts.length > 0) {
+                    console.log(`アラート検出: ${item.work_date}`, alerts);
+                }
+                
                 tr.innerHTML = `
                     <td class="idm-cell">${item.employee_id}</td>
                     <td><strong>${item.employee_name || ''}</strong></td>
@@ -578,6 +635,7 @@
                     <td>${formatTime(item.start_time)}</td>
                     <td>${formatEndTime(item)}</td>
                     <td class="attendance-times">${attendanceTimesHtml}</td>
+                    <td id="alerts-${item.work_date}" style="font-size: 0.85em;">${alertsHtml}</td>
                     <td id="overtime-${item.work_date}" style="font-size: 0.85em; color: #667eea;">-</td>
                     <td id="leave-${item.work_date}" style="font-size: 0.85em; color: #28a745;">-</td>
                 `;
@@ -802,6 +860,40 @@
             });
         }
         
+        // アラート情報をフォーマット
+        function formatAlerts(alerts) {
+            console.log('formatAlerts called with:', alerts, 'type:', typeof alerts, 'isArray:', Array.isArray(alerts));
+            
+            if (!alerts || alerts.length === 0) {
+                console.log('formatAlerts: アラートなし');
+                return '<span style="color: #999;">-</span>';
+            }
+            
+            if (!Array.isArray(alerts)) {
+                console.error('formatAlerts: alerts is not an array:', alerts);
+                return '<span style="color: #999;">-</span>';
+            }
+            
+            const formatted = alerts.map(alert => {
+                if (!alert || typeof alert !== 'object') {
+                    console.error('formatAlerts: invalid alert object:', alert);
+                    return '';
+                }
+                
+                const icon = alert.type === 'error' ? '❌' : alert.type === 'warning' ? '⚠️' : 'ℹ️';
+                const className = alert.type === 'error' ? 'error' : alert.type === 'warning' ? 'warning' : 'info';
+                const title = alert.details ? `${alert.message}: ${alert.details}` : alert.message;
+                
+                return `<div class="alert-item ${className}" title="${title.replace(/"/g, '&quot;')}">
+                    <span class="alert-icon">${icon}</span>
+                    <span>${alert.message}</span>
+                </div>`;
+            }).join('');
+            
+            console.log('formatAlerts: formatted result:', formatted);
+            return formatted;
+        }
+        
         // エラー表示
         function showError(message) {
             const errorDiv = document.getElementById('error-message');
@@ -875,7 +967,7 @@
                 return;
             }
             
-            let csv = '従業員ID,従業員名,勤務日,勤務タイプ,開始時刻,終了時刻,実際の打刻時間\n';
+            let csv = '従業員ID,従業員名,勤務日,勤務タイプ,開始時刻,終了時刻,実際の打刻時間,エラー・警告\n';
             searchResults.forEach(item => {
                 const attendanceTimes = (item.attendance_records || []).map(record => record.time_only).join(' ');
                 
@@ -892,7 +984,12 @@
                     endTimeForCSV = item.end_time || '';
                 }
                 
-                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${item.work_type || ''}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}"\n`;
+                // アラート情報をCSVに追加
+                const alertsText = (item.alerts || []).map(alert => {
+                    return alert.details ? `${alert.message}: ${alert.details}` : alert.message;
+                }).join('; ').replace(/"/g, '""');
+                
+                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${item.work_type || ''}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}","${alertsText}"\n`;
             });
             
             // BOM（Byte Order Mark）を追加してExcelで文字化けを防ぐ

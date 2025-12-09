@@ -236,11 +236,25 @@ def get_overtime_applications(employee_num=None, work_date=None, status=None, li
             
             if employee_num:
                 query += " AND employee_num = ?"
-                params.append(employee_num)
+                # 文字列と整数の両方に対応
+                params.append(str(employee_num))
             
             if work_date:
                 query += " AND work_date = ?"
-                params.append(work_date)
+                # 日付フォーマットを統一（YYYY-MM-DD形式）
+                if isinstance(work_date, str):
+                    # 既にYYYY-MM-DD形式の場合はそのまま使用
+                    work_date_str = work_date.strip()
+                    # YYYY/MM/DD形式の場合はYYYY-MM-DDに変換
+                    if '/' in work_date_str:
+                        try:
+                            date_obj = datetime.strptime(work_date_str, '%Y/%m/%d')
+                            work_date_str = date_obj.strftime('%Y-%m-%d')
+                        except ValueError:
+                            pass
+                    params.append(work_date_str)
+                else:
+                    params.append(work_date)
             
             if status:
                 query += " AND status = ?"

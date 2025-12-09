@@ -429,6 +429,57 @@ def get_stats():
             
             return result
         
+        # 従業員マスタ統計
+        cursor.execute("SELECT COUNT(*) FROM employee_master")
+        stats['employee_master_records'] = cursor.fetchone()[0]
+        
+        # 最新の打刻履歴（パラメータバインディング使用）
+        cursor.execute("""
+            SELECT idm, timestamp, terminal_id, received_at 
+            FROM attendance 
+            ORDER BY received_at DESC 
+            LIMIT ?
+        """, (Config.STATS_LATEST_RECORDS,))
+        latest_records = cursor.fetchall()
+        
+        # 今日の打刻件数（安全な日付処理）
+        today = datetime.now().strftime('%Y-%m-%d')
+        cursor.execute("""
+            SELECT COUNT(*) FROM attendance 
+            WHERE DATE(received_at) = ?
+        """, (today,))
+        stats['today_count'] = cursor.fetchone()[0]
+        
+        # 安全な最新打刻履歴整形（AIガイドの推奨パターン）
+        latest_list = []
+        if latest_records:
+            for record in latest_records:
+                try:
+                    latest_list.append({
+                        'idm': record[0] if record[0] is not None else '',
+                        'timestamp': record[1] if record[1] is not None else '',
+                        'terminal_id': record[2] if record[2] is not None else '',
+                        'received_at': record[3] if record[3] is not None else ''
+                    })
+                except (IndexError, TypeError) as e:
+                    logger.warning(f"レコード処理失敗: {record}, エラー: {e}")
+                    continue
+        
+            # 統一されたレスポンス形式
+            result = {
+                'status': 'success',
+                'total_records': stats['total_records'],
+                'unique_cards': stats['unique_cards'], 
+                'unique_terminals': stats['unique_terminals'],
+                'schedule_records': stats['schedule_records'],
+                'unique_employees': stats['unique_employees'],
+                'employee_master_records': stats['employee_master_records'],
+                'today_count': stats['today_count'],
+                'latest': latest_list
+            }
+            
+            return result
+        
     except sqlite3.Error as e:
         logger.error(f"get_stats()でデータベースエラー: {e}", exc_info=True)
         return {
@@ -749,6 +800,324 @@ def check_attendance_vs_schedule(employee_id, check_date):
     # 新しいサービスを使用
     from attendance_check_service import check_attendance_vs_schedule as new_check
     return new_check(employee_id, check_date)
+
+def insert_late_arrival_request(employee_num, employee_name, request_date, work_date, late_minutes, reason=''):
+            cursor.execute("""
+                SELECT employee_num, name, idm FROM employee_master 
+                WHERE employee_num = ?
+            """, (employee_id,))
+            
+            emp_result = cursor.fetchone()
+            if not emp_result:
+                return {
+                    'status': 'error',
+                    'message': f'従業員ID {employee_id} が見つかりません'
+                }
+            
+            employee_num, employee_name, idm = emp_result
+            
+            # チェック日付のスケジュールを取得
+            cursor.execute("""
+                SELECT id, work_date, work_type, start_time, end_time
+                FROM attend_schedule
+                WHERE employee_id = ? AND work_date = ?
+            """, (employee_id, check_date))
+            
+            schedule_row = cursor.fetchone()
+            
+            # チェック日付の打刻データを取得
+            cursor.execute("""
+                SELECT id, timestamp, terminal_id
+                FROM attendance
+                WHERE idm = ? AND date(timestamp) = ?
+                ORDER BY timestamp ASC
+            """, (idm, check_date))
+            
+            attendance_rows = cursor.fetchall()
+            
+            # 前日の24勤・夜勤のスケジュールを取得（「明」勤務で前日の退勤時刻をチェックするため）
+            prev_date = (datetime.strptime(check_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+            cursor.execute("""
+                SELECT work_date, work_type, start_time, end_time
+                FROM attend_schedule
+                WHERE employee_id = ? AND work_date = ? AND (work_type LIKE '%24勤%' OR work_type LIKE '%夜勤%')
+            """, (employee_id, prev_date))
+            
+            prev_day_night_shift_schedule = cursor.fetchone()
+            
+            # 結果を構築
+            result = {
+                'employee_id': employee_num,
+                'employee_name': employee_name,
+                'check_date': check_date,
+                'schedule': None,
+                'attendance_records': [],
+                'actual_clock_in': None,
+                'actual_clock_out': None,
+                'alerts': [],
+                'prev_day_night_shift': None  # 前日の24勤・夜勤の情報（「明」勤務用）
+            }
+            
+            # スケジュール情報
+            if schedule_row:
+                result['schedule'] = {
+                    'id': schedule_row[0],
+                    'work_date': schedule_row[1],
+                    'work_type': schedule_row[2],
+                    'start_time': schedule_row[3],
+                    'end_time': schedule_row[4]
+                }
+            
+            # 前日の24勤・夜勤の情報を保存（「明」勤務の表示用）
+            if prev_day_night_shift_schedule:
+                result['prev_day_night_shift'] = {
+                    'work_date': prev_day_night_shift_schedule[0],
+                    'work_type': prev_day_night_shift_schedule[1],
+                    'start_time': prev_day_night_shift_schedule[2],
+                    'end_time': prev_day_night_shift_schedule[3]
+                }
+            
+            # 打刻データを整形（統一関数を使用）
+            for att_row in attendance_rows:
+                timestamp_str = att_row[1]
+                time_only = extract_time_from_timestamp(timestamp_str)
+                
+                result['attendance_records'].append({
+                    'id': att_row[0],
+                    'time': time_only,
+                    'timestamp': timestamp_str,
+                    'terminal_id': att_row[2]
+                })
+            
+            # 打刻時間の判定
+            work_type = result['schedule']['work_type'] if result['schedule'] else None
+            
+            if result['attendance_records']:
+                if is_24hour_or_night_shift(work_type):
+                    # 24勤・夜勤: 一番早い時間が出勤、翌日の「明」の日の一番遅い時間が退勤
+                    result['actual_clock_in'] = result['attendance_records'][0]['time']
+                    
+                    # 共通関数を使用して翌日の「明」勤務の打刻から終了時間を取得
+                    # 表示用には設定するが、退勤時刻の差異チェックでは使用しない（翌日の「明」勤務でチェックするため）
+                    end_time = get_night_shift_end_time_from_next_day(cursor, employee_id, check_date)
+                    if end_time:
+                        result['actual_clock_out'] = end_time  # 表示用に設定
+                elif is_off_day_shift(work_type):
+                    # 「明」勤務: 前日の24勤・夜勤の退勤時刻を表示（「明」勤務の日の打刻が前日の退勤時刻）
+                    if len(result['attendance_records']) > 0:
+                        # 「明」勤務の日の打刻は前日の24勤・夜勤の退勤時刻として扱う
+                        result['actual_clock_in'] = None  # 「明」勤務には出勤時刻の概念がない
+                        result['actual_clock_out'] = result['attendance_records'][-1]['time']  # 最後の打刻が前日の退勤時刻
+                    else:
+                        # 打刻がない場合も初期化
+                        result['actual_clock_in'] = None
+                        result['actual_clock_out'] = None
+                else:
+                    # 日勤: 一番早い時間が出勤、一番遅い時間が退勤
+                    if len(result['attendance_records']) > 0:
+                        result['actual_clock_in'] = result['attendance_records'][0]['time']
+                        result['actual_clock_out'] = result['attendance_records'][-1]['time']
+            
+            # アラートチェック
+            alerts = []
+            
+            # 1. 休みの日に打刻があるかチェック
+            if result['schedule']:
+                work_type = result['schedule']['work_type']
+                if work_type and ('有' in work_type or '所' in work_type or '法' in work_type):
+                    if result['attendance_records']:
+                        alerts.append({
+                            'type': 'error',
+                            'message': '休日なのに打刻',
+                            'details': f'勤務タイプ: {work_type}、打刻回数: {len(result["attendance_records"])}回'
+                        })
+            
+            # 2. スケジュールがあるのに打刻がないかチェック
+            if result['schedule']:
+                work_type = result['schedule']['work_type']
+                # 休み以外で、出退勤スケジュールがあるのに打刻がない
+                # 「明」勤務も打刻が必要な場合はチェック対象に含める
+                if work_type and not is_holiday_shift(work_type):
+                    # 「明」勤務の場合はstart_time/end_timeがなくても打刻チェックを行う
+                    # その他の勤務タイプはstart_timeまたはend_timeがある場合のみチェック
+                    should_check = False
+                    if is_off_day_shift(work_type):
+                        # 「明」勤務は常にチェック
+                        should_check = True
+                    elif result['schedule']['start_time'] or result['schedule']['end_time']:
+                        # その他の勤務タイプはstart_timeまたはend_timeがある場合のみチェック
+                        should_check = True
+                    
+                    if should_check and not result['attendance_records']:
+                        alerts.append({
+                            'type': 'error',
+                            'message': '打刻なし',
+                            'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
+                        })
+        
+            # 2-1. 休日出勤届が出ている日に打刻時間がない場合のアラート
+            if result['schedule']:
+                work_type = result['schedule']['work_type']
+                if work_type and ('休出' in work_type or '休日出勤' in work_type):
+                    if not result['attendance_records']:
+                        alerts.append({
+                            'type': 'error',
+                            'message': '休日出勤届があるのに打刻なし',
+                            'details': f'勤務タイプ: {work_type}、スケジュール: {result["schedule"]["start_time"]} - {result["schedule"]["end_time"]}'
+                        })
+        
+            # 2-2. 休暇届が出ているのに打刻がある場合のアラート
+            try:
+                # 承認済みの休暇願を取得（循環インポート回避のため関数内でインポート）
+                from leave_request import get_leave_requests
+                approved_leaves = get_leave_requests(
+                    employee_num=str(employee_num),
+                    leave_date=check_date,
+                    status='approved',
+                    limit=100
+                )
+                
+                # チェック日付が休暇期間内かどうかを確認
+                for leave in approved_leaves:
+                    leave_date_from = leave.get('leave_date_from')
+                    leave_date_to = leave.get('leave_date_to')
+                    
+                    if leave_date_from and leave_date_to:
+                        # チェック日付が休暇期間内かどうか
+                        if leave_date_from <= check_date <= leave_date_to:
+                            if result['attendance_records']:
+                                leave_type = leave.get('leave_type', '')
+                                leave_subtype = leave.get('leave_subtype', '')
+                                leave_detail = leave_type
+                                if leave_subtype:
+                                    leave_detail += f' ({leave_subtype})'
+                                
+                                alerts.append({
+                                    'type': 'error',
+                                    'message': '休暇願があるのに打刻あり',
+                                    'details': f'休暇種類: {leave_detail}、打刻回数: {len(result["attendance_records"])}回'
+                                })
+                                break  # 1件見つかれば十分
+            except Exception as e:
+                # 休暇願の取得エラーは無視（ログに出力）
+                logger.warning(f"休暇願チェックエラー: {e}")
+            
+            # 3. 遅刻早退申告を取得
+            late_requests = get_late_arrival_requests(employee_num=employee_num, work_date=check_date, status='pending')
+            early_requests = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='pending')
+            
+            # 24勤や夜勤の場合、翌日の「明」の日に遅刻申告があるかチェック
+            late_minutes_adjustment = 0
+            early_minutes_adjustment = 0
+            
+            if late_requests:
+                # 承認済みの遅刻申告の合計分数を取得
+                approved_late = get_late_arrival_requests(employee_num=employee_num, work_date=check_date, status='approved')
+                late_minutes_adjustment = sum(req['late_minutes'] for req in approved_late)
+            
+            if early_requests:
+                # 承認済みの早退申告の合計分数を取得
+                approved_early = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='approved')
+                early_minutes_adjustment = sum(req['early_minutes'] for req in approved_early)
+            
+            # 24勤や夜勤の場合、翌日の「明」の日に遅刻申告があるかチェック
+            if is_24hour_or_night_shift(work_type):
+                next_date = (datetime.strptime(check_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                next_day_late_requests = get_late_arrival_requests(employee_num=employee_num, work_date=next_date, status='approved')
+                if next_day_late_requests:
+                    # 翌日の「明」の日に遅刻申告があれば、出勤と退勤を行ったように処理
+                    late_minutes_adjustment += sum(req['late_minutes'] for req in next_day_late_requests)
+            
+            # 3. 出退勤時刻の差異チェック（30分以上、遅刻早退申告を考慮）
+            if result['schedule'] and result['attendance_records']:
+                schedule_start = result['schedule']['start_time']
+                schedule_end = result['schedule']['end_time']
+                actual_start = result['actual_clock_in']
+                actual_end = result['actual_clock_out']
+                
+                # 24勤・夜勤の当日の場合、actual_clock_outをNoneにする（翌日の「明」勤務でチェックするため）
+                work_type = result['schedule']['work_type'] if result['schedule'] else None
+                is_night_shift_day = is_24hour_or_night_shift(work_type)
+                
+                if is_night_shift_day:
+                    actual_end = None  # 24勤・夜勤の当日では退勤時刻チェックをスキップ
+                
+                # 出勤時刻の差異チェック
+                # 24勤・夜勤の場合も当日の出勤時刻をチェックする（前日の出勤時刻は前日の画面で表示）
+                if schedule_start and actual_start:
+                    diff_start = calculate_time_diff_minutes(schedule_start, actual_start)
+                    if diff_start is not None:
+                        adjusted_diff_start = diff_start - late_minutes_adjustment
+                        if abs(adjusted_diff_start) >= 30:
+                            alerts.append({
+                                'type': 'warning',
+                                'message': '出退勤時刻に差異あり',
+                                'details': f'出勤時刻: スケジュール {schedule_start} / 実際 {actual_start} (差異: {diff_start:+d}分, 遅刻申告調整後: {adjusted_diff_start:+d}分)'
+                            })
+                
+                # 退勤時刻の差異チェック
+                # 24勤・夜勤の場合は翌日の「明」で退勤するため、当日の退勤時刻はチェックしない
+                # 「明」勤務の場合は、前日の24勤・夜勤の退勤時刻をチェックする
+                
+                if is_off_day_shift(work_type):
+                    # 「明」勤務の場合、前日に24勤・夜勤があった場合、その出勤時刻と退勤時刻をチェック
+                    # 専用関数を使用してチェック処理を実行
+                    off_day_alerts = check_off_day_shift_attendance(
+                        cursor=cursor,
+                        employee_id=employee_id,
+                        employee_num=employee_num,
+                        idm=idm,
+                        check_date=check_date,
+                        work_type=work_type,
+                        prev_day_night_shift_schedule=prev_day_night_shift_schedule,
+                        actual_end=actual_end,
+                        prev_date=prev_date
+                    )
+                    alerts.extend(off_day_alerts)
+                    
+                    # 前日の24勤・夜勤スケジュールが見つからない場合の警告（打刻がある場合のみ）
+                    if not prev_day_night_shift_schedule and result['attendance_records']:
+                        alerts.append({
+                            'type': 'warning',
+                            'message': '「明」勤務ですが、前日の24勤・夜勤スケジュールが見つかりません',
+                            'details': f'前日({prev_date})のスケジュールを確認してください'
+                        })
+                elif schedule_end and actual_end and not is_night_shift_day:
+                    # 24勤・夜勤以外で、退勤時刻がある場合のみチェック
+                    # 日勤の場合は退勤時刻をチェック
+                    # 念のため、work_typeに「24勤」または「夜勤」が含まれている場合はスキップ
+                    if not is_24hour_or_night_shift(work_type):
+                        # 24勤・夜勤以外の場合のみチェック
+                        diff_end = calculate_time_diff_minutes(schedule_end, actual_end)
+                        if diff_end is not None:
+                            adjusted_diff_end = diff_end + early_minutes_adjustment
+                            if abs(adjusted_diff_end) >= 30:
+                                alerts.append({
+                                    'type': 'warning',
+                                    'message': '出退勤時刻に差異あり',
+                                    'details': f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)'
+                                })
+                elif schedule_end and not actual_end and not is_24hour_or_night_shift:
+                    # 退勤スケジュールがあるのに退勤打刻がない（24勤・夜勤以外）
+                    alerts.append({
+                        'type': 'warning',
+                        'message': '出退勤時刻に差異あり',
+                        'details': f'退勤時刻: スケジュール {schedule_end} / 実際 打刻なし'
+                    })
+            
+            result['alerts'] = alerts
+            
+            return {
+                'status': 'success',
+                'data': result
+            }
+        
+    except Exception as e:
+        logger.error(f"勤怠チェックエラー: {e}", exc_info=True)
+        return {
+            'status': 'error',
+            'message': f'チェックエラー: {str(e)}'
+        }
 
 def insert_late_arrival_request(employee_num, employee_name, request_date, work_date, late_minutes, reason=''):
     """

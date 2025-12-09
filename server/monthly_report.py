@@ -11,7 +11,7 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import os
 from config import Config
-from database import get_night_shift_end_time_from_next_day
+from database import get_night_shift_end_time_from_next_day, check_attendance_vs_schedule
 from utils import calculate_date_range, time_to_minutes, get_db_connection
 from work_type_constants import (
     is_off_day_shift,
@@ -106,7 +106,7 @@ def get_monthly_attendance_data(employee_id, search_month):
             employee_row = cursor.fetchone()
             if not employee_row:
                 return None
-            
+        
             if has_workplace:
                 employee_info = {
                     'employee_num': employee_row[0],
@@ -396,6 +396,21 @@ def get_monthly_attendance_data(employee_id, search_month):
                 if isinstance(day_data.get('date'), date):
                     day_data['date'] = day_data['date'].isoformat()
             
+            # 各日付に対してアラート情報を取得
+            for date_str, day_data in daily_data.items():
+                try:
+                    check_result = check_attendance_vs_schedule(employee_id, date_str)
+                    if check_result.get('status') == 'success' and check_result.get('data'):
+                        alerts = check_result['data'].get('alerts', [])
+                        day_data['alerts'] = alerts
+                        if alerts:
+                            logger.debug(f"アラート取得: {date_str} - {len(alerts)}件")
+                    else:
+                        day_data['alerts'] = []
+                except Exception as e:
+                    logger.warning(f"アラート取得エラー ({date_str}): {e}")
+                    day_data['alerts'] = []
+            
             return {
                 'employee_info': employee_info,
                 'search_month': search_month,
@@ -545,7 +560,7 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         
         # ヘッダー情報
         row = 1
-        ws.merge_cells(f'A{row}:O{row}')  # 列数をMからOに変更（15列）
+        ws.merge_cells(f'A{row}:P{row}')  # 列数をOからPに変更（16列：エラー・警告列追加）
         ws[f'A{row}'] = f"{search_month}月度 勤務実績表"
         ws[f'A{row}'].font = title_font
         ws[f'A{row}'].alignment = center_align
@@ -564,7 +579,7 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         
         # テーブルヘッダー
         row += 2
-        headers = ['日付', '区分', '開始時間（スケジュール）', '終了時間（スケジュール）', '出勤時間（打刻）', '退勤時間（打刻）', '時間外', '外深夜', '内深夜', '内深夜', '早朝', '休暇願', '交通費', '備考']
+        headers = ['日付', '区分', '開始時間（スケジュール）', '終了時間（スケジュール）', '出勤時間（打刻）', '退勤時間（打刻）', 'エラー・警告', '時間外', '外深夜', '内深夜', '内深夜', '早朝', '休暇願', '交通費', '備考']
         for col_idx, header in enumerate(headers, start=2):  # B列から開始
             cell = ws.cell(row=row, column=col_idx)
             cell.value = header
@@ -680,6 +695,44 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             ws.cell(row=row, column=7).alignment = center_align
             ws.cell(row=row, column=7).border = thin_border
             
+            # エラー・警告（列8）
+            alerts = day_data.get('alerts', [])
+            alert_cell = ws.cell(row=row, column=8)
+            if alerts:
+                alert_texts = []
+                for alert in alerts:
+                    alert_type = alert.get('type', '')
+                    alert_message = alert.get('message', '')
+                    alert_details = alert.get('details', '')
+                    
+                    if alert_type == 'error':
+                        icon = '❌'
+                        alert_texts.append(f"{icon} {alert_message}")
+                    elif alert_type == 'warning':
+                        icon = '⚠️'
+                        alert_texts.append(f"{icon} {alert_message}")
+                    else:
+                        icon = 'ℹ️'
+                        alert_texts.append(f"{icon} {alert_message}")
+                    
+                    if alert_details:
+                        alert_texts[-1] += f"\n{alert_details}"
+                
+                alert_cell.value = '\n'.join(alert_texts)
+                alert_cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+                
+                # エラーの場合は背景色を赤、警告の場合は黄色に設定
+                has_error = any(a.get('type') == 'error' for a in alerts)
+                if has_error:
+                    alert_cell.fill = PatternFill(start_color='FFE6E6', end_color='FFE6E6', fill_type='solid')
+                else:
+                    alert_cell.fill = PatternFill(start_color='FFF9E6', end_color='FFF9E6', fill_type='solid')
+            else:
+                alert_cell.value = '-'
+                alert_cell.alignment = center_align
+            alert_cell.border = thin_border
+            alert_cell.font = normal_font
+            
             # 基準時間を計算（表示用）
             standard_hours, _, _ = calculate_work_hours(
                 work_type,
@@ -688,13 +741,13 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                 clock_times
             )
             
-            # 時間外（列8）- 開始時間・終了時間と内残業・外残業・深夜時間の詳細を表示
+            # 時間外（列9）- 開始時間・終了時間と内残業・外残業・深夜時間の詳細を表示
             overtime = day_data.get('overtime', {})
             overtime_hours = overtime.get('outer', 0) + overtime.get('inner', 0)
             overtime_night = overtime.get('night', 0)
             overtime_applications = overtime.get('applications', [])
             
-            overtime_cell = ws.cell(row=row, column=8)
+            overtime_cell = ws.cell(row=row, column=9)
             if overtime_hours > 0 or overtime_night > 0:
                 # 時間外申告の詳細がある場合は、開始時間・終了時間を含めて表示
                 if overtime_applications:
@@ -760,28 +813,28 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             overtime_cell.border = thin_border
             total_overtime += overtime_hours
             
-            # 外深夜（列9）
+            # 外深夜（列10）
             night_outer = day_data['overtime']['night']
             if night_outer > 0:
-                ws.cell(row=row, column=9).value = f"{int(night_outer)}:{int((night_outer % 1) * 60):02d}"
-            ws.cell(row=row, column=9).alignment = center_align
-            ws.cell(row=row, column=9).border = thin_border
-            
-            # 内深夜（2列：列10, 11）
-            night_inner = 0  # 内深夜は別途計算が必要
-            ws.cell(row=row, column=10).value = ''
+                ws.cell(row=row, column=10).value = f"{int(night_outer)}:{int((night_outer % 1) * 60):02d}"
             ws.cell(row=row, column=10).alignment = center_align
             ws.cell(row=row, column=10).border = thin_border
+            
+            # 内深夜（2列：列11, 12）
+            night_inner = 0  # 内深夜は別途計算が必要
             ws.cell(row=row, column=11).value = ''
             ws.cell(row=row, column=11).alignment = center_align
             ws.cell(row=row, column=11).border = thin_border
-            
-            # 早朝（列12）
             ws.cell(row=row, column=12).value = ''
             ws.cell(row=row, column=12).alignment = center_align
             ws.cell(row=row, column=12).border = thin_border
             
-            # 休暇願（列13）
+            # 早朝（列13）
+            ws.cell(row=row, column=13).value = ''
+            ws.cell(row=row, column=13).alignment = center_align
+            ws.cell(row=row, column=13).border = thin_border
+            
+            # 休暇願（列14）
             leave_request = day_data.get('leave_request')
             if leave_request:
                 leave_type = leave_request.get('leave_type', '')
@@ -790,23 +843,23 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                     leave_display = f"{leave_type} {leave_subtype}"
                 else:
                     leave_display = leave_type
-                ws.cell(row=row, column=13).value = leave_display
+                ws.cell(row=row, column=14).value = leave_display
             else:
-                ws.cell(row=row, column=13).value = '-'
-            ws.cell(row=row, column=13).alignment = center_align
-            ws.cell(row=row, column=13).border = thin_border
-            
-            # 交通費（列14）
-            transportation = day_data['overtime']['transportation_fee']
-            if transportation > 0:
-                ws.cell(row=row, column=14).value = transportation
-            ws.cell(row=row, column=14).alignment = right_align
+                ws.cell(row=row, column=14).value = '-'
+            ws.cell(row=row, column=14).alignment = center_align
             ws.cell(row=row, column=14).border = thin_border
             
-            # 備考（列15）
-            ws.cell(row=row, column=15).value = ''
-            ws.cell(row=row, column=15).alignment = left_align
+            # 交通費（列15）
+            transportation = day_data['overtime']['transportation_fee']
+            if transportation > 0:
+                ws.cell(row=row, column=15).value = transportation
+            ws.cell(row=row, column=15).alignment = right_align
             ws.cell(row=row, column=15).border = thin_border
+            
+            # 備考（列16）
+            ws.cell(row=row, column=16).value = ''
+            ws.cell(row=row, column=16).alignment = left_align
+            ws.cell(row=row, column=16).border = thin_border
             
             # フォント設定
             for col in range(2, 16):
@@ -821,19 +874,19 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         ws.cell(row=row, column=2).fill = header_fill
         ws.cell(row=row, column=2).border = thin_border
         
-        # 時間外合計（列8）
-        ws.cell(row=row, column=8).value = f"{int(total_overtime)}:{int((total_overtime % 1) * 60):02d}"
-        ws.cell(row=row, column=8).font = header_font
-        ws.cell(row=row, column=8).alignment = center_align
-        ws.cell(row=row, column=8).fill = header_fill
-        ws.cell(row=row, column=8).border = thin_border
+        # 時間外合計（列9）
+        ws.cell(row=row, column=9).value = f"{int(total_overtime)}:{int((total_overtime % 1) * 60):02d}"
+        ws.cell(row=row, column=9).font = header_font
+        ws.cell(row=row, column=9).alignment = center_align
+        ws.cell(row=row, column=9).fill = header_fill
+        ws.cell(row=row, column=9).border = thin_border
         
-        # 基準合計（列13）
-        ws.cell(row=row, column=13).value = f"{int(total_standard)}:{int((total_standard % 1) * 60):02d}"
-        ws.cell(row=row, column=13).font = header_font
-        ws.cell(row=row, column=13).alignment = center_align
-        ws.cell(row=row, column=13).fill = header_fill
-        ws.cell(row=row, column=13).border = thin_border
+        # 基準合計（列14）
+        ws.cell(row=row, column=14).value = f"{int(total_standard)}:{int((total_standard % 1) * 60):02d}"
+        ws.cell(row=row, column=14).font = header_font
+        ws.cell(row=row, column=14).alignment = center_align
+        ws.cell(row=row, column=14).fill = header_fill
+        ws.cell(row=row, column=14).border = thin_border
         
         # 列幅調整
         column_widths = {
@@ -843,14 +896,15 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             'E': 18,  # 終了時間（スケジュール）
             'F': 18,  # 出勤時間（打刻）
             'G': 18,  # 退勤時間（打刻）
-            'H': 10,  # 時間外
-            'I': 10,  # 外深夜
-            'J': 10,  # 内深夜
+            'H': 25,  # エラー・警告
+            'I': 10,  # 時間外
+            'J': 10,  # 外深夜
             'K': 10,  # 内深夜
-            'L': 10,  # 早朝
-            'M': 10,  # 基準
-            'N': 10,  # 交通費
-            'O': 20   # 備考
+            'L': 10,  # 内深夜
+            'M': 10,  # 早朝
+            'N': 10,  # 休暇願
+            'O': 10,  # 交通費
+            'P': 20   # 備考
         }
         
         for col_letter, width in column_widths.items():
