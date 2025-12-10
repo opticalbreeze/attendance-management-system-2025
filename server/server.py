@@ -18,6 +18,7 @@ from api_attendance import register_attendance_api_routes
 from api_overtime import register_overtime_api_routes
 from api_leave import register_leave_api_routes
 from api_monthly_report import register_monthly_report_api_routes
+from api_check_status import register_check_status_api_routes
 from auth import init_auth, login_required, verify_admin_password, verify_db_password, set_db_access_granted
 from utils import get_database_connection
 from logger_config import setup_logger
@@ -120,6 +121,12 @@ def register_web_routes(app):
         """管理者ページ"""
         return _add_no_cache_headers(make_response(render_template('admin.html')))
     
+    @app.route('/attendance-check')
+    @login_required
+    def attendance_check_page():
+        """打刻チェック確認ページ（管理者専用）"""
+        return _add_no_cache_headers(make_response(render_template('attendance_check.html')))
+
 
 def register_auth_routes(app):
     """認証関連のAPIルートを登録"""
@@ -147,6 +154,8 @@ def register_auth_routes(app):
             # 管理者パスワードを検証
             if verify_admin_password(password):
                 session['admin_logged_in'] = True
+                session['admin_user_id'] = 'admin'  # 管理者IDをセッションに保存
+                session['admin_username'] = '管理者'  # 管理者名をセッションに保存
                 session.permanent = True
                 
                 # データベースアクセス権限の設定
@@ -265,6 +274,7 @@ def main():
     register_overtime_api_routes(app)
     register_leave_api_routes(app)
     register_monthly_report_api_routes(app)
+    register_check_status_api_routes(app)  # 打刻チェック状況管理API
     register_admin_api_routes(app)  # 管理者機能を有効化
     
     # 起動情報表示

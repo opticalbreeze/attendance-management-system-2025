@@ -20,6 +20,7 @@ from utils import (
     validate_employee_id, validate_search_month, format_response, safe_int,
     get_db_connection
 )
+from auth import login_required
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -90,15 +91,19 @@ def register_attendance_api_routes(app):
             
             results = search_schedule(employee_id, start_date, end_date, limit)
             
-            # 各日付に対してアラート情報を取得
+            # 各日付に対してアラート情報と実際の打刻時刻を取得
             from database import check_attendance_vs_schedule
             total_alerts_count = 0
             for item in results:
                 try:
                     check_result = check_attendance_vs_schedule(employee_id, item['work_date'])
                     if check_result.get('status') == 'success' and check_result.get('data'):
-                        alerts = check_result['data'].get('alerts', [])
+                        data = check_result['data']
+                        alerts = data.get('alerts', [])
                         item['alerts'] = alerts
+                        # 実際の出勤・退勤時刻を追加
+                        item['actual_clock_in'] = data.get('actual_clock_in')
+                        item['actual_clock_out'] = data.get('actual_clock_out')
                         if alerts:
                             total_alerts_count += len(alerts)
                             logger.info(f"アラート取得: {item['work_date']} - {len(alerts)}件")
@@ -106,10 +111,14 @@ def register_attendance_api_routes(app):
                                 logger.debug(f"  アラート: {alert.get('type')} - {alert.get('message')}")
                     else:
                         item['alerts'] = []
+                        item['actual_clock_in'] = None
+                        item['actual_clock_out'] = None
                         logger.debug(f"アラートなし: {item['work_date']} (status={check_result.get('status')})")
                 except Exception as e:
                     logger.error(f"アラート取得エラー ({item['work_date']}): {e}", exc_info=True)
                     item['alerts'] = []
+                    item['actual_clock_in'] = None
+                    item['actual_clock_out'] = None
             
             if total_alerts_count > 0:
                 logger.info(f"検索結果: {len(results)}件中、合計{total_alerts_count}件のアラートを検出")
@@ -157,10 +166,18 @@ def register_attendance_api_routes(app):
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/employees', methods=['GET'])
+    @login_required
     def get_employees_api():
         """従業員一覧取得API"""
         try:
             employees = get_employees()
+            
+            # デバッグログ（最初の3件のみ）
+            if employees:
+                logger.info(f"従業員API返却データ例（最初の3件）:")
+                for i, emp in enumerate(employees[:3]):
+                    logger.info(f"  {i+1}. employee_num={emp.get('employee_num')}, name={emp.get('name')}, section={emp.get('section')}")
+            
             return jsonify(format_response('success',
                 message=f'{len(employees)}名の従業員情報を取得しました', data=employees))
             

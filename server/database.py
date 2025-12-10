@@ -65,6 +65,9 @@ def init_database():
     # 時間外申告テーブルの作成
     init_overtime_table_internal(cursor)
     
+    # 打刻チェック状況テーブルの作成
+    init_attendance_check_status_table(cursor)
+    
     conn.commit()
     conn.close()
     logger.info("データベース初期化完了（全テーブル統合管理）")
@@ -654,6 +657,128 @@ def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
     except Exception as e:
         return None
 
+def init_attendance_check_status_table(cursor):
+    """
+    打刻チェック状況テーブルの初期化
+    管理者が打刻なし・時刻差異エラーを確認済みかどうかを記録
+    """
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS attendance_check_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_num TEXT NOT NULL,
+                work_date TEXT NOT NULL,
+                check_type TEXT NOT NULL,  -- 'missing_punch' or 'time_difference'
+                is_checked BOOLEAN DEFAULT FALSE,
+                checked_by TEXT,
+                checked_at TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(employee_num, work_date, check_type)
+            )
+        """)
+        
+        # インデックス作成
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_check_status_employee ON attendance_check_status(employee_num)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_check_status_date ON attendance_check_status(work_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_check_status_type ON attendance_check_status(check_type)")
+        
+        logger.info("打刻チェック状況テーブル初期化完了")
+        
+    except sqlite3.Error as e:
+        logger.error(f"打刻チェック状況テーブルの初期化エラー: {e}")
+
+def get_attendance_check_status(employee_num, work_date, check_type):
+    """
+    打刻チェック状況を取得
+    
+    Args:
+        employee_num: 従業員番号
+        work_date: 勤務日
+        check_type: チェックタイプ ('missing_punch' or 'time_difference')
+    
+    Returns:
+        dict: チェックステータス情報またはNone
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, employee_num, work_date, check_type, is_checked, 
+                       checked_by, checked_at, notes, created_at, updated_at
+                FROM attendance_check_status
+                WHERE employee_num = ? AND work_date = ? AND check_type = ?
+            """, (employee_num, work_date, check_type))
+            
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'employee_num': row[1],
+                    'work_date': row[2],
+                    'check_type': row[3],
+                    'is_checked': bool(row[4]),
+                    'checked_by': row[5],
+                    'checked_at': row[6],
+                    'notes': row[7],
+                    'created_at': row[8],
+                    'updated_at': row[9]
+                }
+            return None
+            
+    except Exception as e:
+        logger.error(f"打刻チェックステータス取得エラー: {e}", exc_info=True)
+        return None
+
+def update_attendance_check_status(employee_num, work_date, check_type, is_checked, checked_by=None, notes=None):
+    """
+    打刻チェック状況を更新
+    
+    Args:
+        employee_num: 従業員番号
+        work_date: 勤務日
+        check_type: チェックタイプ ('missing_punch' or 'time_difference')
+        is_checked: チェック済みかどうか
+        checked_by: チェックした人
+        notes: 備考
+    
+    Returns:
+        bool: 成功したかどうか
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            now = datetime.now().isoformat()
+            
+            # UPSERT操作: 既存レコードの場合は更新、新規の場合は挿入
+            # SQLiteのバージョン互換性のため、INSERT OR REPLACEとCOALESCEを使用
+            # 
+            # ロジック:
+            # 1. 既存レコードがある場合: created_atを保持し、その他のフィールドを更新
+            # 2. 新規レコードの場合: created_atとupdated_atの両方を現在時刻に設定
+            # 
+            # 注意: SQLite 3.24.0以降ではON CONFLICT構文が使えるが、
+            #       互換性のためINSERT OR REPLACEを使用
+            cursor.execute("""
+                INSERT OR REPLACE INTO attendance_check_status 
+                (employee_num, work_date, check_type, is_checked, checked_by, checked_at, notes, 
+                 created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 
+                        COALESCE((SELECT created_at FROM attendance_check_status 
+                                 WHERE employee_num = ? AND work_date = ? AND check_type = ?), ?), ?)
+            """, (employee_num, work_date, check_type, is_checked, checked_by, now if is_checked else None, notes,
+                  employee_num, work_date, check_type, now, now))
+            
+            logger.info(f"打刻チェックステータス更新: 従業員={employee_num}, 日付={work_date}, タイプ={check_type}, チェック済み={is_checked}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"打刻チェックステータス更新エラー: {e}", exc_info=True)
+        return False
+
 def get_employees():
     """従業員マスタから全従業員情報を取得"""
     try:
@@ -705,27 +830,39 @@ def get_employees():
             cursor.execute(query)
             rows = cursor.fetchall()
             
+            logger.info(f"従業員情報取得: {len(rows)}件のレコードを取得")
+            
             employees = []
             for row in rows:
+                # nameがNULLまたは空文字列の場合の処理
+                employee_name = row[1] if row[1] else None
+                
                 if has_section:
-                    employees.append({
+                    employee_data = {
                         'employee_num': row[0],
-                        'name': row[1],
+                        'name': employee_name,
                         'idm': row[2],
                         'section': row[3] or '設備',  # NULLの場合はデフォルト値
                         'has_24hour_shifts': bool(row[4]),
                         'total_schedules': row[5]
-                    })
+                    }
                 else:
-                    employees.append({
+                    employee_data = {
                         'employee_num': row[0],
-                        'name': row[1],
+                        'name': employee_name,
                         'idm': row[2],
                         'section': '設備',  # カラムが存在しない場合はデフォルト値
                         'has_24hour_shifts': bool(row[3]),
                         'total_schedules': row[4]
-                    })
+                    }
+                
+                # デバッグログ（最初の3件のみ）
+                if len(employees) < 3:
+                    logger.info(f"従業員データ例: employee_num={employee_data['employee_num']}, name={employee_data['name']}, section={employee_data['section']}")
+                
+                employees.append(employee_data)
             
+            logger.info(f"従業員情報取得完了: {len(employees)}件")
             return employees
         
     except sqlite3.Error as e:

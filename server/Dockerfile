@@ -32,6 +32,7 @@ COPY api_attendance.py .
 COPY api_overtime.py .
 COPY api_leave.py .
 COPY api_monthly_report.py .
+COPY api_check_status.py .
 COPY auth.py .
 COPY monthly_report.py .
 COPY pdf_generator.py .
@@ -46,6 +47,7 @@ COPY work_type_constants.py .
 COPY attendance_check_service.py .
 COPY import_schedule_csv.py .
 COPY templates/ templates/
+COPY static/ static/
 
 # データディレクトリの作成（マウントポイント）
 RUN mkdir -p /app/data
