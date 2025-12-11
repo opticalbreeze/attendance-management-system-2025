@@ -32,7 +32,9 @@ class AttendanceConstants:
     MSG_HOLIDAY_PUNCH = '休日なのに打刻'
     MSG_MISSING_PUNCH = '打刻なし'
     MSG_PUNCH_LEAK = '打刻漏れ'
-    MSG_TIME_DIFF = '出退勤時刻に差異あり'
+    MSG_TIME_DIFF = '出退勤時刻に差異あり'  # 後方互換性のため残す
+    MSG_CLOCK_IN_TIME_DIFF = '出勤時刻に差異あり'
+    MSG_CLOCK_OUT_TIME_DIFF = '退勤時刻に差異あり'
     MSG_HOLIDAY_WORK_NO_PUNCH = '休日出勤届があるのに打刻なし'
     MSG_LEAVE_WITH_PUNCH = '休暇願があるのに打刻あり'
     MSG_OFF_DAY_NO_PREV_SHIFT = '「明」勤務ですが、前日の24勤・夜勤スケジュールが見つかりません'
@@ -191,6 +193,18 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
     if not result.schedule:
         return
     
+    # 未来の日付（明日以降）は打刻がないのが正常なので、エラーを出さない
+    try:
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, '%Y-%m-%d').date()
+        today = date.today()
+        if check_date_obj > today:
+            logger.info(f"  未来の日付のため打刻なしエラーをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+    except (ValueError, TypeError) as e:
+        logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
+        # 日付の解析に失敗した場合は続行（既存の動作を維持）
+    
     work_type = result.schedule['work_type']
     if work_type and not is_holiday_shift(work_type):
         should_check = False
@@ -202,6 +216,62 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
             should_check = True
         
         if should_check:
+            # 休暇申請があるかチェック（承認済みのみ）
+            # 承認待ち（pending）の休暇申請もチェック対象に含める（申請されている時点で休暇予定とみなす）
+            has_leave_request = False
+            try:
+                from leave_request import get_leave_requests
+                from datetime import datetime as dt
+                
+                # 日付を正規化（YYYY-MM-DD形式に統一）
+                check_date_normalized = result.check_date
+                if isinstance(check_date_normalized, str):
+                    # 日付文字列を正規化
+                    try:
+                        # 様々な形式に対応
+                        if '/' in check_date_normalized:
+                            check_date_normalized = dt.strptime(check_date_normalized, '%Y/%m/%d').strftime('%Y-%m-%d')
+                        elif len(check_date_normalized) == 8:
+                            # YYYYMMDD形式
+                            check_date_normalized = dt.strptime(check_date_normalized, '%Y%m%d').strftime('%Y-%m-%d')
+                    except ValueError:
+                        pass  # 既にYYYY-MM-DD形式の可能性がある
+                
+                # 承認済みの休暇申請をチェック
+                approved_leaves = get_leave_requests(
+                    employee_num=str(result.employee_id),
+                    leave_date=check_date_normalized,
+                    status=AttendanceConstants.STATUS_APPROVED,
+                    limit=AttendanceConstants.DEFAULT_LIMIT
+                )
+                
+                # 承認待ちの休暇申請もチェック（申請されている時点で休暇予定とみなす）
+                pending_leaves = get_leave_requests(
+                    employee_num=str(result.employee_id),
+                    leave_date=check_date_normalized,
+                    status=AttendanceConstants.STATUS_PENDING,
+                    limit=AttendanceConstants.DEFAULT_LIMIT
+                )
+                
+                all_leaves = approved_leaves + pending_leaves
+                
+                logger.info(f"  休暇申請チェック: 日付={check_date_normalized}, 従業員ID={result.employee_id}, 承認済み={len(approved_leaves)}件, 承認待ち={len(pending_leaves)}件, 合計={len(all_leaves)}件")
+                
+                # get_leave_requestsは既に該当日付を含む休暇申請のみを返すので、
+                # 結果が1件以上あれば休暇申請があると判断
+                if all_leaves and len(all_leaves) > 0:
+                    has_leave_request = True
+                    leave_info = all_leaves[0]
+                    leave_status = leave_info.get('status', 'unknown')
+                    logger.info(f"  休暇申請あり: 日付={check_date_normalized}, 休暇種類={leave_info.get('leave_type', '')}, ステータス={leave_status}, 期間={leave_info.get('leave_date_from', '')}～{leave_info.get('leave_date_to', '')}")
+            except Exception as e:
+                logger.warning(f"休暇申請チェックエラー: {e}", exc_info=True)
+            
+            # 休暇申請がある場合は「打刻なし」エラーを出さない
+            if has_leave_request:
+                logger.info(f"  休暇申請があるため打刻なしエラーをスキップ: 日付={result.check_date}")
+                return
+            
             punch_count = len(result.attendance_records) if result.attendance_records else 0
             
             logger.info(f"打刻漏れチェック: 日付={result.check_date}, 勤務タイプ={work_type}, 打刻回数={punch_count}, start_time={result.schedule.get('start_time')}, end_time={result.schedule.get('end_time')}")
@@ -390,53 +460,131 @@ def check_time_difference_errors(result: AttendanceCheckResult, late_adjust: int
     work_type = result.schedule['work_type']
     is_night_shift_day = is_24hour_or_night_shift(work_type)
     
+    logger.info(f"出退勤時刻差異チェック開始: 日付={result.check_date}, 従業員={result.employee_id}, スケジュール={schedule_start}-{schedule_end}, 実際={actual_start}-{actual_end}")
+    
     # 時間外申告を取得
     overtime_apps = _get_overtime_applications_safe(result)
     
+    logger.info(f"出退勤時刻差異チェック: 時間外申告取得完了, 件数={len(overtime_apps)}")
+    if overtime_apps:
+        for app in overtime_apps:
+            logger.info(f"  時間外申告: 開始時間={app.get('start_time')}, 終了時間={app.get('end_time')}")
+    
     # 出勤時刻チェック（24勤・夜勤以外）
-    _check_clock_in_time_diff(result, schedule_start, actual_start, late_adjust, is_night_shift_day)
+    _check_clock_in_time_diff(result, schedule_start, actual_start, late_adjust, is_night_shift_day, overtime_apps)
     
     # 退勤時刻チェック（日勤のみ）
     _check_clock_out_time_diff(result, schedule_end, actual_end, early_adjust, work_type, is_night_shift_day, overtime_apps)
+    
+    logger.info(f"出退勤時刻差異チェック完了: 日付={result.check_date}, アラート件数={len(result.alerts)}")
 
-def _check_clock_in_time_diff(result: AttendanceCheckResult, schedule_start: str, actual_start: str, late_adjust: int, is_night_shift_day: bool) -> None:
+def _check_clock_in_time_diff(result: AttendanceCheckResult, schedule_start: str, actual_start: str, late_adjust: int, is_night_shift_day: bool, overtime_apps: List[Dict]) -> None:
     """出勤時刻差異をチェック"""
     if schedule_start and actual_start and not is_night_shift_day:
+        logger.info(f"出勤時刻差異チェック開始: スケジュール={schedule_start}, 実際={actual_start}, 遅刻調整={late_adjust}分, 時間外申告件数={len(overtime_apps)}")
+        
+        # 時間外申告の開始時間と出勤打刻時間が±15分以内かチェック
+        if _check_overtime_time_within_tolerance(actual_start, overtime_apps):
+            logger.info(f"出勤時刻: 時間外申告の開始時間と打刻時間が±15分以内のため、エラーをスキップ: 打刻={actual_start}")
+            return
+        
         diff_start = calculate_time_diff_minutes(schedule_start, actual_start)
         if diff_start is not None:
             adjusted_diff_start = diff_start - late_adjust
+            logger.info(f"出勤時刻差異計算: スケジュール={schedule_start}, 実際={actual_start}, diff_start={diff_start}分, late_adjust={late_adjust}分, adjusted_diff_start={adjusted_diff_start}分, 閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分")
             if abs(adjusted_diff_start) >= AttendanceConstants.TIME_DIFF_THRESHOLD:
+                logger.info(f"出勤時刻差異エラー追加: 差異={adjusted_diff_start}分 (閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分)")
                 _add_alert(result, AttendanceConstants.ALERT_WARNING,
-                          AttendanceConstants.MSG_TIME_DIFF,
+                          AttendanceConstants.MSG_CLOCK_IN_TIME_DIFF,
                           f'出勤時刻: スケジュール {schedule_start} / 実際 {actual_start} (差異: {diff_start:+d}分, 遅刻申告調整後: {adjusted_diff_start:+d}分)')
+            else:
+                logger.info(f"出勤時刻差異: 差異={adjusted_diff_start}分は閾値未満のためエラーなし")
 
 def _check_clock_out_time_diff(result: AttendanceCheckResult, schedule_end: str, actual_end: str, early_adjust: int, 
                               work_type: str, is_night_shift_day: bool, overtime_apps: List[Dict]) -> None:
     """退勤時刻差異をチェック"""
     if not (schedule_end and actual_end and not is_night_shift_day and not is_24hour_or_night_shift(work_type)):
+        logger.debug(f"退勤時刻差異チェックスキップ: schedule_end={schedule_end}, actual_end={actual_end}, is_night_shift_day={is_night_shift_day}, work_type={work_type}")
         return
     
     diff_end = calculate_time_diff_minutes(schedule_end, actual_end)
     if diff_end is None:
+        logger.debug(f"退勤時刻差異計算失敗: schedule_end={schedule_end}, actual_end={actual_end}")
         return
     
     adjusted_diff_end = diff_end + early_adjust
-    logger.info(f"退勤時刻差異計算: スケジュール={schedule_end}, 実際={actual_end}, diff_end={diff_end}分, early_adjust={early_adjust}分, adjusted_diff_end={adjusted_diff_end}分")
+    logger.info(f"退勤時刻差異計算: スケジュール={schedule_end}, 実際={actual_end}, diff_end={diff_end}分, early_adjust={early_adjust}分, adjusted_diff_end={adjusted_diff_end}分, 時間外申告件数={len(overtime_apps)}")
+    
+    # 時間外申告の開始時間または終了時間と退勤打刻時間が±15分以内かチェック
+    if _check_overtime_time_within_tolerance(actual_end, overtime_apps):
+        logger.info(f"退勤時刻: 時間外申告の開始時間または終了時間と打刻時間が±15分以内のため、エラーをスキップ: 打刻={actual_end}")
+        return
     
     # 退勤時刻が遅い場合（時間外勤務の可能性）
     if diff_end > 0:
         has_overtime_for_time = _check_overtime_coverage(schedule_end, actual_end, overtime_apps)
+        logger.info(f"退勤時刻が遅い場合のチェック: diff_end={diff_end}分, has_overtime_for_time={has_overtime_for_time}, adjusted_diff_end={adjusted_diff_end}分, 閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分")
         
         # 時間外申告がない場合のみエラーを出す
         if not has_overtime_for_time and abs(adjusted_diff_end) >= AttendanceConstants.TIME_DIFF_THRESHOLD:
+            logger.info(f"退勤時刻差異エラー追加: 差異={adjusted_diff_end}分 (閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分)")
             _add_alert(result, AttendanceConstants.ALERT_WARNING,
-                      AttendanceConstants.MSG_TIME_DIFF,
+                      AttendanceConstants.MSG_CLOCK_OUT_TIME_DIFF,
                       f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)')
+        else:
+            logger.info(f"退勤時刻差異: エラーなし (has_overtime_for_time={has_overtime_for_time}, adjusted_diff_end={adjusted_diff_end}分)")
     # 退勤時刻が早い場合（早退）
-    elif diff_end < 0 and abs(adjusted_diff_end) >= AttendanceConstants.TIME_DIFF_THRESHOLD:
-        _add_alert(result, AttendanceConstants.ALERT_WARNING,
-                  AttendanceConstants.MSG_TIME_DIFF,
-                  f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)')
+    elif diff_end < 0:
+        logger.info(f"退勤時刻が早い場合のチェック: diff_end={diff_end}分, adjusted_diff_end={adjusted_diff_end}分, 閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分")
+        if abs(adjusted_diff_end) >= AttendanceConstants.TIME_DIFF_THRESHOLD:
+            logger.info(f"退勤時刻差異エラー追加: 差異={adjusted_diff_end}分 (閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分)")
+            _add_alert(result, AttendanceConstants.ALERT_WARNING,
+                      AttendanceConstants.MSG_CLOCK_OUT_TIME_DIFF,
+                      f'退勤時刻: スケジュール {schedule_end} / 実際 {actual_end} (差異: {diff_end:+d}分, 早退申告調整後: {adjusted_diff_end:+d}分)')
+        else:
+            logger.info(f"退勤時刻差異: 差異={adjusted_diff_end}分は閾値未満のためエラーなし")
+
+def _check_overtime_time_within_tolerance(clock_time: str, overtime_apps: List[Dict]) -> bool:
+    """時間外申告の開始時間または終了時間と打刻時間が±15分以内かチェック"""
+    if not clock_time:
+        logger.debug(f"時間外申告チェック: 打刻時間がNoneのためスキップ")
+        return False
+    
+    if not overtime_apps:
+        logger.debug(f"時間外申告チェック: 時間外申告が0件のためスキップ (打刻時間={clock_time})")
+        return False
+    
+    clock_minutes = time_to_minutes(clock_time)
+    if clock_minutes is None:
+        logger.debug(f"時間外申告チェック: 打刻時間の変換失敗 (打刻時間={clock_time})")
+        return False
+    
+    logger.info(f"時間外申告チェック開始: 打刻時間={clock_time}, 時間外申告件数={len(overtime_apps)}")
+    
+    for app in overtime_apps:
+        app_start = app.get('start_time')
+        app_end = app.get('end_time')
+        
+        if app_start:
+            app_start_minutes = time_to_minutes(app_start)
+            if app_start_minutes is not None:
+                time_diff = abs(app_start_minutes - clock_minutes)
+                logger.info(f"時間外申告開始時間チェック: 開始時間={app_start}, 打刻時間={clock_time}, 差異={time_diff}分 (閾値={AttendanceConstants.TOLERANCE_MINUTES}分)")
+                if time_diff <= AttendanceConstants.TOLERANCE_MINUTES:
+                    logger.info(f"✓ 時間外申告開始時間と打刻時間が±15分以内: 開始時間={app_start}, 打刻時間={clock_time}, 差異={time_diff}分")
+                    return True
+        
+        if app_end:
+            app_end_minutes = time_to_minutes(app_end)
+            if app_end_minutes is not None:
+                time_diff = abs(app_end_minutes - clock_minutes)
+                logger.info(f"時間外申告終了時間チェック: 終了時間={app_end}, 打刻時間={clock_time}, 差異={time_diff}分 (閾値={AttendanceConstants.TOLERANCE_MINUTES}分)")
+                if time_diff <= AttendanceConstants.TOLERANCE_MINUTES:
+                    logger.info(f"✓ 時間外申告終了時間と打刻時間が±15分以内: 終了時間={app_end}, 打刻時間={clock_time}, 差異={time_diff}分")
+                    return True
+    
+    logger.info(f"時間外申告チェック完了: 打刻時間={clock_time}は時間外申告の開始時間・終了時間と±15分以内ではない")
+    return False
 
 def _check_overtime_coverage(schedule_end: str, actual_end: str, overtime_apps: List[Dict]) -> bool:
     """時間外申告が実際の残業時間をカバーしているかチェック"""

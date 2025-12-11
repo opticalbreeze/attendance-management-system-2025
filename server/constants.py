@@ -68,6 +68,17 @@ class CheckType:
     """確認タイプ定数"""
     MISSING_PUNCH = "missing_punch"
     TIME_DIFFERENCE = "time_difference"
+    PUNCH_LEAK = "punch_leak"
+    
+    @classmethod
+    def get_all(cls):
+        """全てのチェックタイプを取得"""
+        return [cls.MISSING_PUNCH, cls.TIME_DIFFERENCE, cls.PUNCH_LEAK]
+    
+    @classmethod
+    def is_valid(cls, check_type):
+        """チェックタイプが有効かどうかを判定"""
+        return check_type in cls.get_all()
 
 class UIConfig:
     """UI設定定数"""

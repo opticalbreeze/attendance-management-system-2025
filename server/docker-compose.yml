@@ -2,6 +2,7 @@ services:
   attendance-server:
     build: .
     container_name: attendance-server
+    restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
@@ -76,7 +77,6 @@ services:
       - SECRET_KEY=change-me-in-production-please-set-secure-key
       - ADMIN_PASSWORD=admin
       - DB_PASSWORD=dbadmin
-    restart: unless-stopped
     networks:
       - attendance-network
 

@@ -15,6 +15,7 @@ from database import (
 from auth import login_required
 from api_utils import format_response
 from logger_config import setup_logger
+from constants import CheckType
 
 logger = setup_logger(__name__)
 
@@ -30,7 +31,7 @@ def get_check_status():
     Query parameters:
         employee_num: 従業員番号
         work_date: 勤務日
-        check_type: チェックタイプ ('missing_punch' or 'time_difference')
+        check_type: チェックタイプ ('missing_punch', 'time_difference', or 'punch_leak')
     """
     try:
         employee_num = request.args.get('employee_num')
@@ -42,8 +43,8 @@ def get_check_status():
             response['success'] = False
             return jsonify(response), 400
         
-        if check_type not in ['missing_punch', 'time_difference']:
-            response = format_response('error', message='無効なチェックタイプです')
+        if not CheckType.is_valid(check_type):
+            response = format_response('error', message=f'無効なチェックタイプです: {check_type}')
             response['success'] = False
             return jsonify(response), 400
         
@@ -69,7 +70,7 @@ def update_check_status():
     Request body:
         employee_num: 従業員番号
         work_date: 勤務日
-        check_type: チェックタイプ ('missing_punch' or 'time_difference')
+        check_type: チェックタイプ ('missing_punch', 'time_difference', or 'punch_leak')
         is_checked: チェック済みかどうか
         notes: 備考（任意）
     """
@@ -92,8 +93,8 @@ def update_check_status():
             response['success'] = False
             return jsonify(response), 400
         
-        if check_type not in ['missing_punch', 'time_difference']:
-            response = format_response('error', message='無効なチェックタイプです')
+        if not CheckType.is_valid(check_type):
+            response = format_response('error', message=f'無効なチェックタイプです: {check_type}')
             response['success'] = False
             return jsonify(response), 400
         

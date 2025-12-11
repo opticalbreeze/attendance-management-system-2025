@@ -1118,9 +1118,14 @@
         // チェック状況のHTMLを生成する関数
         function generateCheckStatusHTML(item, alerts) {
             const hasMissingPunch = alerts.some(alert => alert.message && alert.message.includes('打刻なし'));
-            const hasTimeDifference = alerts.some(alert => alert.message && alert.message.includes('時刻差異'));
+            const hasPunchLeak = alerts.some(alert => alert.message && alert.message.includes('打刻漏れ'));
+            // 「出勤時刻に差異あり」「退勤時刻に差異あり」「出退勤時刻に差異あり」のいずれかにマッチ
+            const hasTimeDifference = alerts.some(alert => alert.message && (
+                alert.message.includes('時刻に差異あり') || 
+                alert.message.includes('時刻差異')
+            ));
             
-            if (!hasMissingPunch && !hasTimeDifference) {
+            if (!hasMissingPunch && !hasPunchLeak && !hasTimeDifference) {
                 return '<span style="color: #999;">-</span>';
             }
             
@@ -1138,6 +1143,21 @@
                         <label for="missing-${item.employee_id}-${item.work_date}">打刻なし</label>
                     </div>
                     <div id="missing-status-${item.employee_id}-${item.work_date}" class="check-status">未確認</div>
+                `;
+            }
+            
+            if (hasPunchLeak) {
+                html += `
+                    <div class="check-item">
+                        <input type="checkbox" 
+                               id="punchleak-${item.employee_id}-${item.work_date}" 
+                               data-type="punch_leak"
+                               data-employee="${item.employee_id}"
+                               data-date="${item.work_date}"
+                               onchange="updateCheckStatus(this)">
+                        <label for="punchleak-${item.employee_id}-${item.work_date}">打刻漏れ</label>
+                    </div>
+                    <div id="punchleak-status-${item.employee_id}-${item.work_date}" class="check-status">未確認</div>
                 `;
             }
             
@@ -1200,13 +1220,22 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    const statusId = `${checkType === 'missing_punch' ? 'missing' : 'timediff'}-status-${employeeNum}-${workDate}`;
+                    let statusId;
+                    if (checkType === 'missing_punch') {
+                        statusId = `missing-status-${employeeNum}-${workDate}`;
+                    } else if (checkType === 'punch_leak') {
+                        statusId = `punchleak-status-${employeeNum}-${workDate}`;
+                    } else {
+                        statusId = `timediff-status-${employeeNum}-${workDate}`;
+                    }
                     const statusElement = document.getElementById(statusId);
                     
                     if (statusElement) {
                         if (isChecked) {
                             if (checkType === 'missing_punch') {
                                 statusElement.textContent = '打刻もれチェック済　時間外無';
+                            } else if (checkType === 'punch_leak') {
+                                statusElement.textContent = '打刻漏れチェック済　時間外無';
                             } else {
                                 statusElement.textContent = '時間外チェック済　時間外無';
                             }
@@ -1235,7 +1264,7 @@
         // 確認ステータスを読み込む関数
         async function loadCheckStatuses(results) {
             for (const item of results) {
-                for (const checkType of ['missing_punch', 'time_difference']) {
+                for (const checkType of ['missing_punch', 'time_difference', 'punch_leak']) {
                     try {
                         const response = await fetch(`/api/attendance-check-status?employee_num=${item.employee_id}&work_date=${item.work_date}&check_type=${checkType}`);
                         
@@ -1255,8 +1284,17 @@
                         const result = await response.json();
                         
                         if (result.success && result.data && result.data.is_checked) {
-                            const checkboxId = `${checkType === 'missing_punch' ? 'missing' : 'timediff'}-${item.employee_id}-${item.work_date}`;
-                            const statusId = `${checkType === 'missing_punch' ? 'missing' : 'timediff'}-status-${item.employee_id}-${item.work_date}`;
+                            let checkboxId, statusId;
+                            if (checkType === 'missing_punch') {
+                                checkboxId = `missing-${item.employee_id}-${item.work_date}`;
+                                statusId = `missing-status-${item.employee_id}-${item.work_date}`;
+                            } else if (checkType === 'punch_leak') {
+                                checkboxId = `punchleak-${item.employee_id}-${item.work_date}`;
+                                statusId = `punchleak-status-${item.employee_id}-${item.work_date}`;
+                            } else {
+                                checkboxId = `timediff-${item.employee_id}-${item.work_date}`;
+                                statusId = `timediff-status-${item.employee_id}-${item.work_date}`;
+                            }
                             
                             const checkbox = document.getElementById(checkboxId);
                             const statusElement = document.getElementById(statusId);
@@ -1266,6 +1304,8 @@
                                 
                                 if (checkType === 'missing_punch') {
                                     statusElement.textContent = '打刻もれチェック済　時間外無';
+                                } else if (checkType === 'punch_leak') {
+                                    statusElement.textContent = '打刻漏れチェック済　時間外無';
                                 } else {
                                     statusElement.textContent = '時間外チェック済　時間外無';
                                 }
