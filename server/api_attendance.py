@@ -1,3 +1,5 @@
+
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -11,10 +13,12 @@ from datetime import datetime
 from config import Config
 from database import (
     insert_attendance, search_schedule, get_stats, cleanup_duplicates,
-    get_employees, check_attendance_vs_schedule,
+    get_employees,
     insert_late_arrival_request, insert_early_leave_request,
     get_late_arrival_requests, get_early_leave_requests
 )
+from attendance_check_service import check_attendance_vs_schedule
+from constants import AttendanceConstants
 from utils import (
     check_duplicate_attendance, calculate_date_range,
     validate_employee_id, validate_search_month, format_response, safe_int,
@@ -92,7 +96,6 @@ def register_attendance_api_routes(app):
             results = search_schedule(employee_id, start_date, end_date, limit)
             
             # 各日付に対してアラート情報と実際の打刻時刻を取得
-            from database import check_attendance_vs_schedule
             total_alerts_count = 0
             for item in results:
                 try:
@@ -212,7 +215,7 @@ def register_attendance_api_routes(app):
                 return jsonify(format_response('error', message='チェック日付が指定されていません')), 400
             
             try:
-                datetime.strptime(check_date, '%Y-%m-%d')
+                datetime.strptime(check_date, AttendanceConstants.DATE_FORMAT)
             except ValueError:
                 return jsonify(format_response('error', message='日付形式が正しくありません')), 400
             
@@ -236,8 +239,6 @@ def register_attendance_api_routes(app):
     def attendance_check_monthly_api(search_month, employee_id_filter=None, section_filter=None, check_all=False):
         """月度勤怠チェックAPI（複数従業員・複数日）"""
         try:
-            from database import get_employees
-            from utils import calculate_date_range, validate_search_month, get_db_connection
             from datetime import date
             
             # 月度バリデーション
@@ -253,8 +254,8 @@ def register_attendance_api_routes(app):
             try:
                 start_date_str, end_date_str = calculate_date_range(search_month)
                 # 文字列をdateオブジェクトに変換
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                start_date = datetime.strptime(start_date_str, AttendanceConstants.DATE_FORMAT).date()
+                end_date = datetime.strptime(end_date_str, AttendanceConstants.DATE_FORMAT).date()
             except ValueError as e:
                 return jsonify(format_response('error', message=str(e))), 400
             
@@ -263,8 +264,8 @@ def register_attendance_api_routes(app):
                 end_date = today
             
             # SQLクエリ用に文字列形式に戻す
-            start_date_str = start_date.strftime('%Y-%m-%d')
-            end_date_str = end_date.strftime('%Y-%m-%d')
+            start_date_str = start_date.strftime(AttendanceConstants.DATE_FORMAT)
+            end_date_str = end_date.strftime(AttendanceConstants.DATE_FORMAT)
             
             # 従業員一覧を取得
             all_employees = get_employees()
@@ -317,13 +318,13 @@ def register_attendance_api_routes(app):
                     try:
                         # work_dateをdateオブジェクトに変換
                         if isinstance(work_date, str):
-                            work_date_obj = datetime.strptime(work_date, '%Y-%m-%d').date()
+                            work_date_obj = datetime.strptime(work_date, AttendanceConstants.DATE_FORMAT).date()
                         elif isinstance(work_date, date):
                             work_date_obj = work_date
                         else:
                             # その他の型の場合は文字列に変換してからパース
                             work_date_str = str(work_date)
-                            work_date_obj = datetime.strptime(work_date_str, '%Y-%m-%d').date()
+                            work_date_obj = datetime.strptime(work_date_str, AttendanceConstants.DATE_FORMAT).date()
                         
                         # 今日より後の日付はスキップ
                         if work_date_obj > today:

@@ -312,7 +312,7 @@ async function updateCheckStatus(checkbox) {
  */
 async function loadCheckStatuses(results) {
     for (const item of results) {
-        for (const checkType of ['missing_punch', 'time_difference', 'punch_leak']) {
+        for (const checkType of Object.values(CheckType)) {
             try {
                 const response = await fetch(`/api/attendance-check-status?employee_num=${item.employee_id}&work_date=${item.work_date}&check_type=${checkType}`);
                 

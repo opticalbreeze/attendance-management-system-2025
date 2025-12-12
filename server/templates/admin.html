@@ -4,51 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理者ページ - 勤怠管理システム</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
         .admin-container {
             max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
         }
         
         .admin-section {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-            padding: 25px;
-        }
-        
-        .admin-section h2 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #3498db;
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
         }
         
         .upload-area {
-            border: 2px dashed #3498db;
-            border-radius: 10px;
-            padding: 40px;
+            border: var(--border-width) dashed var(--border-color);
+            padding: var(--spacing-xl);
             text-align: center;
-            background: #f8f9fa;
-            transition: background-color 0.3s;
-        }
-        
-        .upload-area:hover {
-            background: #e3f2fd;
+            background: var(--bg-primary);
+            margin: var(--spacing-md) 0;
         }
         
         .upload-area.dragover {
-            background: #bbdefb;
-            border-color: #1976d2;
+            background: var(--bg-hover);
+            border-color: var(--accent-color);
         }
         
         .file-input-wrapper {
             position: relative;
             display: inline-block;
-            margin: 20px 0;
+            margin: var(--spacing-md) 0;
         }
         
         .file-input {
@@ -57,117 +42,104 @@
         }
         
         .file-input-button {
-            background: #3498db;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 5px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
             cursor: pointer;
             display: inline-block;
-            transition: background-color 0.3s;
-            border: none;
-            font-size: 16px;
         }
         
         .file-input-button:hover {
-            background: #2980b9;
+            background: var(--bg-hover);
         }
         
         .selected-file {
-            margin: 15px 0;
-            padding: 10px;
-            background: #e8f5e8;
-            border-radius: 5px;
-            color: #2e7d32;
+            margin: var(--spacing-md) 0;
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border: var(--border-width) solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .import-button {
-            background: #27ae60;
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: var(--border-width) solid var(--accent-color);
             cursor: pointer;
-            transition: background-color 0.3s;
         }
         
         .import-button:hover:not(:disabled) {
-            background: #2ecc71;
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
         
         .import-button:disabled {
-            background: #bdc3c7;
+            opacity: 0.5;
             cursor: not-allowed;
         }
         
         .progress {
             display: none;
-            margin: 20px 0;
-            padding: 15px;
-            background: #f1c40f;
-            color: #fff;
-            border-radius: 5px;
+            margin: var(--spacing-md) 0;
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border: var(--border-width) solid var(--border-color);
             text-align: center;
         }
         
         .result {
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 5px;
+            margin: var(--spacing-md) 0;
+            padding: var(--spacing-md);
             display: none;
-        }
-        
-        .result.success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        
-        .result.error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
         }
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
         }
         
         .stats-card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
+            background: var(--bg-primary);
+            padding: var(--spacing-lg);
             text-align: center;
+            border: var(--border-width) solid var(--border-color);
         }
         
         .stats-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #3498db;
+            font-size: 32px;
+            font-weight: 400;
+            color: var(--text-primary);
         }
         
         .stats-label {
-            color: #7f8c8d;
-            margin-top: 5px;
+            color: var(--text-secondary);
+            margin-top: var(--spacing-sm);
         }
         
         .work-type-list {
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 15px;
+            background: var(--bg-primary);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
         }
         
         .work-type-item {
             display: flex;
             justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px solid #e9ecef;
+            padding: var(--spacing-sm) 0;
+            border-bottom: var(--border-width) solid var(--border-color);
+        }
+        
+        .work-type-item:hover {
+            background: var(--bg-hover);
         }
         
         .work-type-item:last-child {
@@ -175,32 +147,32 @@
         }
         
         .loading {
-            opacity: 0.6;
+            opacity: 0.5;
             pointer-events: none;
         }
         
         .navigation-links {
-            margin-bottom: 30px;
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
         }
         
         .navigation-links a {
-            display: inline-block;
-            margin-right: 15px;
-            padding: 10px 20px;
-            background: #34495e;
-            color: white;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
             text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s;
+            border: var(--border-width) solid var(--border-color);
         }
         
         .navigation-links a:hover {
-            background: #2c3e50;
+            background: var(--bg-hover);
         }
     </style>
 </head>
 <body>
-    <div class="admin-container">
+    <div class="container admin-container">
         <!-- ナビゲーション -->
         <div class="navigation-links">
             <a href="/">トップページ</a>
@@ -215,25 +187,25 @@
         
         <!-- 管理機能へのクイックアクセス -->
         <div class="admin-section">
-            <h2>🔗 管理機能へのアクセス</h2>
-            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <a href="/overtime/list" class="file-input-button" style="text-decoration: none;">📋 時間外一覧（管理）</a>
-                <a href="/leave/list" class="file-input-button" style="text-decoration: none; background: #27ae60;">📋 休暇願一覧（管理）</a>
-                <a href="/search" class="file-input-button" style="text-decoration: none; background: #9b59b6;">🔍 打刻データ検索</a>
-                <a href="/attendance-check" class="file-input-button" style="text-decoration: none; background: #e74c3c;">⚠️ 打刻チェック確認</a>
-                <a href="/check" class="file-input-button" style="text-decoration: none; background: #f39c12;">✅ 勤怠チェック</a>
-                <a href="/monthly-report" class="file-input-button" style="text-decoration: none; background: #16a085;">📊 月間集計レポート</a>
+            <h2>管理機能へのアクセス</h2>
+            <div class="buttons">
+                <a href="/overtime/list" class="btn btn-primary">時間外一覧（管理）</a>
+                <a href="/leave/list" class="btn btn-primary">休暇願一覧（管理）</a>
+                <a href="/search" class="btn btn-primary">打刻データ検索</a>
+                <a href="/attendance-check" class="btn btn-primary">打刻チェック確認</a>
+                <a href="/check" class="btn btn-primary">勤怠チェック</a>
+                <a href="/monthly-report" class="btn btn-primary">月間集計レポート</a>
             </div>
         </div>
         
         <!-- CSVインポート機能 -->
         <div class="admin-section">
-            <h2>📁 CSVファイル インポート</h2>
+            <h2>CSVファイル インポート</h2>
             <p>勤怠スケジュールデータをCSVファイルからインポートできます。</p>
             
             <div class="upload-area" id="uploadArea">
                 <div>
-                    <p>📊 CSVファイルをここにドラッグ＆ドロップ</p>
+                    <p>CSVファイルをここにドラッグ＆ドロップ</p>
                     <p>または</p>
                     
                     <div class="file-input-wrapper">
@@ -244,14 +216,14 @@
                 
                 <div class="selected-file" id="selectedFile" style="display: none;">
                     <span id="fileName"></span>
-                    <button onclick="clearSelectedFile()" style="float: right; background: none; border: none; color: #e74c3c; cursor: pointer;">✕</button>
+                    <button onclick="clearSelectedFile()" style="background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 0;">閉じる</button>
                 </div>
                 
                 <button class="import-button" id="importButton" onclick="importCSV()" disabled>インポート実行</button>
             </div>
             
             <div class="progress" id="progress">
-                <p>📤 インポート処理中...</p>
+                <p>インポート処理中...</p>
             </div>
             
             <div class="result" id="result">
@@ -260,10 +232,42 @@
             </div>
         </div>
         
+        <!-- 自動バックアップ管理 -->
+        <div class="admin-section">
+            <h2>自動バックアップ管理</h2>
+            <div style="margin-bottom: 20px;">
+                <button onclick="toggleAutoBackup()" class="btn btn-success" id="toggleBackupBtn">自動バックアップを開始</button>
+                <button onclick="manualBackup()" class="btn btn-primary">手動バックアップ実行</button>
+                <button onclick="loadBackupStatus()" class="btn btn-info">バックアップ状況確認</button>
+            </div>
+            
+            <div id="backupStatus" style="display: none;">
+                <h3>バックアップ状況</h3>
+                <div id="backupStatusContent">
+                    <!-- バックアップ状況がここに表示される -->
+                </div>
+            </div>
+            
+            <div class="info-box" style="margin-top: 20px;">
+                <h4>📁 デュアルバックアップ保存先</h4>
+                <ul>
+                    <li><strong>プライマリ</strong>: C:/AttendanceBackup/ （メイン保存先）</li>
+                    <li><strong>セカンダリ</strong>: D:/AttendanceBackup_Mirror/ （安全性向上のためのミラー）</li>
+                </ul>
+                <h4>⏰ 自動スケジュール</h4>
+                <ul>
+                    <li><strong>日次バックアップ</strong>: 毎日午前3時に実行（30日間保持）</li>
+                    <li><strong>週次バックアップ</strong>: 毎週日曜日午前2時に実行（90日間保持）</li>
+                    <li><strong>月次バックアップ</strong>: 毎月1日午前1時に実行（365日間保持）</li>
+                    <li><strong>レポートデータ</strong>: 週次でCSV形式保存（60日間保持）</li>
+                </ul>
+            </div>
+        </div>
+        
         <!-- データベース統計情報 -->
         <div class="admin-section">
-            <h2>📊 データベース統計情報</h2>
-            <button onclick="loadDatabaseStats()" class="import-button">統計情報を更新</button>
+            <h2>データベース統計情報</h2>
+            <button onclick="loadDatabaseStats()" class="btn btn-primary">統計情報を更新</button>
             
             <div class="stats-grid" id="statsGrid">
                 <!-- 統計情報がここに表示される -->
@@ -277,7 +281,7 @@
         
         <!-- 今後の機能拡張エリア -->
         <div class="admin-section">
-            <h2>🚧 今後の機能</h2>
+            <h2>今後の機能</h2>
             <ul>
                 <li>データベースバックアップ・復元</li>
                 <li>ユーザー管理機能</li>
@@ -326,7 +330,7 @@
         function selectFile(file) {
             selectedFile = file;
             document.getElementById('fileName').textContent = file.name;
-            document.getElementById('selectedFile').style.display = 'block';
+            document.getElementById('selectedFile').style.display = 'flex';
             document.getElementById('importButton').disabled = false;
             hideResult();
         }
@@ -386,7 +390,7 @@
             const messageDiv = document.getElementById('resultMessage');
             const detailsDiv = document.getElementById('resultDetails');
             
-            resultDiv.className = 'result ' + type;
+            resultDiv.className = 'result alert alert-' + type;
             messageDiv.textContent = message;
             
             if (details) {
@@ -475,6 +479,151 @@
                 workTypeList.innerHTML = workTypeHtml;
                 workTypeList.style.display = 'block';
             }
+        }
+        
+        // バックアップ管理機能
+        let autoBackupRunning = false;
+        
+        function toggleAutoBackup() {
+            const btn = document.getElementById('toggleBackupBtn');
+            const action = autoBackupRunning ? 'stop' : 'start';
+            
+            fetch(`/api/admin/backup/${action}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    autoBackupRunning = !autoBackupRunning;
+                    btn.textContent = autoBackupRunning ? '自動バックアップを停止' : '自動バックアップを開始';
+                    btn.className = autoBackupRunning ? 'btn btn-warning' : 'btn btn-success';
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('ネットワークエラー', 'error');
+            });
+        }
+        
+        function manualBackup() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '実行中...';
+            
+            fetch('/api/admin/backup/manual', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(`手動バックアップ完了: ${data.filename}`, 'success');
+                    loadBackupStatus(); // 状況更新
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('バックアップエラー', 'error');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '手動バックアップ実行';
+            });
+        }
+        
+        function loadBackupStatus() {
+            const statusDiv = document.getElementById('backupStatus');
+            const contentDiv = document.getElementById('backupStatusContent');
+            
+            statusDiv.style.display = 'block';
+            contentDiv.innerHTML = '読み込み中...';
+            
+            fetch('/api/admin/backup/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayBackupStatus(data.data);
+                } else {
+                    contentDiv.innerHTML = '<p>状況取得に失敗しました</p>';
+                }
+            })
+            .catch(error => {
+                contentDiv.innerHTML = '<p>ネットワークエラー</p>';
+            });
+        }
+        
+        function displayBackupStatus(status) {
+            const contentDiv = document.getElementById('backupStatusContent');
+            
+            let html = '';
+            
+            // Dドライブ利用可否表示
+            const driveStatus = status.d_drive_available ? 
+                '<span style="color: green;">✓ Dドライブ利用可能（デュアルバックアップ有効）</span>' :
+                '<span style="color: orange;">⚠ Dドライブ利用不可（Cドライブのみ）</span>';
+            
+            html += `<div style="margin-bottom: 20px; font-weight: bold;">${driveStatus}</div>`;
+            
+            // プライマリ（Cドライブ）状況
+            html += '<h4>📁 プライマリ (Cドライブ)</h4>';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+            
+            const typeNames = {
+                'daily': '日次',
+                'weekly': '週次', 
+                'monthly': '月次',
+                'reports': 'レポート'
+            };
+            
+            Object.keys(typeNames).forEach(type => {
+                const typeData = status.primary[type];
+                const size = typeData.total_size ? (typeData.total_size / (1024 * 1024)).toFixed(2) : '0';
+                const latest = typeData.latest ? new Date(typeData.latest).toLocaleString('ja-JP') : 'なし';
+                
+                html += `
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; border: 1px solid #28a745;">
+                        <h5 style="margin: 0 0 10px 0; color: #155724;">C:/ ${typeNames[type]}</h5>
+                        <p style="margin: 5px 0;">ファイル数: ${typeData.count}</p>
+                        <p style="margin: 5px 0;">合計: ${size} MB</p>
+                        <p style="margin: 5px 0;">最新: ${latest}</p>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            // セカンダリ（Dドライブ）状況
+            if (status.d_drive_available && status.secondary) {
+                html += '<h4>💽 セカンダリ (Dドライブ)</h4>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
+                
+                Object.keys(typeNames).forEach(type => {
+                    const typeData = status.secondary[type];
+                    const size = typeData.total_size ? (typeData.total_size / (1024 * 1024)).toFixed(2) : '0';
+                    const latest = typeData.latest ? new Date(typeData.latest).toLocaleString('ja-JP') : 'なし';
+                    
+                    html += `
+                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; border: 1px solid #2196f3;">
+                            <h5 style="margin: 0 0 10px 0; color: #0d47a1;">D:/ ${typeNames[type]}</h5>
+                            <p style="margin: 5px 0;">ファイル数: ${typeData.count}</p>
+                            <p style="margin: 5px 0;">合計: ${size} MB</p>
+                            <p style="margin: 5px 0;">最新: ${latest}</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            contentDiv.innerHTML = html;
+        }
+        
+        function showMessage(message, type) {
+            const resultDiv = document.getElementById('result');
+            const messageDiv = document.getElementById('resultMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = type === 'success' ? 'success' : 'error';
+            resultDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
         }
         
         // ページ読み込み時に統計情報を取得

@@ -4,21 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>休暇願一覧（管理用） - 打刻システム</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
         .container {
             max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
         }
         h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
         .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
@@ -71,38 +60,41 @@
             transition: all 0.3s;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
         .btn-success {
-            background: #28a745;
-            color: white;
-            padding: 8px 16px;
-            font-size: 12px;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
         }
-        .btn-success:hover { background: #218838; }
+        .btn-success:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
         .btn-danger {
-            background: #dc3545;
-            color: white;
-            padding: 8px 16px;
-            font-size: 12px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
         }
-        .btn-danger:hover { background: #c82333; }
+        .btn-danger:hover { background: var(--bg-hover); }
         .summary-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
         }
         .summary-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
             text-align: center;
         }
         .summary-number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }

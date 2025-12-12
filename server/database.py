@@ -385,11 +385,18 @@ def get_stats():
             cursor.execute("SELECT COUNT(*) FROM employee_master")
             stats['employee_master_records'] = cursor.fetchone()[0]
             
-            # 最新の打刻履歴（パラメータバインディング使用）
+            # 最新の打刻履歴（従業員情報を含む）
             cursor.execute("""
-                SELECT idm, timestamp, terminal_id, received_at 
-                FROM attendance 
-                ORDER BY received_at DESC 
+                SELECT 
+                    a.idm, 
+                    a.timestamp, 
+                    a.terminal_id, 
+                    a.received_at,
+                    em.employee_num,
+                    em.name
+                FROM attendance a
+                LEFT JOIN employee_master em ON a.idm = em.idm
+                ORDER BY a.received_at DESC 
                 LIMIT ?
             """, (Config.STATS_LATEST_RECORDS,))
             latest_records = cursor.fetchall()
@@ -402,7 +409,7 @@ def get_stats():
             """, (today,))
             stats['today_count'] = cursor.fetchone()[0]
             
-            # 安全な最新打刻履歴整形（AIガイドの推奨パターン）
+            # 安全な最新打刻履歴整形（従業員情報を含む）
             latest_list = []
             if latest_records:
                 for record in latest_records:
@@ -411,7 +418,9 @@ def get_stats():
                             'idm': record[0] if record[0] is not None else '',
                             'timestamp': record[1] if record[1] is not None else '',
                             'terminal_id': record[2] if record[2] is not None else '',
-                            'received_at': record[3] if record[3] is not None else ''
+                            'received_at': record[3] if record[3] is not None else '',
+                            'employee_num': record[4] if record[4] is not None else '',
+                            'employee_name': record[5] if record[5] is not None else ''
                         })
                     except (IndexError, TypeError) as e:
                         logger.warning(f"レコード処理失敗: {record}, エラー: {e}")

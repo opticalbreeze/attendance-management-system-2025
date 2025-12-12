@@ -80,6 +80,46 @@ class CheckType:
         """チェックタイプが有効かどうかを判定"""
         return check_type in cls.get_all()
 
+class AttendanceConstants:
+    """勤怠チェック関連の定数（統一化）"""
+    # 閾値設定
+    TIME_DIFF_THRESHOLD = 30  # 時刻差異の閾値（分）
+    TOLERANCE_MINUTES = 15    # 許容時間差（分）
+    DEFAULT_LIMIT = 100       # デフォルト取得件数
+    
+    # 日付フォーマット
+    DATE_FORMAT = '%Y-%m-%d'  # 標準日付フォーマット（YYYY-MM-DD）
+    DATE_FORMAT_SLASH = '%Y/%m/%d'  # スラッシュ区切り日付フォーマット（YYYY/MM/DD）
+    
+    # ステータス
+    STATUS_APPROVED = 'approved'
+    STATUS_PENDING = 'pending'
+    
+    # アラートタイプ
+    ALERT_ERROR = 'error'
+    ALERT_WARNING = 'warning'
+    
+    # エラーメッセージ
+    MSG_HOLIDAY_PUNCH = '休日なのに打刻'
+    MSG_MISSING_PUNCH = '打刻なし'
+    MSG_PUNCH_LEAK = '打刻漏れ'
+    MSG_CLOCK_IN_PUNCH_LEAK = '出勤打刻漏れ'
+    MSG_CLOCK_OUT_PUNCH_LEAK = '退勤打刻漏れ'
+    MSG_TIME_DIFF = '出退勤時刻に差異あり'  # 後方互換性のため残す
+    MSG_CLOCK_IN_TIME_DIFF = '出勤時刻に差異あり'
+    MSG_CLOCK_OUT_TIME_DIFF = '退勤時刻に差異あり'
+    MSG_HOLIDAY_WORK_NO_PUNCH = '休日出勤届があるのに打刻なし'
+    MSG_LEAVE_WITH_PUNCH = '休暇願があるのに打刻あり'
+    MSG_OFF_DAY_NO_PREV_SHIFT = '「明」勤務ですが、前日の24勤・夜勤スケジュールが見つかりません'
+    
+    # エラーメッセージ詳細テンプレート
+    DETAIL_CLOCK_IN_MISSING = '出勤時刻: スケジュール {schedule} / 実際の打刻なし'
+    DETAIL_CLOCK_OUT_MISSING = '退勤時刻: スケジュール {schedule} / 実際の打刻なし'
+    DETAIL_CLOCK_IN_MISSING_SINGLE_PUNCH = '出勤時刻: スケジュール {schedule} / 実際の打刻なし（打刻1回のみで終了時間に近い）'
+    DETAIL_CLOCK_OUT_MISSING_SINGLE_PUNCH = '退勤時刻: スケジュール {schedule} / 実際の打刻なし（打刻1回のみで開始時間に近い）'
+    DETAIL_CLOCK_IN_TIME_DIFF = '出勤時刻: スケジュール {schedule} / 実際 {actual} (差異: {diff:+d}分, 遅刻申告調整後: {adjusted_diff:+d}分)'
+    DETAIL_CLOCK_OUT_TIME_DIFF = '退勤時刻: スケジュール {schedule} / 実際 {actual} (差異: {diff:+d}分, 早退申告調整後: {adjusted_diff:+d}分)'
+
 class UIConfig:
     """UI設定定数"""
     # テーブル列幅設定

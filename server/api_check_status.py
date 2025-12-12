@@ -47,10 +47,10 @@ def get_check_status():
             response['success'] = False
             return jsonify(response), 400
         
-        # チェックタイプの検証（punch_leakを明示的に許可）
-        valid_check_types = ['missing_punch', 'time_difference', 'punch_leak']
+        # チェックタイプの検証
+        valid_check_types = CheckType.get_all()
         
-        if check_type not in valid_check_types:
+        if not CheckType.is_valid(check_type):
             logger.error(f"[GET] 無効なチェックタイプ: check_type={check_type!r}, valid_types={valid_check_types}")
             response = format_response('error', message=f'無効なチェックタイプです: {check_type}')
             response['success'] = False
@@ -123,10 +123,10 @@ def update_check_status():
             response['success'] = False
             return jsonify(response), 400
         
-        # チェックタイプの検証（punch_leakを明示的に許可）
-        valid_check_types = ['missing_punch', 'time_difference', 'punch_leak']
+        # チェックタイプの検証
+        valid_check_types = CheckType.get_all()
         
-        if check_type not in valid_check_types:
+        if not CheckType.is_valid(check_type):
             logger.error(f"[POST] 無効なチェックタイプ: check_type={check_type!r}, valid_types={valid_check_types}")
             logger.error(f"[POST] CheckType.is_valid('punch_leak')={CheckType.is_valid('punch_leak')}")
             response = format_response('error', message=f'無効なチェックタイプです: {check_type} (有効なタイプ: {", ".join(valid_check_types)})')

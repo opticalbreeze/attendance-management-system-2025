@@ -4,125 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理画面ログイン</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            min-height: 100vh;
         }
         
         .login-container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
             max-width: 400px;
             width: 100%;
         }
         
         h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2em;
             text-align: center;
         }
         
         .subtitle {
-            color: #666;
             text-align: center;
-            margin-bottom: 30px;
-            font-size: 0.9em;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            color: #333;
-            font-weight: bold;
-            margin-bottom: 8px;
-            font-size: 0.9em;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .btn {
-            width: 100%;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
         }
         
         .error {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #dc3545;
             display: none;
         }
         
         .info {
-            background: #e7f3ff;
-            color: #0066cc;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #0066cc;
-            font-size: 0.9em;
-        }
-        
-        .back-link {
-            display: block;
-            text-align: center;
-            color: #667eea;
-            text-decoration: none;
-            margin-top: 20px;
-            font-size: 0.9em;
-        }
-        
-        .back-link:hover {
-            text-decoration: underline;
+            font-size: var(--font-size-sm);
         }
         
         .password-toggle {
@@ -131,32 +40,36 @@
         
         .password-toggle-btn {
             position: absolute;
-            right: 10px;
+            right: var(--spacing-sm);
             top: 50%;
             transform: translateY(-50%);
             background: none;
             border: none;
             cursor: pointer;
-            color: #666;
-            font-size: 0.9em;
-            padding: 5px;
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+            padding: var(--spacing-xs);
         }
         
         .password-toggle-btn:hover {
-            color: #333;
+            color: var(--text-primary);
+        }
+        
+        .form-group label input[type="checkbox"] {
+            width: auto;
+            margin-right: var(--spacing-sm);
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h1>🔒 管理画面ログイン</h1>
+    <div class="container login-container">
+        <h1>管理画面ログイン</h1>
         <p class="subtitle">管理者パスワードを入力してください</p>
         
-        <div id="error-message" class="error"></div>
+        <div id="error-message" class="alert alert-error"></div>
         
-        <div class="info">
-            <strong>⚠️ 注意:</strong> デフォルトパスワードは「admin」です。<br>
-            本番環境では必ず環境変数で変更してください。
+        <div class="alert alert-info">
+            注意: デフォルトパスワードは「admin」です。本番環境では必ず環境変数で変更してください。
         </div>
         
         <form id="login-form">
@@ -164,14 +77,14 @@
                 <label for="password">パスワード</label>
                 <div class="password-toggle">
                     <input type="password" id="password" name="password" required autofocus>
-                    <button type="button" class="password-toggle-btn" onclick="togglePassword()">👁️ 表示</button>
+                    <button type="button" class="password-toggle-btn" onclick="togglePassword()">表示</button>
                 </div>
             </div>
             
             <div class="form-group">
                 <label>
                     <input type="checkbox" id="db-access" name="db_access" onchange="toggleDbPassword()">
-                    <span style="margin-left: 5px;">データベースアクセス権限も取得する</span>
+                    データベースアクセス権限も取得する
                 </label>
             </div>
             
@@ -179,14 +92,16 @@
                 <label for="db-password">データベースパスワード</label>
                 <div class="password-toggle">
                     <input type="password" id="db-password" name="db_password">
-                    <button type="button" class="password-toggle-btn" onclick="toggleDbPasswordVisibility()">👁️ 表示</button>
+                    <button type="button" class="password-toggle-btn" onclick="toggleDbPasswordVisibility()">表示</button>
                 </div>
             </div>
             
-            <button type="submit" class="btn">ログイン</button>
+            <button type="submit" class="btn btn-primary">ログイン</button>
         </form>
         
-        <a href="/" class="back-link">← トップページに戻る</a>
+        <div style="margin-top: var(--spacing-lg); text-align: center;">
+            <a href="/" class="back-link">トップページに戻る</a>
+        </div>
     </div>
     
     <script>
@@ -196,10 +111,10 @@
             
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
-                toggleBtn.textContent = '🙈 非表示';
+                toggleBtn.textContent = '非表示';
             } else {
                 passwordInput.type = 'password';
-                toggleBtn.textContent = '👁️ 表示';
+                toggleBtn.textContent = '表示';
             }
         }
         
@@ -209,10 +124,10 @@
             
             if (dbPasswordInput.type === 'password') {
                 dbPasswordInput.type = 'text';
-                toggleBtn.textContent = '🙈 非表示';
+                toggleBtn.textContent = '非表示';
             } else {
                 dbPasswordInput.type = 'password';
-                toggleBtn.textContent = '👁️ 表示';
+                toggleBtn.textContent = '表示';
             }
         }
         

@@ -49,6 +49,11 @@ def _add_no_cache_headers(response):
 def register_web_routes(app):
     """Webページのルートを登録"""
     
+    @app.route('/favicon.ico')
+    def favicon():
+        """ファビコンを提供"""
+        return send_file('static/favicon.ico', mimetype='image/vnd.microsoft.icon')
+    
     @app.route('/')
     def index():
         """トップページ"""

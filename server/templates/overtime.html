@@ -4,180 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>時間外作業申告 - 打刻システム</title>
-    <!-- html2pdf.js ライブラリ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- html2pdf.js ライブラリ（ローカルファイル） -->
+    <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-
-        .form-section {
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
-
-        .form-section h2 {
-            color: #555;
-            font-size: 18px;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #667eea;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .required {
-            color: #e74c3c;
-            margin-left: 4px;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
         textarea {
             resize: vertical;
             min-height: 80px;
         }
-
+        
         .overtime-entry {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid #ddd;
+            margin-bottom: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: var(--bg-primary);
+            border: var(--border-width) solid var(--border-color);
         }
-
+        
         .overtime-entry h3 {
-            color: #667eea;
-            font-size: 16px;
-            margin-bottom: 15px;
+            font-size: var(--font-size-lg);
+            margin-bottom: var(--spacing-md);
         }
-
+        
         .time-inputs {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: var(--spacing-md);
         }
-
+        
         .button-group {
             display: flex;
-            gap: 15px;
-            margin-top: 30px;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-lg);
         }
-
+        
         button {
             flex: 1;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
         }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-
+        
         .btn-secondary {
-            background: #6c757d;
-            color: white;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
         }
-
+        
         .btn-secondary:hover {
-            background: #5a6268;
-            transform: translateY(-2px);
+            background: var(--bg-hover);
         }
-
+        
         .btn-success {
-            background: #28a745;
-            color: white;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
-
+        
         .btn-success:hover {
-            background: #218838;
-            transform: translateY(-2px);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
-
+        
         .btn-info {
-            background: #17a2b8;
-            color: white;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
-
+        
         .btn-info:hover {
-            background: #138496;
-            transform: translateY(-2px);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
-
+        
         .btn-warning {
-            background: #ffc107;
-            color: #333;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
         }
-
+        
         .btn-warning:hover {
-            background: #e0a800;
-            transform: translateY(-2px);
+            background: var(--bg-hover);
         }
 
         /* PDF生成用のスタイル */

@@ -4,21 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>休暇願確認（個人用） - 打刻システム</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
         .container {
             max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
         }
         h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
         .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
@@ -72,29 +61,30 @@
             transition: all 0.3s;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
         .summary-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
         }
         .summary-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
             text-align: center;
         }
-        .summary-card.green { background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%); }
-        .summary-card.orange { background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%); }
-        .summary-card.blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .summary-card.green { background: var(--bg-secondary); }
+        .summary-card.orange { background: var(--bg-secondary); }
+        .summary-card.blue { background: var(--bg-secondary); }
         .summary-number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }
         .summary-label { font-size: 0.9em; opacity: 0.9; }
         .table-container { overflow-x: auto; }

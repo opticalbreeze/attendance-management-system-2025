@@ -7,185 +7,100 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>勤怠チェック</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-        }
-        
-        .back-link {
-            display: inline-block;
-            color: #667eea;
-            text-decoration: none;
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-        
-        .back-link:hover {
-            text-decoration: underline;
-        }
-        
         .check-form {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-        }
-        
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .form-group label {
-            color: #333;
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 0.9em;
-        }
-        
-        .form-group input,
-        .form-group select {
-            padding: 10px 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: border-color 0.3s;
-            background-color: white;
-            width: 100%;
-        }
-        
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .btn {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
         }
         
         .btn-check {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
         
         .btn-check:hover {
-            transform: scale(1.05);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
         
         .btn-clear {
-            background: #6c757d;
-            color: white;
-            margin-left: 10px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+            margin-left: var(--spacing-sm);
         }
         
         .btn-clear:hover {
-            background: #5a6268;
+            background: var(--bg-hover);
         }
         
         .results-section {
-            margin-top: 30px;
+            margin-top: var(--spacing-lg);
         }
         
         .employee-info {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 20px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+            margin-bottom: var(--spacing-md);
         }
         
         .employee-info h2 {
-            margin-bottom: 10px;
-            font-size: 1.5em;
+            margin-bottom: var(--spacing-sm);
+            font-size: var(--font-size-lg);
         }
         
         .info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
         }
         
         .info-item {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 10px;
-            border-radius: 8px;
+            background: var(--bg-primary);
+            padding: var(--spacing-sm);
+            border: var(--border-width) solid var(--border-color);
         }
         
         .info-label {
-            font-size: 0.85em;
-            opacity: 0.9;
-            margin-bottom: 5px;
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
         }
         
         .info-value {
-            font-size: 1.2em;
-            font-weight: bold;
+            font-size: var(--font-size-lg);
+            font-weight: 400;
+            color: var(--text-primary);
         }
         
         .schedule-table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
+            background: var(--bg-primary);
+            margin-bottom: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
         }
         
         .schedule-table thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--bg-secondary);
         }
         
         .schedule-table th,
         .schedule-table td {
-            padding: 15px;
+            padding: var(--spacing-md);
             text-align: left;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: var(--border-width) solid var(--border-color);
         }
         
         .schedule-table tbody tr:hover {
-            background: #f8f9fa;
+            background: var(--bg-hover);
         }
         
         .alerts-section {
@@ -312,7 +227,7 @@
         <div style="margin-bottom: 20px;">
             <a href="/" class="back-link">← トップページに戻る</a>
             <a href="/search" class="back-link" style="margin-left: 20px;">🔍 勤怠スケジュール検索</a>
-            <a href="/admin" class="back-link" style="margin-left: 20px;">⚙️ 管理者ページ</a>
+            <a href="/admin" class="back-link" style="margin-left: 20px; color: #dc3545; border-color: #dc3545; font-weight: bold;">⚙️ 管理者ページ</a>
         </div>
         
         <h1>✅ 勤怠チェック</h1>

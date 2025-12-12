@@ -4,27 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>月間集計レポート</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
+            width: 100%;
+            padding: 0 10px;
         }
         
         h1 {
@@ -70,29 +54,21 @@
         }
         
         .btn {
-            padding: 12px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            margin-right: 10px;
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+            margin-right: var(--spacing-sm);
         }
         
         .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
         
         .btn-secondary {
-            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
         }
         
         .error {
@@ -132,23 +108,147 @@
             display: flex;
             gap: 10px;
             margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .button-group button {
+            min-width: 150px;
+            flex: 1 1 auto;
         }
         
         .back-link {
             display: inline-block;
             margin-top: 20px;
-            color: #667eea;
+            color: var(--accent-color);
             text-decoration: none;
         }
         
         .back-link:hover {
             text-decoration: underline;
         }
+        
+        /* A4印刷用スタイル */
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            
+            @page {
+                size: A4 landscape;
+                margin: 8mm 6mm;
+            }
+            
+            body {
+                margin: 0;
+                padding: 0;
+                font-size: 8pt;
+                line-height: 1.2;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 0;
+                width: 100%;
+            }
+            
+            .form-section, .back-link, h1, #error-message, #success-message, #loading {
+                display: none !important;
+            }
+            
+            #preview-section {
+                display: block !important;
+                width: 100%;
+                overflow: visible;
+            }
+            
+            #preview-content {
+                width: 100%;
+                overflow: visible;
+                font-size: 7pt;
+            }
+            
+            table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+                page-break-inside: auto;
+                font-size: 7pt !important;
+                margin: 0;
+            }
+            
+            th, td {
+                padding: 2px 1px !important;
+                border: 0.5pt solid #000 !important;
+                font-size: 7pt !important;
+                line-height: 1.1 !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+            
+            th {
+                background-color: #f0f0f0 !important;
+                font-weight: bold !important;
+            }
+            
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            
+            thead {
+                display: table-header-group;
+            }
+            
+            tfoot {
+                display: table-footer-group;
+            }
+        }
+        
+        /* 印刷時に非表示にする要素 */
+        .no-print {
+            display: none !important;
+        }
+        
+        /* レスポンシブテーブル対応 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .responsive-table {
+            width: 100%;
+            min-width: 800px;
+            border-collapse: collapse;
+            word-wrap: break-word;
+            table-layout: fixed;
+        }
+        
+        .responsive-table th,
+        .responsive-table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+        
+        /* 小画面対応 */
+        @media screen and (max-width: 768px) {
+            .responsive-table {
+                font-size: 8px;
+            }
+            
+            .responsive-table th,
+            .responsive-table td {
+                padding: 2px 1px;
+                font-size: 8px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 月間集計レポート</h1>
+        <h1 class="no-print">月間集計レポート</h1>
         
         <div id="error-message" class="error"></div>
         <div id="success-message" class="success"></div>
@@ -177,14 +277,14 @@
             </div>
             
             <div class="button-group">
-                <button class="btn" onclick="generateReport()">📥 Excel生成・ダウンロード</button>
-                <button class="btn btn-secondary" onclick="previewReport()">👁️ プレビュー</button>
+                <button class="btn" onclick="generateReport()">Excel生成・ダウンロード</button>
+                <button class="btn btn-secondary" onclick="previewReport()">プレビュー</button>
             </div>
         </div>
         
         <div id="preview-section" style="display: none;">
             <h2 style="margin-top: 30px; margin-bottom: 20px;">プレビュー</h2>
-            <div id="preview-content"></div>
+            <div id="preview-content" style="width: 100%; margin: 0; padding: 0; box-sizing: border-box; font-size: 14px; overflow-x: auto; background: white;"></div>
         </div>
         
         <a href="/" class="back-link">← トップページに戻る</a>
@@ -407,23 +507,30 @@
                }
             
             let html = `
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                    <h3>${data.search_month}月度 勤務実績表</h3>
-                    <p><strong>社員番号:</strong> ${data.employee_info.employee_num || '-'}</p>
-                    <p><strong>社員名:</strong> ${data.employee_info.name || '-'}</p>
-                    <p><strong>勤務先名:</strong> ${data.employee_info.workplace || '-'}</p>
-                    <p><strong>期間:</strong> ${data.start_date || '-'} 〜 ${data.end_date || '-'}</p>
+                <div class="preview-header" style="background: white; padding: 10px; border: 1px solid #333; margin-bottom: 10px; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <div style="font-weight: bold; font-size: 21px; color: #333;">${data.search_month}月度 勤務実績表</div>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: #333;">
+                            <span><strong>社員番号:</strong> ${data.employee_info.employee_num || '-'}</span>
+                            <span><strong>社員名:</strong> ${data.employee_info.name || '-'}</span>
+                            <span><strong>勤務先名:</strong> ${data.employee_info.workplace || '-'}</span>
+                            <span><strong>期間:</strong> ${data.start_date || '-'} 〜 ${data.end_date || '-'}</span>
+                        </div>
+                    </div>
                 </div>
                 
-                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <div style="width: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow-x: auto; background: white;">
+                <table style="width: 1000px; border-collapse: collapse; margin: 10px 0; font-size: 14px; table-layout: fixed; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background: white;">
                     <thead>
-                        <tr style="background: #667eea; color: white;">
-                            <th style="padding: 10px; border: 1px solid #ddd;">日付</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">区分</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">開始時間<br>出勤時間</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">終了時間<br>退勤時間</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">時間外</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">休暇願</th>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 80px; font-size: 14px; line-height: 1.2; text-align: center;">日付</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 80px; font-size: 14px; line-height: 1.2; text-align: center;">区分</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 100px; font-size: 14px; line-height: 1.1; text-align: center;">開始<br>出勤</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 100px; font-size: 14px; line-height: 1.1; text-align: center;">終了<br>退勤</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 180px; font-size: 14px; line-height: 1.1; text-align: center;">エラー・警告</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 120px; font-size: 14px; line-height: 1.1; text-align: center;">確認状況</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 200px; font-size: 14px; line-height: 1.1; text-align: center;">時間外</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 140px; font-size: 14px; line-height: 1.1; text-align: center;">休暇願</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -432,10 +539,15 @@
             const dailyData = data.daily_data || {};
             const sortedDates = Object.keys(dailyData).sort();
             
+            let totalOvertime = 0;
+            let totalStandard = 0;
+            let totalErrorCount = 0;
+            let totalCheckedCount = 0;
+            
             if (sortedDates.length === 0) {
                 html += `
                     <tr>
-                        <td colspan="6" style="padding: 20px; text-align: center; color: #666;">
+                        <td colspan="8" style="padding: 20px; text-align: center; color: #666;">
                             データがありません
                         </td>
                     </tr>
@@ -457,11 +569,11 @@
                     const hasOvertime = overtimeHours > 0 || (overtime.night || 0) > 0;
                     const overtimeApplications = overtime.applications || [];
                     
-                    // 時間外時間の表示文字列を生成（開始時間・終了時間を含む）
+                    // 時間外時間の表示文字列を生成（内残業・外残業・深夜時間の詳細を個別に表示）
                     let overtimeDisplay = '-';
                     if (hasOvertime) {
                         if (overtimeApplications.length > 0) {
-                            // 各時間外申告の詳細を表示（開始時間・終了時間と作業内容を含む）
+                            // 各時間外申告の詳細を表示（開始時間・終了時間と内残業・外残業・深夜時間を個別に）
                             const appParts = overtimeApplications.map(app => {
                                 const timeStr = `${app.start_time || '-'}～${app.end_time || '-'}`;
                                 const typeParts = [];
@@ -474,19 +586,16 @@
                                 if (app.night > 0) {
                                     typeParts.push(`深夜${app.night.toFixed(1)}h`);
                                 }
-                                // 開始時間・終了時間、時間外時間、作業内容を表示
+                                // 開始時間・終了時間と内残業・外残業・深夜時間を個別に表示
                                 let displayStr = timeStr;
                                 if (typeParts.length > 0) {
-                                    displayStr += ` (${typeParts.join(' ')})`;
-                                }
-                                if (app.description && app.description.trim()) {
-                                    displayStr += `<br><span style="font-size: 0.85em; color: #666;">${app.description}</span>`;
+                                    displayStr += '<br>' + typeParts.join(' ');
                                 }
                                 return displayStr;
                             });
                             overtimeDisplay = appParts.join('<br><br>'); // 複数の申告がある場合は改行で区切る
                         } else {
-                            // applicationsが空の場合でも、時間外時間を表示
+                            // applicationsが空の場合でも、内残業・外残業・深夜時間を個別に表示
                             const parts = [];
                             if (overtime.inner > 0) {
                                 parts.push(`内${overtime.inner.toFixed(1)}h`);
@@ -497,7 +606,7 @@
                             if (overtime.night > 0) {
                                 parts.push(`深夜${overtime.night.toFixed(1)}h`);
                             }
-                            overtimeDisplay = parts.length > 0 ? parts.join(' ') : `${overtimeHours.toFixed(1)}h`;
+                            overtimeDisplay = parts.length > 0 ? parts.join('<br>') : `${overtimeHours.toFixed(1)}h`;
                         }
                     }
                     
@@ -566,30 +675,138 @@
                         }
                     }
                     
+                    // エラー・警告情報を取得（簡潔な表示）
+                    const alerts = dayData.alerts || [];
+                    let alertsDisplay = '-';
+                    if (alerts.length > 0) {
+                        const alertTexts = alerts.map(alert => {
+                            const icon = alert.type === 'error' ? '[エラー]' : alert.type === 'warning' ? '[警告]' : '[情報]';
+                            let simpleMessage = alert.message;
+                            
+                            // detailsから差異の分数を抽出して簡潔に表示
+                            if (alert.details) {
+                                const diffMatch = alert.details.match(/差異:\s*([+-]?\d+)分/);
+                                if (diffMatch) {
+                                    const diffMinutes = diffMatch[1];
+                                    if (alert.details.includes('退勤時刻') || alert.message.includes('退勤')) {
+                                        simpleMessage = `退勤差異 ${diffMinutes > 0 ? '+' : ''}${diffMinutes}分`;
+                                    } else if (alert.details.includes('出勤時刻') || alert.message.includes('出勤')) {
+                                        simpleMessage = `出勤差異 ${diffMinutes > 0 ? '+' : ''}${diffMinutes}分`;
+                                    } else {
+                                        simpleMessage = `${alert.message} ${diffMinutes > 0 ? '+' : ''}${diffMinutes}分`;
+                                    }
+                                }
+                            }
+                            
+                            return `${icon}${simpleMessage}`;
+                        });
+                        alertsDisplay = alertTexts.join('<br>');
+                        totalErrorCount += alerts.filter(a => a.type === 'error').length;
+                    }
+                    
+                    // 確認状況を取得
+                    const checkStatuses = dayData.check_statuses || {};
+                    let checkStatusDisplay = '-';
+                    if (alerts.length > 0) {
+                        const errorAlerts = alerts.filter(a => a.type === 'error');
+                        const checkStatusParts = [];
+                        
+                        // 打刻なしエラーの確認状況
+                        const missingPunchErrors = errorAlerts.filter(a => a.message.includes('打刻なし') || a.message.includes('打刻もれ'));
+                        if (missingPunchErrors.length > 0) {
+                            if (checkStatuses.missing_punch || checkStatuses.punch_leak) {
+                                checkStatusParts.push('[確認済]打刻もれ');
+                                totalCheckedCount += 1;
+                            } else {
+                                checkStatusParts.push('未確認');
+                            }
+                        }
+                        
+                        // 時刻差異エラーの確認状況
+                        const timeDiffErrors = errorAlerts.filter(a => a.message.includes('時刻差異') || a.message.includes('時間外'));
+                        if (timeDiffErrors.length > 0) {
+                            if (checkStatuses.time_difference) {
+                                checkStatusParts.push('[確認済]時刻差異');
+                                totalCheckedCount += 1;
+                            } else {
+                                checkStatusParts.push('未確認');
+                            }
+                        }
+                        
+                        if (checkStatusParts.length > 0) {
+                            checkStatusDisplay = checkStatusParts.join('<br>');
+                        }
+                    }
+                    
+                    // 基準時間を計算（簡易版）
+                    let standardHours = 0;
+                    if (work_type && !work_type.includes('明') && !work_type.includes('法') && !work_type.includes('有')) {
+                        if (work_type.includes('24勤A')) {
+                            standardHours = 3;
+                        } else if (work_type.includes('24勤B')) {
+                            standardHours = 5;
+                        } else if (work_type.includes('夜勤')) {
+                            standardHours = 8;
+                        } else if (work_type.includes('日勤')) {
+                            standardHours = 8;
+                        }
+                    }
+                    totalStandard += standardHours;
+                    totalOvertime += overtimeHours;
+                    
                     html += `
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${work_type || '-'}</td>
-                            <td style="padding: 8px; border: 1px solid #ddd; line-height: 1.5;">
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">${work_type || '-'}</td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; line-height: 1.3;">
                                 ${startTime}<br>
-                                <span style="color: #3498db; font-size: 0.9em;">${clockStartStr}</span>
+                                <span style="color: #666; font-size: 14px;">${clockStartStr}</span>
                             </td>
-                            <td style="padding: 8px; border: 1px solid #ddd; line-height: 1.5;">
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; line-height: 1.3;">
                                 ${endTime}<br>
-                                <span style="color: #3498db; font-size: 0.9em;">${clockEndStr}</span>
+                                <span style="color: #666; font-size: 14px;">${clockEndStr}</span>
                             </td>
-                            <td style="padding: 8px; border: 1px solid #ddd; ${hasOvertime ? 'color: #e74c3c; font-weight: bold;' : ''}; line-height: 1.5;">
+                            <td style="padding: 4px 3px; border: 1px solid #333; font-size: 14px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
+                                ${alertsDisplay}
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; font-size: 14px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
+                                ${checkStatusDisplay}
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; ${hasOvertime ? 'color: #333; font-weight: 400;' : ''}; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
                                 ${overtimeDisplay}
                             </td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${leaveDisplay}</td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; word-wrap: break-word; overflow-wrap: break-word;">${leaveDisplay}</td>
                         </tr>
                     `;
                 }
+                
+                // サマリー行を追加
+                html += `
+                        <tr style="background: #f8f9fa; font-weight: bold;">
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">計</td>
+                            <td style="padding: 6px 3px; border: 1px solid #333;"></td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                労働: ${Math.floor(totalStandard)}:${String(Math.floor((totalStandard % 1) * 60)).padStart(2, '0')}
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333;"></td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                エラー: ${totalErrorCount}件
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                確認: ${totalCheckedCount}件
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                ${Math.floor(totalOvertime)}:${String(Math.floor((totalOvertime % 1) * 60)).padStart(2, '0')}
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333;"></td>
+                        </tr>
+                `;
             }
             
             html += `
                     </tbody>
                 </table>
+                </div>
             `;
             
             previewContent.innerHTML = html;

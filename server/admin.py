@@ -15,6 +15,9 @@ from werkzeug.utils import secure_filename
 from config import Config
 from utils import get_database_connection, get_db_connection
 from auth import login_required
+from logger_config import setup_logger
+
+logger = setup_logger(__name__)
 
 # アップロード設定
 UPLOAD_FOLDER = '/tmp/uploads'
@@ -199,55 +202,143 @@ def register_admin_api_routes(app):
         try:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
-            
-            # 基本統計
-            cursor.execute("""
-                SELECT 
-                    COUNT(DISTINCT employee_id) as employees,
-                    COUNT(*) as total_records,
-                    MIN(work_date) as start_date,
-                    MAX(work_date) as end_date
-                FROM attend_schedule
-            """)
-            basic_stats = cursor.fetchone()
-            
-            # 勤務区分別統計
-            cursor.execute("""
-                SELECT work_type, COUNT(*) as count 
-                FROM attend_schedule 
-                GROUP BY work_type 
-                ORDER BY count DESC
-            """)
-            work_type_stats = cursor.fetchall()
-            
-            # 月別統計
-            cursor.execute("""
-                SELECT 
-                    strftime('%Y-%m', work_date) as month,
-                    COUNT(*) as records
-                FROM attend_schedule 
-                GROUP BY strftime('%Y-%m', work_date)
-                ORDER BY month DESC
-                LIMIT 12
-            """)
-            monthly_stats = cursor.fetchall()
-            
-            return jsonify({
-                'success': True,
-                'data': {
-                    'basic': {
-                        'employees': basic_stats[0] if basic_stats[0] else 0,
-                        'total_records': basic_stats[1] if basic_stats[1] else 0,
-                        'start_date': basic_stats[2],
-                        'end_date': basic_stats[3]
-                    },
-                    'work_types': [{'type': row[0], 'count': row[1]} for row in work_type_stats],
-                    'monthly': [{'month': row[0], 'records': row[1]} for row in monthly_stats]
-                }
-            })
+                
+                # 基本統計
+                cursor.execute("""
+                    SELECT 
+                        COUNT(DISTINCT employee_id) as employees,
+                        COUNT(*) as total_records,
+                        MIN(work_date) as start_date,
+                        MAX(work_date) as end_date
+                    FROM attend_schedule
+                """)
+                basic_stats = cursor.fetchone()
+                
+                # 勤務区分別統計
+                cursor.execute("""
+                    SELECT work_type, COUNT(*) as count 
+                    FROM attend_schedule 
+                    GROUP BY work_type 
+                    ORDER BY count DESC
+                """)
+                work_type_stats = cursor.fetchall()
+                
+                # 月別統計
+                cursor.execute("""
+                    SELECT 
+                        strftime('%Y-%m', work_date) as month,
+                        COUNT(*) as records
+                    FROM attend_schedule 
+                    GROUP BY strftime('%Y-%m', work_date)
+                    ORDER BY month DESC
+                    LIMIT 12
+                """)
+                monthly_stats = cursor.fetchall()
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'basic': {
+                            'employees': basic_stats[0] if basic_stats[0] else 0,
+                            'total_records': basic_stats[1] if basic_stats[1] else 0,
+                            'start_date': basic_stats[2],
+                            'end_date': basic_stats[3]
+                        },
+                        'work_types': [{'type': row[0], 'count': row[1]} for row in work_type_stats],
+                        'monthly': [{'month': row[0], 'records': row[1]} for row in monthly_stats]
+                    }
+                })
             
         except Exception as e:
+            logger.error(f"データベース統計情報取得エラー: {str(e)}", exc_info=True)
             return jsonify({
                 'success': False,
                 'message': f'統計情報取得エラー: {str(e)}'
+            })
+
+    # バックアップ管理API
+    @app.route('/api/admin/backup/start', methods=['POST'])
+    @login_required
+    def start_auto_backup():
+        """自動バックアップを開始"""
+        try:
+            from auto_save import auto_save_manager
+            result = auto_save_manager.start_scheduler()
+            if result:
+                return jsonify({
+                    'success': True,
+                    'message': '自動バックアップを開始しました'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '自動バックアップの開始に失敗しました'
+                })
+        except Exception as e:
+            logger.error(f"自動バックアップ開始エラー: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'message': f'エラー: {str(e)}'
+            })
+
+    @app.route('/api/admin/backup/stop', methods=['POST'])
+    @login_required
+    def stop_auto_backup():
+        """自動バックアップを停止"""
+        try:
+            from auto_save import auto_save_manager
+            auto_save_manager.stop_scheduler()
+            return jsonify({
+                'success': True,
+                'message': '自動バックアップを停止しました'
+            })
+        except Exception as e:
+            logger.error(f"自動バックアップ停止エラー: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'message': f'エラー: {str(e)}'
+            })
+
+    @app.route('/api/admin/backup/manual', methods=['POST'])
+    @login_required
+    def manual_backup():
+        """手動バックアップを実行"""
+        try:
+            from auto_save import auto_save_manager
+            backup_path = auto_save_manager.backup_database("manual")
+            if backup_path:
+                filename = os.path.basename(backup_path)
+                return jsonify({
+                    'success': True,
+                    'message': '手動バックアップが完了しました',
+                    'filename': filename
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '手動バックアップに失敗しました'
+                })
+        except Exception as e:
+            logger.error(f"手動バックアップエラー: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'message': f'エラー: {str(e)}'
+            })
+
+    @app.route('/api/admin/backup/status', methods=['GET'])
+    @login_required
+    def get_backup_status():
+        """バックアップ状況を取得"""
+        try:
+            from auto_save import auto_save_manager
+            status = auto_save_manager.get_backup_status()
+            return jsonify({
+                'success': True,
+                'data': status
+            })
+        except Exception as e:
+            logger.error(f"バックアップ状況取得エラー: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'message': f'エラー: {str(e)}'
             })
