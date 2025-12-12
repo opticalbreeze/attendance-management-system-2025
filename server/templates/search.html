@@ -450,6 +450,9 @@
 
     </div>
     
+    <!-- 共通ライブラリを読み込み -->
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
+    
     <script>
         let searchResults = [];
         
@@ -706,31 +709,7 @@
             document.getElementById('results-section').style.display = 'block';
         }
         
-        // 日付フォーマット
-        function formatDate(dateStr) {
-            if (!dateStr) return '';
-            const dt = new Date(dateStr);
-            return dt.toLocaleDateString('ja-JP', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            });
-        }
-        
-        // 時刻フォーマット
-        function formatTime(timeStr) {
-            if (!timeStr) return '';
-            // ISO時刻文字列の場合
-            if (timeStr.includes('T') || timeStr.includes(' ')) {
-                const dt = new Date(timeStr);
-                return dt.toLocaleTimeString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-            // HH:MM形式の場合はそのまま返す
-            return timeStr;
-        }
+        // formatDate, formatTime は attendance-common.js から使用
 
         // 24勤の退勤時刻を翌日の明に移動する処理
         function processNightShiftEndTimes(results) {
@@ -782,18 +761,7 @@
             return formatTime(item.end_time);
         }
         
-        // 勤務タイプに応じたCSSクラスを返す
-        function getWorkTypeClass(workType) {
-            if (!workType) return '';
-            if (workType.includes('24勤')) return 'shift-24';
-            if (workType.includes('日勤')) return 'day-shift';
-            if (workType.includes('夜勤')) return 'night-shift';
-            if (workType.includes('所')) return 'office';
-            if (workType.includes('明')) return 'off-day';
-            if (workType.includes('法')) return 'holiday';
-            if (workType.includes('有')) return 'paid-leave';
-            return '';
-        }
+        // getWorkTypeClass は attendance-common.js から使用
         
         // 行データから完全なデータを取得するヘルパー関数
         function getFullDataFromRow(row) {
@@ -811,87 +779,7 @@
             return Array.from(rows).map(row => getFullDataFromRow(row)).filter(data => data !== null);
         }
         
-        // 打刻時間を整形する関数（有効な打刻に色を付ける）
-        function formatAttendanceTimes(attendanceRecords, workType, workDate, allResults) {
-            if (!attendanceRecords || attendanceRecords.length === 0) {
-                return '<span class="no-attendance">打刻なし</span>';
-            }
-            
-            // 有効な出勤・退勤時刻を判定
-            const validTimes = getValidClockTimes(attendanceRecords, workType, workDate, allResults);
-            
-            const timeSpans = attendanceRecords.map(record => {
-                const timeStr = record.time_only;
-                let className = 'attendance-time';
-                let title = `端末: ${record.terminal_id}`;
-                
-                // 有効な出勤時刻かチェック
-                if (validTimes.clockIn === timeStr) {
-                    className += ' valid-clock-in';
-                    title += ' (有効な出勤時刻)';
-                }
-                // 有効な退勤時刻かチェック
-                else if (validTimes.clockOut === timeStr) {
-                    className += ' valid-clock-out';
-                    title += ' (有効な退勤時刻)';
-                }
-                
-                return `<span class="${className}" title="${title}">${timeStr}</span>`;
-            });
-            
-            return timeSpans.join(' ');
-        }
-        
-        // 有効な出勤・退勤時刻を判定する関数
-        function getValidClockTimes(attendanceRecords, workType, workDate, allResults) {
-            const result = {
-                clockIn: null,
-                clockOut: null
-            };
-            
-            if (!attendanceRecords || attendanceRecords.length === 0) {
-                return result;
-            }
-            
-            // 時刻でソート（早い順）
-            const sortedRecords = [...attendanceRecords].sort((a, b) => {
-                return a.time_only.localeCompare(b.time_only);
-            });
-            
-            // 24勤A/B、夜勤の場合
-            if (workType && (workType.includes('24勤') || workType.includes('夜勤'))) {
-                // 一番早い時間が出勤
-                result.clockIn = sortedRecords[0].time_only;
-                
-                // 翌日の「明」の日の一番遅い時間が退勤
-                const currentDate = new Date(workDate);
-                const nextDate = new Date(currentDate);
-                nextDate.setDate(currentDate.getDate() + 1);
-                const nextDateStr = nextDate.toISOString().split('T')[0];
-                
-                // 翌日の明のスケジュールを探す
-                if (allResults) {
-                    const nextDayOffItem = allResults.find(item => 
-                        item.work_date === nextDateStr && item.work_type === '明'
-                    );
-                    
-                    if (nextDayOffItem && nextDayOffItem.attendance_records && nextDayOffItem.attendance_records.length > 0) {
-                        // 翌日の打刻データを時刻でソート
-                        const nextDaySorted = [...nextDayOffItem.attendance_records].sort((a, b) => {
-                            return a.time_only.localeCompare(b.time_only);
-                        });
-                        // 一番遅い時間が退勤
-                        result.clockOut = nextDaySorted[nextDaySorted.length - 1].time_only;
-                    }
-                }
-            } else {
-                // 日勤の場合：一番早い時間が出勤、一番遅い時間が退勤
-                result.clockIn = sortedRecords[0].time_only;
-                result.clockOut = sortedRecords[sortedRecords.length - 1].time_only;
-            }
-            
-            return result;
-        }
+        // formatAttendanceTimes, getValidClockTimes は attendance-common.js から使用
         
         // 日時フォーマット（下位互換用）
         function formatDateTime(datetime) {
@@ -907,39 +795,7 @@
             });
         }
         
-        // アラート情報をフォーマット
-        function formatAlerts(alerts) {
-            console.log('formatAlerts called with:', alerts, 'type:', typeof alerts, 'isArray:', Array.isArray(alerts));
-            
-            if (!alerts || alerts.length === 0) {
-                console.log('formatAlerts: アラートなし');
-                return '<span style="color: #999;">-</span>';
-            }
-            
-            if (!Array.isArray(alerts)) {
-                console.error('formatAlerts: alerts is not an array:', alerts);
-                return '<span style="color: #999;">-</span>';
-            }
-            
-            const formatted = alerts.map(alert => {
-                if (!alert || typeof alert !== 'object') {
-                    console.error('formatAlerts: invalid alert object:', alert);
-                    return '';
-                }
-                
-                const icon = alert.type === 'error' ? '❌' : alert.type === 'warning' ? '⚠️' : 'ℹ️';
-                const className = alert.type === 'error' ? 'error' : alert.type === 'warning' ? 'warning' : 'info';
-                const title = alert.details ? `${alert.message}: ${alert.details}` : alert.message;
-                
-                return `<div class="alert-item ${className}" title="${title.replace(/"/g, '&quot;')}">
-                    <span class="alert-icon">${icon}</span>
-                    <span>${alert.message}</span>
-                </div>`;
-            }).join('');
-            
-            console.log('formatAlerts: formatted result:', formatted);
-            return formatted;
-        }
+        // formatAlerts は attendance-common.js から使用
         
         // エラー表示
         function showError(message) {

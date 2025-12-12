@@ -14,6 +14,10 @@ services:
       - type: bind
         source: ./templates
         target: /app/templates
+      # staticファイル（CSS/JS）を最新に保つ
+      - type: bind
+        source: ./static
+        target: /app/static
       # サーバーコードを最新に保つ
       - type: bind
         source: ./server.py
@@ -48,6 +52,12 @@ services:
       - type: bind
         source: ./attendance_check_service.py
         target: /app/attendance_check_service.py
+      - type: bind
+        source: ./constants.py
+        target: /app/constants.py
+      - type: bind
+        source: ./api_check_status.py
+        target: /app/api_check_status.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

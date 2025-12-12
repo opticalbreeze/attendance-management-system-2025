@@ -696,7 +696,7 @@ def get_attendance_check_status(employee_num, work_date, check_type):
     Args:
         employee_num: 従業員番号
         work_date: 勤務日
-        check_type: チェックタイプ ('missing_punch' or 'time_difference')
+        check_type: チェックタイプ ('missing_punch', 'time_difference', or 'punch_leak')
     
     Returns:
         dict: チェックステータス情報またはNone
@@ -714,7 +714,7 @@ def get_attendance_check_status(employee_num, work_date, check_type):
             
             row = cursor.fetchone()
             if row:
-                return {
+                result = {
                     'id': row[0],
                     'employee_num': row[1],
                     'work_date': row[2],
@@ -726,6 +726,10 @@ def get_attendance_check_status(employee_num, work_date, check_type):
                     'created_at': row[8],
                     'updated_at': row[9]
                 }
+                # チェック済みデータがある場合のみデバッグ出力
+                if result['is_checked']:
+                    logger.info(f"[DB] ✓ チェック済みデータ取得: employee_num={employee_num}, work_date={work_date}, check_type={check_type}, is_checked={result['is_checked']}, id={result['id']}")
+                return result
             return None
             
     except Exception as e:
@@ -739,7 +743,7 @@ def update_attendance_check_status(employee_num, work_date, check_type, is_check
     Args:
         employee_num: 従業員番号
         work_date: 勤務日
-        check_type: チェックタイプ ('missing_punch' or 'time_difference')
+        check_type: チェックタイプ ('missing_punch', 'time_difference', or 'punch_leak')
         is_checked: チェック済みかどうか
         checked_by: チェックした人
         notes: 備考
