@@ -10,6 +10,8 @@ from datetime import datetime, time, timedelta
 from config import Config
 from utils import get_database_connection, get_db_connection, time_to_minutes, calculate_duration_minutes
 from logger_config import setup_logger
+from constants import AttendanceConstants
+from work_type_constants import is_off_day_shift, WORK_TYPE_OFF_DAY
 
 logger = setup_logger(__name__)
 
@@ -49,16 +51,83 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
-        # スケジュールから予定勤務時間を取得（employee_numを文字列に変換）
+        # スケジュールから予定勤務時間と勤務タイプを取得（employee_numを文字列に変換）
         cursor.execute("""
-            SELECT start_time, end_time FROM attend_schedule
+            SELECT start_time, end_time, work_type FROM attend_schedule
             WHERE employee_id = ? AND work_date = ?
         """, (str(employee_num), work_date))
         
         schedule = cursor.fetchone()
+        
+        work_type = schedule[2] if schedule and len(schedule) > 2 else None
+        scheduled_start = schedule[0] if schedule else None  # HH:MM
+        scheduled_end = schedule[1] if schedule else None   # HH:MM
+        
+        # 「明」勤務の場合は、前日の24勤スケジュールを取得して判定基準とする
+        if work_type and is_off_day_shift(work_type):
+            # 前日の日付を計算
+            from datetime import datetime, timedelta
+            current_date = datetime.strptime(work_date, '%Y-%m-%d').date()
+            prev_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
+            
+            # 前日の24勤・夜勤スケジュールを取得
+            cursor.execute("""
+                SELECT start_time, end_time, work_type FROM attend_schedule
+                WHERE employee_id = ? AND work_date = ? AND (work_type LIKE '%24勤%' OR work_type LIKE '%夜勤%')
+            """, (str(employee_num), prev_date))
+            
+            prev_schedule = cursor.fetchone()
+            if prev_schedule and prev_schedule[0] and prev_schedule[1]:
+                # 前日の24勤のスケジュールを使用（例：08:30-翌08:30）
+                scheduled_start = prev_schedule[0]  # 前日の開始時刻（例：08:30）
+                scheduled_end = prev_schedule[1]    # 前日の終了時刻（例：08:30 = 翌日の08:30）
+                work_type = prev_schedule[2]        # 24勤の勤務タイプに更新
+                logger.info(f"「明」勤務の時間外計算: 前日24勤スケジュール使用 {prev_date} {scheduled_start}-{scheduled_end} ({work_type})")
+            else:
+                # 前日のスケジュールが見つからない場合は、24勤のデフォルトスケジュール（8:30-翌8:30）を使用
+                scheduled_start = '08:30'
+                scheduled_end = '08:30'  # 翌日の8:30を意味する
+                logger.info(f"「明」勤務の時間外計算: デフォルト24勤スケジュール使用 {scheduled_start}-{scheduled_end}")
+        else:
+            # 通常勤務の場合は、時間外作業日に該当する24勤スケジュールを確認
+            # 時間外作業が深夜に行われた場合、その日の24勤スケジュールを参照
+            cursor.execute("""
+                SELECT start_time, end_time, work_type FROM attend_schedule
+                WHERE employee_id = ? AND work_date = ? AND (work_type LIKE '%24勤%' OR work_type LIKE '%夜勤%')
+            """, (str(employee_num), work_date))
+            
+            same_day_schedule = cursor.fetchone()
+            if same_day_schedule and same_day_schedule[0] and same_day_schedule[1]:
+                # 時間外作業日の24勤スケジュールを使用
+                scheduled_start = same_day_schedule[0]
+                scheduled_end = same_day_schedule[1]
+                work_type = same_day_schedule[2]  # 正しい勤務タイプを設定
+                logger.info(f"時間外作業日の24勤スケジュール使用: {work_date} {scheduled_start}-{scheduled_end}")
+            else:
+                # 時間外作業が早朝（深夜時間帯）に行われた場合、前日の24勤の可能性を確認
+                overtime_start_hour = int(start_time.split(':')[0])
+                if overtime_start_hour <= 8:  # 8時以前の場合は前日の24勤の可能性
+                    from datetime import datetime, timedelta
+                    current_date = datetime.strptime(work_date, '%Y-%m-%d').date()
+                    prev_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
+                    
+                    # 前日の24勤・夜勤スケジュールを取得
+                    cursor.execute("""
+                        SELECT start_time, end_time, work_type FROM attend_schedule
+                        WHERE employee_id = ? AND work_date = ? AND (work_type LIKE '%24勤%' OR work_type LIKE '%夜勤%')
+                    """, (str(employee_num), prev_date))
+                    
+                    prev_schedule = cursor.fetchone()
+                    if prev_schedule and prev_schedule[0] and prev_schedule[1]:
+                        # 前日の24勤のスケジュールを使用
+                        scheduled_start = prev_schedule[0]
+                        scheduled_end = prev_schedule[1]
+                        work_type = prev_schedule[2]
+                        logger.info(f"早朝時間外作業: 前日24勤スケジュール使用 {prev_date} {scheduled_start}-{scheduled_end}")
+                # else: 既に取得済みのスケジュール（日勤など）をそのまま使用
     
-    if not schedule or not schedule[0] or not schedule[1]:
-        # スケジュールがない場合は全て外残業
+    # スケジュールがない場合は全て外残業
+    if not scheduled_start or not scheduled_end:
         total_minutes = calculate_duration_minutes(start_time, end_time)
         night_minutes = calculate_night_overtime(start_time, end_time)
         return {
@@ -68,40 +137,135 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
             'night_overtime_minutes': night_minutes
         }
     
-    scheduled_start = schedule[0]  # HH:MM
-    scheduled_end = schedule[1]    # HH:MM
-    
     # 時刻を分に変換
     overtime_start_min = time_to_minutes(start_time)
     overtime_end_min = time_to_minutes(end_time)
     scheduled_start_min = time_to_minutes(scheduled_start)
     scheduled_end_min = time_to_minutes(scheduled_end)
     
+    logger.info(f"[時間外分類デバッグ] 開始: 従業員={employee_num}, 作業日={work_date}, 時間外作業={start_time}-{end_time}, 勤務タイプ={work_type}")
+    logger.info(f"[時間外分類デバッグ] スケジュール取得: scheduled_start={scheduled_start}({scheduled_start_min}分), scheduled_end={scheduled_end}({scheduled_end_min}分)")
+    logger.info(f"[時間外分類デバッグ] 時間外作業: overtime_start={start_time}({overtime_start_min}分), overtime_end={end_time}({overtime_end_min}分)")
+    
     # 日をまたぐ場合の処理
     if overtime_end_min < overtime_start_min:
-        overtime_end_min += 1440  # 24時間を加算
-    if scheduled_end_min < scheduled_start_min:
+        overtime_end_min += 1440  # 24時間 = 1440分
+        logger.info(f"[時間外分類デバッグ] 時間外作業が日をまたぐため調整: overtime_end_min={overtime_end_min}分")
+        
+    # スケジュールが日をまたぐ場合の処理（24勤など）
+    # 「明」勤務または24勤の場合は、24勤スケジュールの終了時刻が翌日を意味する
+    if work_type and (is_off_day_shift(work_type) or '24勤' in work_type):
+        # 24勤の終了時刻が翌日の場合（例：8:30 → 翌8:30）
+        if scheduled_end == scheduled_start:  # 同じ時刻 = 24時間勤務
+            scheduled_end_min = scheduled_start_min + 1440  # 翌日の同時刻
+            logger.info(f"[時間外分類デバッグ] 24勤: 終了時刻を翌日に調整 scheduled_end_min={scheduled_end_min}分")
+            
+            # 時間外作業が翌日の早朝の場合、翌日の時刻として調整
+            if overtime_start_min < scheduled_start_min:
+                overtime_start_min += 1440  # 翌日の時刻
+                overtime_end_min += 1440
+                logger.info(f"[時間外分類デバッグ] 24勤の翌日早朝時間外: {overtime_start_min//60:02d}:{overtime_start_min%60:02d}-{overtime_end_min//60:02d}:{overtime_end_min%60:02d} に調整")
+                
+        elif scheduled_end_min <= scheduled_start_min:
+            scheduled_end_min += 1440  # 翌日に調整
+            logger.info(f"[時間外分類デバッグ] 24勤: 終了時刻を翌日に調整 scheduled_end_min={scheduled_end_min}分")
+    elif scheduled_end_min < scheduled_start_min:
         scheduled_end_min += 1440
+        logger.info(f"[時間外分類デバッグ] スケジュールが日をまたぐため調整: scheduled_end_min={scheduled_end_min}分")
     
     inner_minutes = 0
     outer_minutes = 0
     
-    # 勤務時間内の時間外（内残業）
-    if overtime_start_min >= scheduled_start_min and overtime_end_min <= scheduled_end_min:
-        inner_minutes = overtime_end_min - overtime_start_min
-    # 勤務時間外の時間外（外残業）
-    else:
-        # 開始が予定より前
-        if overtime_start_min < scheduled_start_min:
-            outer_minutes += min(scheduled_start_min, overtime_end_min) - overtime_start_min
-        # 終了が予定より後
-        if overtime_end_min > scheduled_end_min:
-            outer_minutes += overtime_end_min - max(scheduled_end_min, overtime_start_min)
+    # 日勤の場合：勤務予定時間内で発生する時間外作業を考慮（スケジュールベース）
+    # 24勤の場合：24時間勤務での時間外作業を考慮（スケジュールベース）
+    # 外残業：開始時間より早い時間、または終了時間より遅い時間での時間外作業
+    # 内残業：勤務時間内での休憩時間での時間外作業（勤務時間内の時間外作業）
     
-    # 深夜時間の計算（20:00-05:00）
-    night_minutes = calculate_night_overtime(start_time, end_time)
+    # 時間外作業の総時間を計算
+    total_overtime_minutes = overtime_end_min - overtime_start_min
+    logger.info(f"[時間外分類デバッグ] 時間外作業総時間: {total_overtime_minutes}分 ({total_overtime_minutes/60:.2f}時間)")
+    
+    # 内残業の判定：勤務時間内（開始時刻から終了時刻の間）の時間外作業
+    # 時間外作業が勤務時間内に一部でも含まれる場合、その部分を内残業とする
+    inner_start_min = None
+    inner_end_min = None
+    logger.info(f"[時間外分類デバッグ] 内残業判定条件チェック: overtime_start_min({overtime_start_min}) < scheduled_end_min({scheduled_end_min}) = {overtime_start_min < scheduled_end_min}")
+    logger.info(f"[時間外分類デバッグ] 内残業判定条件チェック: overtime_end_min({overtime_end_min}) > scheduled_start_min({scheduled_start_min}) = {overtime_end_min > scheduled_start_min}")
+    
+    if overtime_start_min < scheduled_end_min and overtime_end_min > scheduled_start_min:
+        # 24勤の場合、当日の終了時刻（例：8:30）以降は外残業とする
+        if work_type and '24勤' in work_type and scheduled_end == scheduled_start:
+            # 当日の終了時刻（調整前の値）
+            original_end_min = scheduled_start_min  # 8:30 = 510分
+            
+            # 翌日に調整された時間外作業の場合（1440分以上）
+            if overtime_start_min >= 1440:
+                # 翌日の時間外作業 → 24勤の勤務時間内として処理
+                inner_start_min = max(overtime_start_min, scheduled_start_min)
+                inner_end_min = min(overtime_end_min, scheduled_end_min)
+                logger.info(f"[時間外分類デバッグ] 24勤翌日時間外: inner_start_min={inner_start_min}分, inner_end_min={inner_end_min}分")
+                if inner_end_min > inner_start_min:
+                    inner_minutes = inner_end_min - inner_start_min
+                    logger.info(f"[時間外分類デバッグ] 翌日内残業時間: {inner_minutes}分 ({inner_minutes/60:.2f}時間)")
+                else:
+                    logger.info(f"[時間外分類デバッグ] 翌日内残業範囲が無効")
+            # 当日の時間外作業が当日終了時刻以降の場合は外残業
+            elif overtime_start_min >= original_end_min:
+                logger.info(f"[時間外分類デバッグ] 24勤当日終了時刻({original_end_min}分)以降の作業 → 外残業")
+                inner_minutes = 0
+            else:
+                # 勤務時間内の時間外作業の範囲を計算（当日終了時刻まで）
+                inner_start_min = max(overtime_start_min, scheduled_start_min)
+                inner_end_min = min(overtime_end_min, original_end_min)
+                logger.info(f"[時間外分類デバッグ] 24勤当日内残業範囲: inner_start_min={inner_start_min}分, inner_end_min={inner_end_min}分")
+                if inner_end_min > inner_start_min:
+                    inner_minutes = inner_end_min - inner_start_min
+                    logger.info(f"[時間外分類デバッグ] 当日内残業時間: {inner_minutes}分 ({inner_minutes/60:.2f}時間)")
+                else:
+                    logger.info(f"[時間外分類デバッグ] 当日内残業範囲が無効")
+        else:
+            # 通常の勤務時間内の時間外作業の範囲を計算
+            inner_start_min = max(overtime_start_min, scheduled_start_min)
+            inner_end_min = min(overtime_end_min, scheduled_end_min)
+            logger.info(f"[時間外分類デバッグ] 内残業範囲計算: inner_start_min={inner_start_min}分, inner_end_min={inner_end_min}分")
+            if inner_end_min > inner_start_min:
+                inner_minutes = inner_end_min - inner_start_min
+                logger.info(f"[時間外分類デバッグ] 内残業時間: {inner_minutes}分 ({inner_minutes/60:.2f}時間)")
+            else:
+                logger.info(f"[時間外分類デバッグ] 内残業範囲が無効: inner_end_min({inner_end_min}) <= inner_start_min({inner_start_min})")
+    else:
+        logger.info(f"[時間外分類デバッグ] 内残業条件不一致: 時間外作業が勤務時間内に含まれていない")
+    
+    # 外残業の計算：時間外作業全体から内残業を引いた残り
+    outer_minutes = total_overtime_minutes - inner_minutes
+    logger.info(f"[時間外分類デバッグ] 外残業計算: total_overtime_minutes({total_overtime_minutes}) - inner_minutes({inner_minutes}) = {outer_minutes}分 ({outer_minutes/60:.2f}時間)")
+    
+    # 深夜時間の計算（設定値から動的に取得）
+    # 内残業と外残業それぞれに対して深夜時間を計算
+    night_minutes = 0
+    
+    # 外残業の深夜時間を計算
+    # 外残業は開始時刻より前、または終了時刻より後の部分
+    if outer_minutes > 0:
+        # 開始時刻より前の部分
+        if overtime_start_min < scheduled_start_min:
+            outer_start_before_min = overtime_start_min
+            outer_end_before_min = min(scheduled_start_min, overtime_end_min)
+            night_minutes += _calculate_night_minutes_from_range(outer_start_before_min, outer_end_before_min)
+        
+        # 終了時刻より後の部分
+        if overtime_end_min > scheduled_end_min:
+            outer_start_after_min = max(scheduled_end_min, overtime_start_min)
+            outer_end_after_min = overtime_end_min
+            night_minutes += _calculate_night_minutes_from_range(outer_start_after_min, outer_end_after_min)
+    
+    # 内残業の深夜時間を計算
+    if inner_minutes > 0 and inner_start_min is not None and inner_end_min is not None:
+        night_minutes += _calculate_night_minutes_from_range(inner_start_min, inner_end_min)
     
     overtime_type = '内残業' if inner_minutes > 0 else '外残業'
+    
+    logger.info(f"[時間外分類デバッグ] 最終判定: overtime_type={overtime_type}, inner={inner_minutes}分({inner_minutes/60:.2f}h), outer={outer_minutes}分({outer_minutes/60:.2f}h), night={night_minutes}分({night_minutes/60:.2f}h)")
     
     return {
         'overtime_type': overtime_type,
@@ -110,9 +274,47 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
         'night_overtime_minutes': night_minutes
     }
 
+def _calculate_night_minutes_from_range(start_min, end_min):
+    """
+    分単位の範囲に対して深夜時間を計算（共通ヘルパー関数）
+    
+    Args:
+        start_min: 開始時刻（分）
+        end_min: 終了時刻（分）
+    
+    Returns:
+        int: 深夜時間（分）
+    """
+    if end_min < start_min:
+        end_min += AttendanceConstants.MINUTES_PER_DAY
+    
+    night_start = AttendanceConstants.get_night_start_minutes()
+    night_end_day2 = AttendanceConstants.get_night_end_minutes_day2()
+    minutes_per_day = AttendanceConstants.MINUTES_PER_DAY
+    
+    night_minutes_total = 0
+    
+    # 1日目の深夜時間帯（設定開始時間-24:00）との重複
+    if start_min < minutes_per_day:
+        overlap_start_day1 = max(start_min, night_start)
+        overlap_end_day1 = min(end_min, minutes_per_day)
+        if overlap_end_day1 > overlap_start_day1:
+            night_minutes_total += overlap_end_day1 - overlap_start_day1
+    
+    # 2日目の深夜時間帯（00:00-設定終了時間）との重複
+    if end_min > minutes_per_day:
+        start_day2 = start_min - minutes_per_day if start_min > minutes_per_day else 0
+        end_day2 = end_min - minutes_per_day
+        overlap_start_day2 = max(start_day2, 0)
+        overlap_end_day2 = min(end_day2, night_end_day2)
+        if overlap_end_day2 > overlap_start_day2:
+            night_minutes_total += overlap_end_day2 - overlap_start_day2
+    
+    return night_minutes_total
+
 def calculate_night_overtime(start_time, end_time):
     """
-    深夜時間帯（20:00-05:00）の時間を計算
+    深夜時間帯の時間を計算（時刻文字列から分単位に変換して計算）
     
     Args:
         start_time: 開始時刻 (HH:MM)
@@ -124,37 +326,7 @@ def calculate_night_overtime(start_time, end_time):
     start_min = time_to_minutes(start_time)
     end_min = time_to_minutes(end_time)
     
-    # 日をまたぐ場合
-    if end_min < start_min:
-        end_min += 1440
-    
-    night_start = 20 * 60  # 20:00
-    night_end = 29 * 60    # 翌05:00 = 29:00
-    
-    # 深夜時間帯との重複を計算
-    overlap_start = max(start_min, night_start)
-    overlap_end = min(end_min, night_end)
-    
-    if overlap_end > overlap_start:
-        return overlap_end - overlap_start
-    
-    # 深夜時間帯が2日にまたがる場合
-    if end_min >= 1440:  # 翌日まで
-        night_minutes = 0
-        # 1日目の深夜（20:00-24:00）
-        if start_min < 1440:
-            overlap_end_day1 = min(end_min, 1440)
-            if overlap_end_day1 > night_start:
-                night_minutes += overlap_end_day1 - max(start_min, night_start)
-        # 2日目の深夜（00:00-05:00）
-        if end_min > 1440:
-            overlap_start_day2 = max(start_min - 1440, 0) if start_min > 1440 else 0
-            overlap_end_day2 = min(end_min - 1440, 5 * 60)
-            if overlap_end_day2 > overlap_start_day2:
-                night_minutes += overlap_end_day2 - overlap_start_day2
-        return night_minutes
-    
-    return 0
+    return _calculate_night_minutes_from_range(start_min, end_min)
 
 # time_to_minutesとcalculate_duration_minutesはutils.pyからインポート（重複を避けるため）
 
@@ -182,7 +354,9 @@ def insert_overtime_application(employee_num, employee_name, application_date, w
             return None
         
         # 時間外の分類を計算
+        logger.info(f"[時間外申告登録] 開始: 従業員={employee_num}, 作業日={work_date}, 時間={start_time}-{end_time}")
         categories = calculate_overtime_categories(employee_num, work_date, start_time, end_time)
+        logger.info(f"[時間外申告登録] 計算結果: type={categories['overtime_type']}, inner={categories['inner_overtime_minutes']}分, outer={categories['outer_overtime_minutes']}分, night={categories['night_overtime_minutes']}分")
         
         with get_db_connection() as conn:
             cursor = conn.cursor()

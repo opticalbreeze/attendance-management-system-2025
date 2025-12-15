@@ -227,7 +227,7 @@
         <div style="margin-bottom: 20px;">
             <a href="/" class="back-link">← トップページに戻る</a>
             <a href="/search" class="back-link" style="margin-left: 20px;">🔍 勤怠スケジュール検索</a>
-            <a href="/admin" class="back-link" style="margin-left: 20px; color: #dc3545; border-color: #dc3545; font-weight: bold;">⚙️ 管理者ページ</a>
+            <a href="/admin" class="back-link" style="margin-left: 20px;">⚙️ 管理者ページ</a>
         </div>
         
         <h1>✅ 勤怠チェック</h1>
@@ -366,7 +366,7 @@
             </table>
             
             <div class="alerts-section" id="alerts-section">
-                <h2 style="margin-bottom: 15px; color: #333;">⚠️ アラート</h2>
+                <h2 style="margin-bottom: 15px; color: #333;">アラート</h2>
                 <div id="alerts-container"></div>
             </div>
             
@@ -609,7 +609,7 @@
                 }
             } catch (error) {
                 console.error('従業員データ読み込みエラー:', error);
-                employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
+                employeeSelect.innerHTML = '<option value="">[エラー] 従業員データ読み込み失敗</option>';
             }
         }
         
@@ -829,7 +829,7 @@
             const resultsSection = document.getElementById('results-section');
             resultsSection.innerHTML = `
                 <div style="margin-bottom: 30px;">
-                    <h2>📊 月度勤怠チェック結果</h2>
+                    <h2>月度勤怠チェック結果</h2>
                     <div class="info-grid" style="margin-top: 15px;">
                         <div class="info-item">
                             <div class="info-label">検索月</div>
@@ -873,8 +873,8 @@
                             <div style="color: #666; font-size: 0.9em; margin-top: 5px;">セクション: ${employee.section}</div>
                         </div>
                         <div style="text-align: right;">
-                            <div style="color: #dc3545; font-weight: bold; font-size: 1.2em;">❌ ${employee.error_count}件</div>
-                            <div style="color: #ffc107; font-weight: bold; font-size: 1.2em;">⚠️ ${employee.warning_count}件</div>
+                            <div style="color: #dc3545; font-weight: bold; font-size: 1.2em;">[エラー] ${employee.error_count}件</div>
+                            <div style="color: #ffc107; font-weight: bold; font-size: 1.2em;">[警告] ${employee.warning_count}件</div>
                         </div>
                     </div>
                     <div id="employee-dates-${employee.employee_id}"></div>
@@ -889,18 +889,22 @@
                     dateDiv.style.cssText = 'margin-bottom: 15px; padding: 15px; background: white; border-radius: 8px;';
                     
                     const schedule = dateInfo.schedule || {};
+                    // 「通常」を「日勤」に変換
+                    if (schedule.work_type) {
+                        schedule.work_type = schedule.work_type.replace('通常', '日勤');
+                    }
                     const workTypeClass = getWorkTypeClass(schedule.work_type);
                     
                     let alertsHtml = '';
                     dateInfo.errors.forEach(error => {
                         alertsHtml += `<div style="margin: 5px 0; padding: 8px; background: #fee; border-left: 3px solid #dc3545; border-radius: 4px;">
-                            <strong style="color: #dc3545;">❌ ${error.message}</strong>
+                            <strong style="color: #dc3545;">[エラー] ${error.message}</strong>
                             ${error.details ? `<div style="font-size: 0.9em; color: #666; margin-top: 3px;">${error.details}</div>` : ''}
                         </div>`;
                     });
                     dateInfo.warnings.forEach(warning => {
                         alertsHtml += `<div style="margin: 5px 0; padding: 8px; background: #fffbf0; border-left: 3px solid #ffc107; border-radius: 4px;">
-                            <strong style="color: #ffc107;">⚠️ ${warning.message}</strong>
+                            <strong style="color: #ffc107;">[警告] ${warning.message}</strong>
                             ${warning.details ? `<div style="font-size: 0.9em; color: #666; margin-top: 3px;">${warning.details}</div>` : ''}
                         </div>`;
                     });
@@ -939,6 +943,10 @@
             
             if (data.schedule) {
                 const schedule = data.schedule;
+                // 「通常」を「日勤」に変換
+                if (schedule.work_type) {
+                    schedule.work_type = schedule.work_type.replace('通常', '日勤');
+                }
                 const workTypeClass = getWorkTypeClass(schedule.work_type);
                 
                 // 出勤時刻行
@@ -1021,7 +1029,7 @@
                     const alertDiv = document.createElement('div');
                     alertDiv.className = `alert alert-${alert.type === 'error' ? 'error' : 'warning'}`;
                     alertDiv.innerHTML = `
-                        <div class="alert-icon">${alert.type === 'error' ? '❌' : '⚠️'}</div>
+                        <div class="alert-icon">${alert.type === 'error' ? '[エラー]' : '[警告]'}</div>
                         <div class="alert-content">
                             <div class="alert-title">${alert.message}</div>
                             <div class="alert-details">${alert.details || ''}</div>
@@ -1200,7 +1208,7 @@
             const alertDiv = document.createElement('div');
             alertDiv.className = `alert alert-${type === 'error' ? 'error' : 'warning'}`;
             alertDiv.innerHTML = `
-                <div class="alert-icon">${type === 'error' ? '❌' : '⚠️'}</div>
+                <div class="alert-icon">${type === 'error' ? '[エラー]' : '[警告]'}</div>
                 <div class="alert-content">
                     <div class="alert-title">${message}</div>
                     <div class="alert-details">${details || ''}</div>

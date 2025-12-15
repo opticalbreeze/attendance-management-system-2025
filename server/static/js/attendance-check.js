@@ -275,12 +275,15 @@ async function updateCheckStatus(checkbox) {
             
             if (statusElement) {
                 if (isChecked) {
+                    // 時間外申告の有無を確認
+                    const hasOvertime = hasOvertimeForDate(workDate);
+                    
                     if (checkType === 'missing_punch') {
-                        statusElement.textContent = '打刻もれチェック済　時間外無';
+                        statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
                     } else if (checkType === 'punch_leak') {
-                        statusElement.textContent = '打刻漏れチェック済　時間外無';
+                        statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
                     } else {
-                        statusElement.textContent = '時間外チェック済　時間外無';
+                        statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
                     }
                     statusElement.classList.add('completed');
                 } else {
@@ -357,12 +360,15 @@ async function loadCheckStatuses(results) {
                     if (checkbox && statusElement) {
                         checkbox.checked = true;
                         
+                        // 時間外申告の有無を確認
+                        const hasOvertime = hasOvertimeForDate(item.work_date);
+                        
                         if (checkType === 'missing_punch') {
-                            statusElement.textContent = '打刻もれチェック済　時間外無';
+                            statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
                         } else if (checkType === 'punch_leak') {
-                            statusElement.textContent = '打刻漏れチェック済　時間外無';
+                            statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
                         } else {
-                            statusElement.textContent = '時間外チェック済　時間外無';
+                            statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
                         }
                         statusElement.classList.add('completed');
                     }
@@ -397,6 +403,9 @@ function formatEndTime(item) {
 
 // formatAttendanceTimes, formatAlerts, getWorkTypeClass は attendance-common.js から使用
 
+// 時間外申告データをグローバル変数に保存（日付をキーとして）
+const overtimeDataMap = {};
+
 // 時間外・休暇願データ取得（既存のsearch.htmlから移植）
 async function fetchOvertimeDataForMonth(employeeId, results) {
     try {
@@ -405,6 +414,9 @@ async function fetchOvertimeDataForMonth(employeeId, results) {
         
         if (result.status === 'success' && result.data) {
             result.data.forEach(overtime => {
+                // 時間外申告データをマップに保存
+                overtimeDataMap[overtime.work_date] = overtime;
+                
                 const cell = document.getElementById(`overtime-${overtime.work_date}`);
                 if (cell) {
                     const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
@@ -416,6 +428,11 @@ async function fetchOvertimeDataForMonth(employeeId, results) {
     } catch (error) {
         console.error('[時間外データ取得エラー]', error);
     }
+}
+
+// 指定日付に時間外申告があるかチェック
+function hasOvertimeForDate(workDate) {
+    return overtimeDataMap.hasOwnProperty(workDate);
 }
 
 async function fetchLeaveDataForMonth(employeeId, results) {

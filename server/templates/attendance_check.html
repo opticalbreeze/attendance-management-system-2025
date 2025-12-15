@@ -309,7 +309,7 @@
 <body>
     <div class="container">
         <h1>🔍 打刻チェック確認（管理者専用）</h1>
-        <a href="/admin" class="back-link" style="color: #dc3545; border-color: #dc3545; font-weight: bold;">← 管理者メニューに戻る</a>
+        <a href="/admin" class="back-link">← 管理者メニューに戻る</a>
         
         <div class="search-form">
             <form id="search-form">
@@ -351,7 +351,7 @@
         <div class="results-section" id="results-section" style="display: none;">
             <div class="results-header">
                 <div class="results-count" id="results-count">検索結果: 0 件</div>
-                <button class="btn-export" onclick="exportCSV()">📥 CSV出力</button>
+                <button class="btn-export" onclick="exportCSV()">CSV出力</button>
             </div>
             
             <div style="overflow-x: auto;">
@@ -484,7 +484,7 @@
                 }
             } catch (error) {
                 console.error('[loadEmployees] エラー詳細:', error);
-                employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
+                employeeSelect.innerHTML = '<option value="">[エラー] 従業員データ読み込み失敗</option>';
                 employeeHint.style.display = 'block';
                 employeeHint.textContent = `従業員データの読み込みに失敗しました: ${error.message}`;
                 employeeHint.style.color = '#e74c3c';
@@ -609,6 +609,10 @@
             results.forEach(item => {
                 const tr = document.createElement('tr');
                 // 打刻時間を整形（有効な打刻に色を付けるため、全結果とitemを渡す）
+                // 「通常」を「日勤」に変換
+                if (item.work_type) {
+                    item.work_type = item.work_type.replace('通常', '日勤');
+                }
                 const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || [], item.work_type, item.work_date, results, item);
                 
                 // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
@@ -793,6 +797,9 @@
             document.getElementById('error-message').style.display = 'none';
         }
         
+        // 時間外申告データをグローバル変数に保存（日付をキーとして）
+        const overtimeDataMap = {};
+        
         // 時間外申告データを月単位で取得
         async function fetchOvertimeDataForMonth(employeeId, results) {
             try {
@@ -801,6 +808,9 @@
                 
                 if (result.status === 'success' && result.data) {
                     result.data.forEach(overtime => {
+                        // 時間外申告データをマップに保存
+                        overtimeDataMap[overtime.work_date] = overtime;
+                        
                         const cell = document.getElementById(`overtime-${overtime.work_date}`);
                         if (cell) {
                             const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
@@ -812,6 +822,11 @@
             } catch (error) {
                 console.error('[時間外データ取得エラー]', error);
             }
+        }
+        
+        // 指定日付に時間外申告があるかチェック
+        function hasOvertimeForDate(workDate) {
+            return overtimeDataMap.hasOwnProperty(workDate);
         }
         
         // 休暇願データを月単位で取得
@@ -910,12 +925,16 @@
                     
                     if (statusElement) {
                         if (isChecked) {
+                            // 時間外申告の有無を確認
+                            const hasOvertime = hasOvertimeForDate(workDate);
+                            const overtimeText = hasOvertime ? '時間外有り' : '時間外無';
+                            
                             if (checkType === 'missing_punch') {
-                                statusElement.textContent = '打刻もれチェック済　時間外無';
+                                statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
                             } else if (checkType === 'punch_leak') {
-                                statusElement.textContent = '打刻漏れチェック済　時間外無';
+                                statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
                             } else {
-                                statusElement.textContent = '時間外チェック済　時間外無';
+                                statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
                             }
                             statusElement.classList.add('completed');
                         } else {
@@ -977,7 +996,7 @@
                         
                         // チェック済みデータがある場合のみデバッグ出力
                         if (result.success && result.data && result.data.is_checked) {
-                            console.log(`[ブラウザ] ✓ チェック済みデータ発見: employee=${item.employee_id}, date=${item.work_date}, check_type=${checkType}, is_checked=${result.data.is_checked}`);
+                            console.log(`[ブラウザ] [確認済] チェック済みデータ発見: employee=${item.employee_id}, date=${item.work_date}, check_type=${checkType}, is_checked=${result.data.is_checked}`);
                             let checkboxId, statusId;
                             if (checkType === 'missing_punch') {
                                 checkboxId = `missing-${item.employee_id}-${item.work_date}`;
@@ -996,19 +1015,22 @@
                             console.log(`[ブラウザ] DOM要素検索結果: checkbox=${checkbox ? '存在' : 'なし'}, statusElement=${statusElement ? '存在' : 'なし'}`);
                             
                             if (checkbox && statusElement) {
-                                console.log(`[ブラウザ] ✓ チェックボックスにチェックを設定: checkboxId=${checkboxId}, 現在のchecked=${checkbox.checked}`);
+                                console.log(`[ブラウザ] [確認済] チェックボックスにチェックを設定: checkboxId=${checkboxId}, 現在のchecked=${checkbox.checked}`);
                                 checkbox.checked = true;
                                 console.log(`[ブラウザ] チェック後: checked=${checkbox.checked}`);
                                 
+                                // 時間外申告の有無を確認
+                                const hasOvertime = hasOvertimeForDate(item.work_date);
+                                
                                 if (checkType === 'missing_punch') {
-                                    statusElement.textContent = '打刻もれチェック済　時間外無';
+                                    statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
                                 } else if (checkType === 'punch_leak') {
-                                    statusElement.textContent = '打刻漏れチェック済　時間外無';
+                                    statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
                                 } else {
-                                    statusElement.textContent = '時間外チェック済　時間外無';
+                                    statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
                                 }
                                 statusElement.classList.add('completed');
-                                console.log(`[ブラウザ] ✓ ステータス表示更新完了: statusId=${statusId}, textContent=${statusElement.textContent}`);
+                                console.log(`[ブラウザ] [確認済] ステータス表示更新完了: statusId=${statusId}, textContent=${statusElement.textContent}`);
                             } else {
                                 console.warn(`[ブラウザ] ✗ 要素が見つかりません: checkboxId=${checkboxId}, statusId=${statusId}, employee_id=${item.employee_id}, date=${item.work_date}`);
                             }

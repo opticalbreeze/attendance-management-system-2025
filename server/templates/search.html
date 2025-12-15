@@ -143,7 +143,7 @@
         <div style="margin-bottom: var(--spacing-md);">
             <a href="/" class="back-link">トップページに戻る</a>
             <a href="/check" class="back-link" style="margin-left: var(--spacing-md);">勤怠チェック</a>
-            <a href="/admin" class="back-link" style="margin-left: var(--spacing-md); color: #dc3545; border-color: #dc3545; font-weight: bold;">管理者ページ</a>
+            <a href="/admin" class="back-link" style="margin-left: var(--spacing-md);">管理者ページ</a>
         </div>
         
         <h1>勤怠スケジュール検索</h1>
@@ -189,7 +189,7 @@
         <div class="results-section" id="results-section" style="display: none;">
             <div class="results-header">
                 <div class="results-count" id="results-count">検索結果: 0 件</div>
-                <button class="btn-export" onclick="exportCSV()">📥 CSV出力</button>
+                <button class="btn-export" onclick="exportCSV()">CSV出力</button>
             </div>
             
             <div style="overflow-x: auto;">
@@ -301,7 +301,7 @@
                     throw new Error(result.message || '従業員データの読み込みに失敗');
                 }
             } catch (error) {
-                employeeSelect.innerHTML = '<option value="">❌ 従業員データ読み込み失敗</option>';
+                employeeSelect.innerHTML = '<option value="">[エラー] 従業員データ読み込み失敗</option>';
                 employeeHint.style.display = 'block';
                 employeeHint.textContent = '従業員データの読み込みに失敗しました';
                 employeeHint.style.color = '#e74c3c';
@@ -440,6 +440,10 @@
             results.forEach(item => {
                 const tr = document.createElement('tr');
                 // 打刻時間を整形（有効な打刻に色を付けるため、全結果を渡す）
+                // 「通常」を「日勤」に変換
+                if (item.work_type) {
+                    item.work_type = item.work_type.replace('通常', '日勤');
+                }
                 const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || [], item.work_type, item.work_date, results);
                 
                 // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
@@ -667,7 +671,10 @@
                     return alert.details ? `${alert.message}: ${alert.details}` : alert.message;
                 }).join('; ').replace(/"/g, '""');
                 
-                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${item.work_type || ''}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}","${alertsText}"\n`;
+                // CSV出力時も「通常」を「日勤」に変換
+                let csvWorkType = item.work_type || '';
+                csvWorkType = csvWorkType.replace('通常', '日勤');
+                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${csvWorkType}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}","${alertsText}"\n`;
             });
             
             // BOM（Byte Order Mark）を追加してExcelで文字化けを防ぐ

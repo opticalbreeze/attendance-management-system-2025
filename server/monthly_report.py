@@ -7,7 +7,7 @@
 
 from datetime import datetime, date, timedelta
 from openpyxl import Workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Font, Alignment, Border, Side
 import os
 from config import Config
 from database import get_night_shift_end_time_from_next_day, get_attendance_check_status
@@ -260,13 +260,19 @@ def get_monthly_attendance_data(employee_id, search_month):
                 # 時間外申告の詳細を保存
                 start_time = row[1]  # HH:MM形式
                 end_time = row[2]    # HH:MM形式
-                inner_minutes = (row[3] or 0) / 60  # 分→時間
-                outer_minutes = (row[4] or 0) / 60
-                night_minutes = (row[5] or 0) / 60
+                inner_minutes_db = row[3] or 0  # データベースから読み込んだ値（分）
+                outer_minutes_db = row[4] or 0
+                night_minutes_db = row[5] or 0
+                inner_minutes = inner_minutes_db / 60  # 分→時間
+                outer_minutes = outer_minutes_db / 60
+                night_minutes = night_minutes_db / 60
                 # 作業内容を取得（row[6]が存在する場合）
                 description = ''
                 if len(row) > 6:
                     description = row[6] or ''
+                
+                # デバッグ出力：データベースから読み込んだ値
+                logger.info(f"[時間外申告データ読み込み] 日付={date_str}, 時間={start_time}-{end_time}, DB値: inner={inner_minutes_db}分({inner_minutes:.2f}h), outer={outer_minutes_db}分({outer_minutes:.2f}h), night={night_minutes_db}分({night_minutes:.2f}h)")
                 
                 # 時間外申告の詳細をリストに追加
                 app_data = {
@@ -397,7 +403,11 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             os.makedirs(output_dir, exist_ok=True)
             logger.debug(f"出力ディレクトリ: {output_dir}")
             
-            filename = f"勤務実績表_{data['employee_info']['employee_num']}_{search_month.replace('/', '')}.xlsx"
+            employee_num = data['employee_info']['employee_num']
+            employee_name = data['employee_info']['name']
+            # ファイル名に使用できない文字を除去
+            safe_name = employee_name.replace('/', '_').replace('\\', '_').replace(':', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
+            filename = f"勤務実績表_{employee_num}_{safe_name}_{search_month.replace('/', '')}.xlsx"
             output_path = os.path.join(output_dir, filename)
         
         # Excelワークブック作成（完全シンプル）
@@ -408,28 +418,37 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         # ヘッダー情報（シンプル）
         row = 1
         cell1 = ws.cell(row=row, column=1, value=f"{search_month}月度 勤務実績表")
-        cell1.font = Font(name='游ゴシック')
+        cell1.font = Font(name='游ゴシック', size=10)
         cell2 = ws.cell(row=row, column=4, value=f"社員番号: {data['employee_info']['employee_num']}")
-        cell2.font = Font(name='游ゴシック')
+        cell2.font = Font(name='游ゴシック', size=10)
         cell3 = ws.cell(row=row, column=7, value=f"社員名: {data['employee_info']['name']}")
-        cell3.font = Font(name='游ゴシック')
+        cell3.font = Font(name='游ゴシック', size=10)
         
         row += 1
         cell4 = ws.cell(row=row, column=1, value=f"勤務先: {data['employee_info']['workplace']}")
-        cell4.font = Font(name='游ゴシック')
+        cell4.font = Font(name='游ゴシック', size=10)
         cell5 = ws.cell(row=row, column=4, value=f"期間: {data['start_date']} 〜 {data['end_date']}")
-        cell5.font = Font(name='游ゴシック')
+        cell5.font = Font(name='游ゴシック', size=10)
         
         # テーブルヘッダー
         row += 2
         headers = ['日付', '区分', '開始', '終了', '出勤', '退勤', '警告', '確認', '時間外', '休暇']
         for col_idx, header in enumerate(headers, start=1):
             cell = ws.cell(row=row, column=col_idx, value=header)
-            cell.font = Font(name='游ゴシック')
+            cell.font = Font(name='游ゴシック', size=10)
         
         # データ行
         row += 1
         daily_data = data['daily_data']
+        
+        # 集計用の変数を初期化
+        total_24hour_days = 0  # 24勤の日数
+        total_day_shift_days = 0  # 日勤の日数
+        total_night_shift_days = 0  # 夜勤の日数
+        total_overtime_outer = 0.0  # 外残業の合計（時間）
+        total_overtime_inner = 0.0  # 内残業の合計（時間）
+        total_overtime_night = 0.0  # 深夜残業の合計（時間）
+        
         for date_str in sorted(daily_data.keys()):
             day_data = daily_data[date_str]
             work_date = day_data['date']
@@ -443,23 +462,43 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             # データ設定（游ゴシック、省略形）
             # 勤務区分の省略形変換
             work_type = day_data['work_type'] or ''
+            # 「通常」を「日勤」に変換
+            work_type = work_type.replace('通常', '日勤')
             work_type = work_type.replace('所定休日', '所休').replace('法定休日', '法休')
             
+            # 集計用：勤務区分のカウント（元のwork_typeを使用）
+            original_work_type = day_data['work_type'] or ''
+            if '24勤' in original_work_type:
+                total_24hour_days += 1
+            elif original_work_type == '通常' or original_work_type == '日勤':
+                total_day_shift_days += 1
+            elif '夜勤' in original_work_type:
+                total_night_shift_days += 1
+            
             cell1 = ws.cell(row=row, column=1, value=f"{work_date.month}/{work_date.day}")
-            cell1.font = Font(name='游ゴシック')
+            cell1.font = Font(name='游ゴシック', size=10)
             cell2 = ws.cell(row=row, column=2, value=work_type)
-            cell2.font = Font(name='游ゴシック')
+            cell2.font = Font(name='游ゴシック', size=10)
             cell3 = ws.cell(row=row, column=3, value=day_data.get('start_time') or '-')
-            cell3.font = Font(name='游ゴシック')
+            cell3.font = Font(name='游ゴシック', size=10)
             cell4 = ws.cell(row=row, column=4, value=day_data.get('end_time') or '-')
-            cell4.font = Font(name='游ゴシック')
+            cell4.font = Font(name='游ゴシック', size=10)
             
             # 打刻時間
             clock_times = day_data.get('clock_times', [])
-            cell5 = ws.cell(row=row, column=5, value=clock_times[0] if clock_times else '-')
-            cell5.font = Font(name='游ゴシック')
-            cell6 = ws.cell(row=row, column=6, value=clock_times[-1] if len(clock_times) > 1 else '-')
-            cell6.font = Font(name='游ゴシック')
+            # 「明」勤務の場合は、出勤時刻は表示せず、退勤時刻のみ表示（前日の24勤・夜勤の退勤時刻として扱う）
+            if original_work_type and is_off_day_shift(original_work_type):
+                # 「明」勤務: 出勤列は'-'、退勤列は最初の打刻（前日の退勤時刻）
+                cell5 = ws.cell(row=row, column=5, value='-')
+                cell5.font = Font(name='游ゴシック', size=10)
+                cell6 = ws.cell(row=row, column=6, value=clock_times[0] if clock_times else '-')
+                cell6.font = Font(name='游ゴシック', size=10)
+            else:
+                # 通常勤務: 最初の打刻が出勤、最後の打刻が退勤
+                cell5 = ws.cell(row=row, column=5, value=clock_times[0] if clock_times else '-')
+                cell5.font = Font(name='游ゴシック', size=10)
+                cell6 = ws.cell(row=row, column=6, value=clock_times[-1] if len(clock_times) > 1 else '-')
+                cell6.font = Font(name='游ゴシック', size=10)
             
             # エラー・警告（省略形に変更）
             alerts = day_data.get('alerts', [])
@@ -475,13 +514,13 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             else:
                 alert_text = '-'
             cell7 = ws.cell(row=row, column=7, value=alert_text)
-            cell7.font = Font(name='游ゴシック')
+            cell7.font = Font(name='游ゴシック', size=10)
             
             # 確認状況
             check_statuses = day_data.get('check_statuses', {})
             checked_count = sum(1 for status in check_statuses.values() if status)
             cell8 = ws.cell(row=row, column=8, value=f"{checked_count}件" if checked_count > 0 else '-')
-            cell8.font = Font(name='游ゴシック')
+            cell8.font = Font(name='游ゴシック', size=10)
             
             # 時間外（内残業・外残業を区別）
             overtime = day_data.get('overtime', {})
@@ -489,17 +528,24 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             inner_time = overtime.get('inner', 0)
             night_time = overtime.get('night', 0)
             
-            overtime_parts = []
-            if outer_time > 0:
-                overtime_parts.append(f"{outer_time:.1f}h外")
-            if inner_time > 0:
-                overtime_parts.append(f"{inner_time:.1f}h内")
-            if night_time > 0:
-                overtime_parts.append(f"{night_time:.1f}h夜")
+            # デバッグ出力：各日の時間外データ
+            if outer_time > 0 or inner_time > 0 or night_time > 0:
+                logger.info(f"[時間外集計デバッグ] 日付={date_str}, outer={outer_time}, inner={inner_time}, night={night_time}, 合計={outer_time + inner_time + night_time}")
             
-            overtime_text = ', '.join(overtime_parts) if overtime_parts else '-'
+            # 集計用：時間外の合計（データ行の表示で使用している値と同じ値をそのまま使用）
+            total_overtime_outer += outer_time
+            total_overtime_inner += inner_time
+            total_overtime_night += night_time
+            
+            # デバッグ出力：累積合計
+            if outer_time > 0 or inner_time > 0 or night_time > 0:
+                logger.info(f"[時間外集計デバッグ] 累積合計: outer={total_overtime_outer}, inner={total_overtime_inner}, night={total_overtime_night}, 総合計={total_overtime_outer + total_overtime_inner + total_overtime_night}")
+            
+            # 時間外（内残業+外残業の合計値のみ表示）
+            total_overtime = outer_time + inner_time
+            overtime_text = f"{total_overtime:.2f}h" if total_overtime > 0 else '-'
             cell9 = ws.cell(row=row, column=9, value=overtime_text)
-            cell9.font = Font(name='游ゴシック')
+            cell9.font = Font(name='游ゴシック', size=10)
             
             # 休暇願
             leave_request = day_data.get('leave_request')
@@ -509,9 +555,319 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                 leave_subtype = leave_request.get('leave_subtype', '')
                 leave_text = f"{leave_type} {leave_subtype}".strip()
             cell10 = ws.cell(row=row, column=10, value=leave_text)
-            cell10.font = Font(name='游ゴシック')
+            cell10.font = Font(name='游ゴシック', size=10)
             
             row += 1
+        
+        # データ行の最終行を取得
+        data_end_row = row - 1
+        
+        # 集計行を追加
+        row += 1
+        summary_row = row
+        
+        # 細い実線の罫線スタイルを定義
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        # 中央寄せのスタイルを定義
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        # 縮小表示のスタイルを定義
+        shrink_alignment = Alignment(
+            horizontal='center',
+            vertical='center',
+            shrink_to_fit=True
+        )
+        
+        # 集計行のヘッダー
+        ws.cell(row=summary_row, column=1, value="集計").font = Font(name='游ゴシック', size=10)
+        ws.cell(row=summary_row, column=1).alignment = center_alignment
+        ws.cell(row=summary_row, column=1).border = thin_border
+        
+        # B-H列をマージして勤務時間の集計を表示
+        ws.merge_cells(f'B{summary_row}:H{summary_row}')
+        
+        # 勤務時間の集計（0日の勤務スタイルは表示しない）
+        work_hours_parts = []
+        if total_24hour_days > 0:
+            work_hours_parts.append(f"24勤:{total_24hour_days}日({total_24hour_days * 16}h)")
+        if total_day_shift_days > 0:
+            work_hours_parts.append(f"日勤:{total_day_shift_days}日({total_day_shift_days * 8}h)")
+        if total_night_shift_days > 0:
+            work_hours_parts.append(f"夜勤:{total_night_shift_days}日({total_night_shift_days * 9}h)")
+        
+        total_work_hours = (total_24hour_days * 16) + (total_day_shift_days * 8) + (total_night_shift_days * 9)
+        work_hours_text = f"{' '.join(work_hours_parts)} 合計:{total_work_hours}h" if work_hours_parts else "合計:0h"
+        
+        cell_b = ws.cell(row=summary_row, column=2, value=work_hours_text)
+        cell_b.font = Font(name='游ゴシック', size=10)
+        cell_b.alignment = center_alignment
+        
+        # マージされたセルの罫線を設定（各セルに個別に設定）
+        # B列（左端）：左、上、下の罫線
+        cell_b_left = ws.cell(row=summary_row, column=2)
+        cell_b_left.border = Border(
+            left=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        # C列、D列、E列、F列、G列（中間）：上、下の罫線
+        for col_idx in [3, 4, 5, 6, 7]:
+            cell_mid = ws.cell(row=summary_row, column=col_idx)
+            cell_mid.border = Border(
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+        # H列（右端）：右、上、下の罫線
+        cell_h = ws.cell(row=summary_row, column=8)
+        cell_h.border = Border(
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # 時間外の集計（内残業と外残業を区別して表示）
+        # データ行の表示で使用している値と同じ値をそのまま合計しているため、単純に足し算する
+        total_overtime_hours = total_overtime_outer + total_overtime_inner + total_overtime_night
+        # デバッグ出力：最終集計結果
+        logger.info(f"[時間外集計デバッグ] 最終集計: outer={total_overtime_outer}, inner={total_overtime_inner}, night={total_overtime_night}, 総合計={total_overtime_hours}, 表示値={total_overtime_hours:.2f}")
+        
+        # 集計行の時間外表示（内残業+外残業の合計値のみ）
+        total_overtime_summary = total_overtime_outer + total_overtime_inner
+        overtime_summary_text = f"{total_overtime_summary:.2f}h" if total_overtime_summary > 0 else ""
+        
+        # I列（時間外列）に値を設定（縮小表示に設定）
+        cell_overtime = ws.cell(row=summary_row, column=9, value=overtime_summary_text)
+        cell_overtime.font = Font(name='游ゴシック', size=10)
+        cell_overtime.alignment = shrink_alignment  # 縮小表示に設定
+        cell_overtime.border = thin_border
+        
+        # 集計行のI列とJ列にも罫線を設定
+        for col_idx in [10]:
+            cell = ws.cell(row=summary_row, column=col_idx)
+            cell.border = thin_border
+            cell.alignment = center_alignment
+        
+        # データ行のスタイル適用（4行目からデータ最終行まで）
+        for row_idx in range(4, data_end_row + 1):
+            for col_idx in range(1, 11):  # A-J列（列1-10）
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.alignment = center_alignment
+                cell.border = thin_border
+        
+        # G列（警告列）とI列（時間外列）を縮小して表示に設定（データ行のみ）
+        for row_idx in range(4, data_end_row + 1):  # 4行目からデータ最終行まで
+            cell_g = ws.cell(row=row_idx, column=7)  # G列（列7：警告列）
+            cell_g.alignment = shrink_alignment
+            cell_i = ws.cell(row=row_idx, column=9)  # I列（列9：時間外列）
+            cell_i.alignment = shrink_alignment
+        
+        # A-J列の幅を8.2に設定
+        for col_letter in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']:
+            ws.column_dimensions[col_letter].width = 8.2
+        
+        # 時間外申告と休暇申告の詳細を追加
+        row += 3  # 空行を追加
+        
+        # 時間外申告セクション
+        row += 1
+        header_cell = ws.cell(row=row, column=1, value="時間外申告")
+        header_cell.font = Font(name='游ゴシック', size=10, bold=True)
+        header_cell.alignment = Alignment(horizontal='left', vertical='center')
+        
+        # 時間外申告ヘッダー
+        row += 1
+        overtime_headers = ['日付', '開始時間', '終了時間', '内残業', '外残業', '深夜', '作業内容']
+        for col_idx, header in enumerate(overtime_headers, start=1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.font = Font(name='游ゴシック', size=10, bold=True)
+            cell.alignment = center_alignment
+            cell.border = thin_border
+        
+        # 時間外申告データを取得して表示
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            start_date, end_date = calculate_date_range(search_month)
+            
+            cursor.execute("""
+                SELECT 
+                    DATE(work_date) as work_date, 
+                    start_time, 
+                    end_time, 
+                    inner_overtime_minutes,
+                    outer_overtime_minutes, 
+                    night_overtime_minutes, 
+                    COALESCE(description, '') as description
+                FROM overtime_applications
+                WHERE employee_num = ?
+                AND DATE(work_date) >= DATE(?)
+                AND DATE(work_date) <= DATE(?)
+                AND status = 'approved'
+                ORDER BY work_date ASC
+            """, (employee_id, start_date, end_date))
+            
+            overtime_rows = cursor.fetchall()
+            
+            if overtime_rows:
+                for overtime_row in overtime_rows:
+                    row += 1
+                    work_date_raw = overtime_row[0]
+                    if isinstance(work_date_raw, str):
+                        work_date_obj = datetime.strptime(work_date_raw, AttendanceConstants.DATE_FORMAT).date()
+                    else:
+                        work_date_obj = work_date_raw
+                    
+                    ws.cell(row=row, column=1, value=f"{work_date_obj.month}/{work_date_obj.day}").font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=2, value=overtime_row[1] or '-').font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=3, value=overtime_row[2] or '-').font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=4, value=f"{(overtime_row[3] or 0) / 60:.1f}h" if overtime_row[3] else '-').font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=5, value=f"{(overtime_row[4] or 0) / 60:.1f}h" if overtime_row[4] else '-').font = Font(name='游ゴシック', size=10)
+                    
+                    # 深夜時間は赤文字で表示
+                    night_cell = ws.cell(row=row, column=6, value=f"{(overtime_row[5] or 0) / 60:.1f}h" if overtime_row[5] else '-')
+                    night_cell.font = Font(name='游ゴシック', size=10, color='FF0000')  # 赤文字
+                    
+                    # G列からJ列までをマージして作業内容を表示（縮小して表示）
+                    ws.merge_cells(f'G{row}:J{row}')
+                    cell_g = ws.cell(row=row, column=7, value=overtime_row[6] or '-')
+                    cell_g.font = Font(name='游ゴシック', size=10)
+                    cell_g.alignment = Alignment(horizontal='center', vertical='center', shrink_to_fit=True)  # 縮小して表示
+                    
+                    # マージされたセルの罫線を設定（各セルに個別に設定）
+                    # G列（左端）：左、上、下の罫線
+                    cell_g_left = ws.cell(row=row, column=7)
+                    cell_g_left.border = Border(
+                        left=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                    # H列、I列（中間）：上、下の罫線
+                    for col_idx in [8, 9]:
+                        cell_mid = ws.cell(row=row, column=col_idx)
+                        cell_mid.border = Border(
+                            top=Side(style='thin'),
+                            bottom=Side(style='thin')
+                        )
+                    # J列（右端）：右、上、下の罫線
+                    cell_j = ws.cell(row=row, column=10)
+                    cell_j.border = Border(
+                        right=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                    
+                    # スタイル適用（A-F列）
+                    for col_idx in range(1, 7):
+                        cell = ws.cell(row=row, column=col_idx)
+                        cell.alignment = center_alignment
+                        cell.border = thin_border
+            else:
+                row += 1
+                ws.cell(row=row, column=1, value="該当なし").font = Font(name='游ゴシック', size=10)
+                ws.cell(row=row, column=1).alignment = center_alignment
+                ws.cell(row=row, column=1).border = thin_border
+        
+        # 休暇申告セクション
+        row += 2  # 空行を追加
+        header_cell = ws.cell(row=row, column=1, value="休暇申告")
+        header_cell.font = Font(name='游ゴシック', size=10, bold=True)
+        header_cell.alignment = Alignment(horizontal='left', vertical='center')
+        
+        # 休暇申告ヘッダー
+        row += 1
+        leave_headers = ['開始日', '終了日', '休暇種類', '休暇詳細']
+        for col_idx, header in enumerate(leave_headers, start=1):
+            cell = ws.cell(row=row, column=col_idx, value=header)
+            cell.font = Font(name='游ゴシック', size=10, bold=True)
+            cell.alignment = center_alignment
+            cell.border = thin_border
+        
+        # 休暇申告データを取得して表示
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            start_date, end_date = calculate_date_range(search_month)
+            
+            cursor.execute("""
+                SELECT 
+                    DATE(leave_date_from) as leave_date_from,
+                    DATE(leave_date_to) as leave_date_to,
+                    leave_type,
+                    leave_subtype
+                FROM leave_requests
+                WHERE employee_num = ?
+                AND status = 'approved'
+                AND (
+                    (DATE(leave_date_from) >= DATE(?) AND DATE(leave_date_from) <= DATE(?))
+                    OR (DATE(leave_date_to) >= DATE(?) AND DATE(leave_date_to) <= DATE(?))
+                    OR (DATE(leave_date_from) <= DATE(?) AND DATE(leave_date_to) >= DATE(?))
+                )
+                ORDER BY leave_date_from ASC
+            """, (employee_id, start_date, end_date, start_date, end_date, start_date, end_date))
+            
+            leave_rows = cursor.fetchall()
+            
+            if leave_rows:
+                for leave_row in leave_rows:
+                    row += 1
+                    leave_date_from_raw = leave_row[0]
+                    leave_date_to_raw = leave_row[1]
+                    
+                    if isinstance(leave_date_from_raw, str):
+                        leave_date_from_obj = datetime.strptime(leave_date_from_raw, AttendanceConstants.DATE_FORMAT).date()
+                    else:
+                        leave_date_from_obj = leave_date_from_raw
+                    
+                    if isinstance(leave_date_to_raw, str):
+                        leave_date_to_obj = datetime.strptime(leave_date_to_raw, AttendanceConstants.DATE_FORMAT).date()
+                    else:
+                        leave_date_to_obj = leave_date_to_raw
+                    
+                    ws.cell(row=row, column=1, value=f"{leave_date_from_obj.month}/{leave_date_from_obj.day}").font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=2, value=f"{leave_date_to_obj.month}/{leave_date_to_obj.day}").font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=3, value=leave_row[2] or '-').font = Font(name='游ゴシック', size=10)
+                    
+                    # D列からJ列までをマージして休暇詳細を表示
+                    ws.merge_cells(f'D{row}:J{row}')
+                    cell_d = ws.cell(row=row, column=4, value=leave_row[3] or '-')
+                    cell_d.font = Font(name='游ゴシック', size=10)
+                    cell_d.alignment = center_alignment
+                    
+                    # マージされたセルの罫線を設定（各セルに個別に設定）
+                    # D列（左端）：左、上、下の罫線
+                    cell_d_left = ws.cell(row=row, column=4)
+                    cell_d_left.border = Border(
+                        left=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                    # E列、F列、G列、H列、I列（中間）：上、下の罫線
+                    for col_idx in [5, 6, 7, 8, 9]:
+                        cell_mid = ws.cell(row=row, column=col_idx)
+                        cell_mid.border = Border(
+                            top=Side(style='thin'),
+                            bottom=Side(style='thin')
+                        )
+                    # J列（右端）：右、上、下の罫線
+                    cell_j = ws.cell(row=row, column=10)
+                    cell_j.border = Border(
+                        right=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                    
+                    # スタイル適用（A-C列）
+                    for col_idx in range(1, 4):
+                        cell = ws.cell(row=row, column=col_idx)
+                        cell.alignment = center_alignment
+                        cell.border = thin_border
+            else:
+                row += 1
+                ws.cell(row=row, column=1, value="該当なし").font = Font(name='游ゴシック', size=10)
+                ws.cell(row=row, column=1).alignment = center_alignment
+                ws.cell(row=row, column=1).border = thin_border
         
         # ファイル保存
         wb.save(output_path)

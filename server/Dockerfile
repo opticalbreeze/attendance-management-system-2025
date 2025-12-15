@@ -46,6 +46,7 @@ COPY admin.py .
 COPY work_type_constants.py .
 COPY attendance_check_service.py .
 COPY import_schedule_csv.py .
+COPY auto_save.py .
 COPY templates/ templates/
 COPY static/ static/
 

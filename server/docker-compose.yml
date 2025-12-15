@@ -58,6 +58,14 @@ services:
       - type: bind
         source: ./api_check_status.py
         target: /app/api_check_status.py
+      # バックアップディレクトリをホストにマウント
+      - type: bind
+        source: ../../backup
+        target: /backup
+      # auto_save.pyのマウント
+      - type: bind
+        source: ./auto_save.py
+        target: /app/auto_save.py
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定

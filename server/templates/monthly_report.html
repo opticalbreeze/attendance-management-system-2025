@@ -96,6 +96,30 @@
             color: #666;
             padding: 20px;
             display: none;
+            position: relative;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            display: inline-block;
+            vertical-align: middle;
         }
         
         .help-text {
@@ -127,8 +151,44 @@
             text-decoration: underline;
         }
         
+        .navigation-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+        }
+        
+        .navigation-buttons a {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #0066cc;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            border: 1px solid #0052a3;
+            transition: background-color 0.3s, border-color 0.3s;
+            cursor: pointer;
+        }
+        
+        .navigation-buttons a:hover {
+            background: #0052a3;
+            border-color: #003d7a;
+        }
+        
+        .navigation-buttons a:active {
+            background: #003d7a;
+        }
+        
         /* A4印刷用スタイル */
         @media print {
+            /* 印刷時に非表示にする要素 */
+            .no-print {
+                display: none !important;
+            }
+            
             * {
                 -webkit-print-color-adjust: exact !important;
                 color-adjust: exact !important;
@@ -152,7 +212,7 @@
                 width: 100%;
             }
             
-            .form-section, .back-link, h1, #error-message, #success-message, #loading {
+            .form-section, .back-link, .navigation-buttons, h1, #error-message, #success-message, #loading {
                 display: none !important;
             }
             
@@ -205,11 +265,6 @@
             }
         }
         
-        /* 印刷時に非表示にする要素 */
-        .no-print {
-            display: none !important;
-        }
-        
         /* レスポンシブテーブル対応 */
         .table-container {
             width: 100%;
@@ -248,11 +303,15 @@
 </head>
 <body>
     <div class="container">
-        <h1 class="no-print">月間集計レポート</h1>
+        <div class="navigation-buttons">
+            <a href="/">トップページ</a>
+            <a href="/admin">管理者ページ</a>
+        </div>
+        <h1>月間集計レポート</h1>
         
         <div id="error-message" class="error"></div>
         <div id="success-message" class="success"></div>
-        <div id="loading" class="loading">処理中...</div>
+        <div id="loading" class="loading"><span class="loading-text">処理中...</span></div>
         
         <div class="form-section">
             <div class="form-group">
@@ -612,7 +671,9 @@
                     
                     // 打刻データから出勤時間・退勤時間を取得（検索画面と同じロジック）
                     const clock_times = dayData.clock_times || [];
-                    const work_type = dayData.work_type || '';
+                    let work_type = dayData.work_type || '';
+                    // 「通常」を「日勤」に変換
+                    work_type = work_type.replace('通常', '日勤');
                     const work_type_str = String(work_type || '');
                     
                     let clock_start = null;
@@ -786,14 +847,14 @@
                             <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">計</td>
                             <td style="padding: 6px 3px; border: 1px solid #333;"></td>
                             <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
-                                労働: ${Math.floor(totalStandard)}:${String(Math.floor((totalStandard % 1) * 60)).padStart(2, '0')}
+                                ${Math.floor(totalStandard)}:${String(Math.floor((totalStandard % 1) * 60)).padStart(2, '0')}
                             </td>
                             <td style="padding: 6px 3px; border: 1px solid #333;"></td>
                             <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
-                                エラー: ${totalErrorCount}件
+                                ${totalErrorCount}件
                             </td>
                             <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
-                                確認: ${totalCheckedCount}件
+                                ${totalCheckedCount}件
                             </td>
                             <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
                                 ${Math.floor(totalOvertime)}:${String(Math.floor((totalOvertime % 1) * 60)).padStart(2, '0')}

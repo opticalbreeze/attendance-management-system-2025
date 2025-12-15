@@ -22,6 +22,7 @@ from api_check_status import register_check_status_api_routes
 from auth import init_auth, login_required, verify_admin_password, verify_db_password, set_db_access_granted
 from utils import get_database_connection
 from logger_config import setup_logger
+from auto_save import auto_save_manager
 
 logger = setup_logger(__name__)
 
@@ -271,6 +272,13 @@ def main():
     
     # データベース初期化（全テーブルを一元管理）
     init_database()
+    
+    # 自動バックアップ機能を開始
+    try:
+        auto_save_manager.start_scheduler()
+        logger.info("自動バックアップ機能が開始されました")
+    except Exception as e:
+        logger.error(f"自動バックアップ機能の開始に失敗しました: {e}")
     
     # ルート登録
     register_web_routes(app)

@@ -87,6 +87,30 @@ class AttendanceConstants:
     TOLERANCE_MINUTES = 15    # 許容時間差（分）
     DEFAULT_LIMIT = 100       # デフォルト取得件数
     
+    # 時間計算用定数
+    MINUTES_PER_HOUR = 60     # 1時間あたりの分数
+    MINUTES_PER_DAY = 1440    # 1日あたりの分数（24時間 * 60分）
+    HOURS_PER_DAY = 24        # 1日の時間数
+    
+    # 深夜時間帯設定
+    NIGHT_START_HOUR = 20     # 深夜開始時間（20:00）
+    NIGHT_END_HOUR = 5        # 深夜終了時間（翌05:00）
+    
+    @classmethod
+    def get_night_start_minutes(cls):
+        """深夜開始時間を分で取得"""
+        return cls.NIGHT_START_HOUR * cls.MINUTES_PER_HOUR
+    
+    @classmethod
+    def get_night_end_minutes(cls):
+        """深夜終了時間を分で取得（翌日の時刻として）"""
+        return (cls.HOURS_PER_DAY + cls.NIGHT_END_HOUR) * cls.MINUTES_PER_HOUR
+    
+    @classmethod
+    def get_night_end_minutes_day2(cls):
+        """2日目の深夜終了時間を分で取得（当日の時刻として）"""
+        return cls.NIGHT_END_HOUR * cls.MINUTES_PER_HOUR
+    
     # 日付フォーマット
     DATE_FORMAT = '%Y-%m-%d'  # 標準日付フォーマット（YYYY-MM-DD）
     DATE_FORMAT_SLASH = '%Y/%m/%d'  # スラッシュ区切り日付フォーマット（YYYY/MM/DD）

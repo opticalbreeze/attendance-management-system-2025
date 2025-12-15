@@ -23,7 +23,7 @@ from logger_config import setup_logger
 logger = setup_logger(__name__)
 
 # 保存先設定（デュアルバックアップ対応）
-BACKUP_BASE_DIR_PRIMARY = "C:/AttendanceBackup"
+BACKUP_BASE_DIR_PRIMARY = "/backup"
 BACKUP_BASE_DIR_SECONDARY = "D:/AttendanceBackup_Mirror"
 
 # プライマリ保存先
@@ -323,8 +323,8 @@ class AutoSaveManager:
             # 毎週日曜日午前2時にバックアップ
             schedule.every().sunday.at("02:00").do(self._weekly_backup_job)
             
-            # 毎月1日午前1時にバックアップ
-            schedule.every().month.do(self._monthly_backup_job)
+            # 毎月1日午前1時にバックアップ（月次は日次処理で1日をチェック）
+            schedule.every().day.at("01:00").do(self._check_monthly_backup)
             
             # 毎日午前4時に古いファイル削除
             schedule.every().day.at("04:00").do(self.cleanup_old_backups)
@@ -373,6 +373,11 @@ class AutoSaveManager:
         """月次バックアップジョブ"""
         logger.info("月次バックアップ開始")
         self.backup_database("monthly")
+    
+    def _check_monthly_backup(self):
+        """月次バックアップチェック（毎日実行、1日のみ実行）"""
+        if datetime.now().day == 1:
+            self._monthly_backup_job()
 
 # グローバルインスタンス
 auto_save_manager = AutoSaveManager()

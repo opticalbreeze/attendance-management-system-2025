@@ -679,10 +679,47 @@ def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_d
     if not is_off_day_shift(work_type):
         return
     
+    # 前日の24勤・夜勤スケジュールがない場合の警告
     if not result.prev_day_night_shift and result.attendance_records:
         _add_alert(result, AttendanceConstants.ALERT_WARNING,
                   AttendanceConstants.MSG_OFF_DAY_NO_PREV_SHIFT,
                   f'前日({prev_date})のスケジュールを確認してください')
+        return
+    
+    # 前日の24勤・夜勤の退勤時刻と「明」勤務の打刻時刻の差異をチェック
+    if result.prev_day_night_shift:
+        prev_schedule_end = result.prev_day_night_shift.get('end_time')
+        actual_end = result.actual_clock_out  # 「明」勤務の日の打刻時刻（前日の退勤時刻）
+        
+        if prev_schedule_end and actual_end:
+            from database import get_early_leave_requests
+            
+            diff_end = calculate_time_diff_minutes(prev_schedule_end, actual_end)
+            if diff_end is not None:
+                # 「明」勤務の日の早退申告を取得（前日の24勤・夜勤の早退申告として扱う）
+                early_leave_requests = get_early_leave_requests(
+                    employee_num=result.employee_num,
+                    work_date=result.check_date,
+                    status=AttendanceConstants.STATUS_APPROVED
+                )
+                early_adjust = sum(req['early_minutes'] for req in early_leave_requests)
+                adjusted_diff_end = diff_end + early_adjust
+                
+                logger.info(f"「明」勤務退勤時刻差異: 前日スケジュール={prev_schedule_end}, 実際={actual_end}, diff={diff_end}分, early_adjust={early_adjust}分, adjusted_diff={adjusted_diff_end}分, 閾値={AttendanceConstants.TIME_DIFF_THRESHOLD}分")
+                
+                if abs(adjusted_diff_end) >= AttendanceConstants.TIME_DIFF_THRESHOLD:
+                    _add_alert(result, AttendanceConstants.ALERT_WARNING,
+                              AttendanceConstants.MSG_CLOCK_OUT_TIME_DIFF,
+                              AttendanceConstants.DETAIL_CLOCK_OUT_TIME_DIFF.format(
+                                  schedule=prev_schedule_end,
+                                  actual=actual_end,
+                                  diff=diff_end,
+                                  adjusted_diff=adjusted_diff_end))
+        elif prev_schedule_end and not actual_end:
+            # 「明」勤務の日の打刻がない場合（前日の24勤・夜勤の退勤打刻がない）
+            _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                      AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
+                      AttendanceConstants.DETAIL_CLOCK_OUT_MISSING.format(schedule=prev_schedule_end))
 
 def check_attendance_vs_schedule(employee_id: str, check_date: str) -> Dict[str, Any]:
     """
