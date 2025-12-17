@@ -10,13 +10,15 @@ import os
 from datetime import datetime, timedelta
 
 from config import Config
-from utils import calculate_time_diff_minutes, get_database_connection, get_db_connection, extract_time_from_timestamp
+from database_utils import get_database_connection, get_db_connection
+from utils import calculate_time_diff_minutes, extract_time_from_timestamp
 from work_type_constants import (
     is_off_day_shift,
     is_24hour_or_night_shift,
     is_holiday_shift,
     WORK_TYPE_OFF_DAY
 )
+from constants import AttendanceConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -34,42 +36,42 @@ def init_database():
     データベースを初期化
     すべてのテーブルを一元管理して作成
     """
-    conn = get_database_connection()
-    cursor = conn.cursor()
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 打刻テーブルの作成
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                idm TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                terminal_id TEXT NOT NULL,
+                received_at TEXT NOT NULL
+            )
+        """)
+        
+        # インデックスの作成（パフォーマンス向上）
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_idm ON attendance(idm)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON attendance(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_terminal_id ON attendance(terminal_id)")
+        
+        # employee_masterテーブルのマイグレーション（sectionカラム追加）
+        migrate_employee_master_table(cursor)
+        
+        # 遅刻早退申告テーブルの作成
+        init_late_early_requests_tables(cursor)
+        
+        # 休暇願テーブルの作成
+        init_leave_request_table_internal(cursor)
+        
+        # 時間外申告テーブルの作成
+        init_overtime_table_internal(cursor)
+        
+        # 打刻チェック状況テーブルの作成
+        init_attendance_check_status_table(cursor)
+        
+        # コンテキストマネージャーが自動的にコミット・クローズする
     
-    # 打刻テーブルの作成
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            idm TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            terminal_id TEXT NOT NULL,
-            received_at TEXT NOT NULL
-        )
-    """)
-    
-    # インデックスの作成（パフォーマンス向上）
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_idm ON attendance(idm)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON attendance(timestamp)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_terminal_id ON attendance(terminal_id)")
-    
-    # employee_masterテーブルのマイグレーション（sectionカラム追加）
-    migrate_employee_master_table(cursor)
-    
-    # 遅刻早退申告テーブルの作成
-    init_late_early_requests_tables(cursor)
-    
-    # 休暇願テーブルの作成
-    init_leave_request_table_internal(cursor)
-    
-    # 時間外申告テーブルの作成
-    init_overtime_table_internal(cursor)
-    
-    # 打刻チェック状況テーブルの作成
-    init_attendance_check_status_table(cursor)
-    
-    conn.commit()
-    conn.close()
     logger.info("データベース初期化完了（全テーブル統合管理）")
 
 def migrate_employee_master_table(cursor):
@@ -151,7 +153,7 @@ def init_late_early_requests_tables(cursor):
                 work_date TEXT NOT NULL,
                 late_minutes INTEGER NOT NULL,
                 reason TEXT,
-                status TEXT DEFAULT 'pending',
+                status TEXT DEFAULT '{AttendanceConstants.STATUS_PENDING}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -167,7 +169,7 @@ def init_late_early_requests_tables(cursor):
                 work_date TEXT NOT NULL,
                 early_minutes INTEGER NOT NULL,
                 reason TEXT,
-                status TEXT DEFAULT 'pending',
+                status TEXT DEFAULT '{AttendanceConstants.STATUS_PENDING}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -206,7 +208,7 @@ def init_leave_request_table_internal(cursor):
                 leave_subtype TEXT,
                 substitute_work_date TEXT,
                 other_reason TEXT,
-                status TEXT DEFAULT 'pending',
+                status TEXT DEFAULT '{AttendanceConstants.STATUS_PENDING}',
                 approved_by TEXT,
                 approved_at TEXT,
                 created_at TEXT NOT NULL,
@@ -241,7 +243,7 @@ def init_overtime_table_internal(cursor):
                 start_time TEXT NOT NULL,
                 end_time TEXT NOT NULL,
                 description TEXT,
-                status TEXT DEFAULT 'pending',
+                status TEXT DEFAULT '{AttendanceConstants.STATUS_PENDING}',
                 overtime_type TEXT,
                 inner_overtime_minutes INTEGER DEFAULT 0,
                 outer_overtime_minutes INTEGER DEFAULT 0,
@@ -402,7 +404,7 @@ def get_stats():
             latest_records = cursor.fetchall()
             
             # 今日の打刻件数（安全な日付処理）
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = datetime.now().strftime(AttendanceConstants.DATE_FORMAT)
             cursor.execute("""
                 SELECT COUNT(*) FROM attendance 
                 WHERE DATE(received_at) = ?
@@ -584,7 +586,7 @@ def check_off_day_shift_attendance(cursor, employee_id, employee_num, idm, check
             if diff_end is not None:
                 # 「明」勤務の日の早退申告を取得
                 # get_early_leave_requestsはdatabase.py内で定義されているため、インポート不要
-                prev_day_early = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status='approved')
+                prev_day_early = get_early_leave_requests(employee_num=employee_num, work_date=check_date, status=AttendanceConstants.STATUS_APPROVED)
                 prev_day_early_adjustment = sum(req['early_minutes'] for req in prev_day_early)
                 adjusted_diff_end = diff_end + prev_day_early_adjustment
                 if abs(adjusted_diff_end) >= 30:
@@ -607,6 +609,9 @@ def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
     """
     24勤・夜勤の終了時間を翌日の「明」勤務の打刻から取得する共通関数
     
+    注意: この関数は attendance_check_service.py に移行されました。
+    後方互換性のためにラッパー関数として残しています。
+    
     Args:
         cursor: データベースカーソル
         employee_id: 従業員番号
@@ -615,56 +620,8 @@ def get_night_shift_end_time_from_next_day(cursor, employee_id, work_date):
     Returns:
         str or None: 翌日の「明」勤務の最後の打刻時刻（HH:MM形式）、取得できない場合はNone
     """
-    try:
-        # employee_masterからIDmを取得
-        cursor.execute("""
-            SELECT idm FROM employee_master 
-            WHERE employee_num = ?
-        """, (employee_id,))
-        
-        idm_result = cursor.fetchone()
-        if not idm_result:
-            return None
-        
-        idm = idm_result[0]
-        
-        # 翌日の日付を計算
-        work_date_obj = datetime.strptime(work_date, '%Y-%m-%d').date()
-        next_date = (work_date_obj + timedelta(days=1)).strftime('%Y-%m-%d')
-        
-        # 翌日の「明」勤務のスケジュールが存在するか確認
-        cursor.execute("""
-            SELECT work_date, work_type
-            FROM attend_schedule
-            WHERE employee_id = ? AND work_date = ? AND work_type LIKE ?
-        """, (employee_id, next_date, f'%{WORK_TYPE_OFF_DAY}%'))
-        
-        next_day_schedule = cursor.fetchone()
-        if not next_day_schedule:
-            return None
-        
-        # 翌日の打刻データを取得（「明」勤務の日の打刻）
-        cursor.execute("""
-            SELECT timestamp
-            FROM attendance
-            WHERE idm = ? AND date(timestamp) = ?
-            ORDER BY timestamp ASC
-        """, (idm, next_date))
-        
-        next_day_attendance_rows = cursor.fetchall()
-        
-        if not next_day_attendance_rows:
-            return None
-        
-        # 最後の打刻時刻を取得（退勤時刻）
-        last_timestamp = next_day_attendance_rows[-1][0]
-        
-        # 時刻のみを抽出（HH:MM形式、統一関数を使用）
-        time_only = extract_time_from_timestamp(last_timestamp)
-        return time_only if time_only else None
-        
-    except Exception as e:
-        return None
+    from attendance_check_service import get_night_shift_end_time_from_next_day as new_get_night_shift_end_time
+    return new_get_night_shift_end_time(cursor, employee_id, work_date)
 
 def init_attendance_check_status_table(cursor):
     """

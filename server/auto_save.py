@@ -18,13 +18,14 @@ import traceback
 
 from config import Config
 from utils import get_db_connection
+from constants import AttendanceConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
 
 # 保存先設定（デュアルバックアップ対応）
 BACKUP_BASE_DIR_PRIMARY = "/backup"
-BACKUP_BASE_DIR_SECONDARY = "D:/AttendanceBackup_Mirror"
+BACKUP_BASE_DIR_SECONDARY = "/app/D_drive_backup"
 
 # プライマリ保存先
 DAILY_BACKUP_DIR = os.path.join(BACKUP_BASE_DIR_PRIMARY, "daily")
@@ -50,17 +51,18 @@ class AutoSaveManager:
     def _check_d_drive(self):
         """Dドライブの利用可能性をチェック"""
         try:
-            d_drive_path = "D:/"
+            # Dockerマウントされたパスを確認
+            d_drive_path = "/app/D_drive_backup"
             if os.path.exists(d_drive_path):
                 # テストファイル作成でアクセス権確認
                 test_file = os.path.join(d_drive_path, "test_write_access.tmp")
                 with open(test_file, 'w') as f:
                     f.write("test")
                 os.remove(test_file)
-                logger.info("Dドライブが利用可能です")
+                logger.info("Dドライブ（マウント）が利用可能です")
                 return True
             else:
-                logger.warning("Dドライブが見つかりません")
+                logger.warning("Dドライブマウントが見つかりません")
                 return False
         except Exception as e:
             logger.warning(f"Dドライブアクセス不可: {e}")
@@ -170,7 +172,7 @@ class AutoSaveManager:
                 self._write_csv(employee_file, employees, ['employee_num', 'name', 'section', 'idm'])
                 
                 # スケジュールデータ（過去1ヶ月）
-                one_month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                one_month_ago = (datetime.now() - timedelta(days=30)).strftime(AttendanceConstants.DATE_FORMAT)
                 cursor.execute("SELECT * FROM attend_schedule WHERE work_date >= ?", (one_month_ago,))
                 schedules = cursor.fetchall()
                 schedule_file = os.path.join(report_dir, "schedules.csv")

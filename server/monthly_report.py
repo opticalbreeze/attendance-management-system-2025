@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 import os
 from config import Config
-from database import get_night_shift_end_time_from_next_day, get_attendance_check_status
+from database import get_attendance_check_status
 from attendance_check_service import check_attendance_vs_schedule
 from utils import calculate_date_range, time_to_minutes, get_db_connection
 from constants import AttendanceConstants
@@ -486,19 +486,6 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             
             # 打刻時間
             clock_times = day_data.get('clock_times', [])
-            # 「明」勤務の場合は、出勤時刻は表示せず、退勤時刻のみ表示（前日の24勤・夜勤の退勤時刻として扱う）
-            if original_work_type and is_off_day_shift(original_work_type):
-                # 「明」勤務: 出勤列は'-'、退勤列は最初の打刻（前日の退勤時刻）
-                cell5 = ws.cell(row=row, column=5, value='-')
-                cell5.font = Font(name='游ゴシック', size=10)
-                cell6 = ws.cell(row=row, column=6, value=clock_times[0] if clock_times else '-')
-                cell6.font = Font(name='游ゴシック', size=10)
-            else:
-                # 通常勤務: 最初の打刻が出勤、最後の打刻が退勤
-                cell5 = ws.cell(row=row, column=5, value=clock_times[0] if clock_times else '-')
-                cell5.font = Font(name='游ゴシック', size=10)
-                cell6 = ws.cell(row=row, column=6, value=clock_times[-1] if len(clock_times) > 1 else '-')
-                cell6.font = Font(name='游ゴシック', size=10)
             
             # エラー・警告（省略形に変更）
             alerts = day_data.get('alerts', [])
@@ -513,12 +500,70 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                 alert_text = ', '.join(alert_messages)
             else:
                 alert_text = '-'
+            
+            # エラーメッセージから打刻漏れを判定
+            has_clock_in_leak = any('出勤打刻漏れ' in alert.get('message', '') for alert in alerts)
+            has_clock_out_leak = any('退勤打刻漏れ' in alert.get('message', '') for alert in alerts)
+            has_missing_punch = any('打刻漏れ' in alert.get('message', '') or '打刻なし' in alert.get('message', '') for alert in alerts)
+            
+            # 「明」勤務の場合は、出勤時刻は表示せず、退勤時刻のみ表示（前日の24勤・夜勤の退勤時刻として扱う）
+            if original_work_type and is_off_day_shift(original_work_type):
+                # 「明」勤務: 出勤列は'-'、退勤列は最初の打刻（前日の退勤時刻）
+                # ただし、退勤打刻漏れの場合は'-'を表示
+                cell5 = ws.cell(row=row, column=5, value='-')
+                cell5.font = Font(name='游ゴシック', size=10)
+                if has_clock_out_leak or has_missing_punch:
+                    cell6 = ws.cell(row=row, column=6, value='-')
+                else:
+                    cell6 = ws.cell(row=row, column=6, value=clock_times[0] if clock_times else '-')
+                cell6.font = Font(name='游ゴシック', size=10)
+            else:
+                # 通常勤務: 最初の打刻が出勤、最後の打刻が退勤
+                # ただし、打刻漏れの場合は該当する列を'-'に設定
+                if has_clock_in_leak or (has_missing_punch and not clock_times):
+                    # 出勤打刻漏れまたは打刻なしの場合
+                    cell5 = ws.cell(row=row, column=5, value='-')
+                else:
+                    # 出勤打刻がある場合
+                    cell5 = ws.cell(row=row, column=5, value=clock_times[0] if clock_times else '-')
+                cell5.font = Font(name='游ゴシック', size=10)
+                
+                if has_clock_out_leak or (has_missing_punch and len(clock_times) <= 1):
+                    # 退勤打刻漏れまたは打刻が1回以下の場合
+                    cell6 = ws.cell(row=row, column=6, value='-')
+                else:
+                    # 退勤打刻がある場合（2回以上）
+                    cell6 = ws.cell(row=row, column=6, value=clock_times[-1] if len(clock_times) > 1 else '-')
+                cell6.font = Font(name='游ゴシック', size=10)
             cell7 = ws.cell(row=row, column=7, value=alert_text)
             cell7.font = Font(name='游ゴシック', size=10)
             
-            # 確認状況
+            # 確認状況（アラートがあるエラータイプのみカウント）
             check_statuses = day_data.get('check_statuses', {})
-            checked_count = sum(1 for status in check_statuses.values() if status)
+            alerts = day_data.get('alerts', [])
+            
+            # アラートが存在するチェックタイプのみカウント
+            error_types_with_alerts = set()
+            for alert in alerts:
+                message = alert.get('message', '')
+                if '打刻' in message or '差異' in message:
+                    if '出勤' in message or '退勤' in message:
+                        error_types_with_alerts.add('punch_leak')
+                    elif '差異' in message:
+                        error_types_with_alerts.add('time_difference')
+                    elif '打刻なし' in message or '打刻漏れ' in message:
+                        error_types_with_alerts.add('missing_punch')
+            
+            # 実際にアラートがあるエラータイプの確認状況のみをカウント
+            checked_count = 0
+            for check_type in error_types_with_alerts:
+                if check_statuses.get(check_type, False):
+                    checked_count += 1
+            
+            # アラートがあるにも関わらず確認件数が0の場合は、エラータイプ数を表示
+            if not checked_count and error_types_with_alerts:
+                checked_count = len(error_types_with_alerts)
+            
             cell8 = ws.cell(row=row, column=8, value=f"{checked_count}件" if checked_count > 0 else '-')
             cell8.font = Font(name='游ゴシック', size=10)
             
@@ -723,11 +768,11 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                     ws.cell(row=row, column=1, value=f"{work_date_obj.month}/{work_date_obj.day}").font = Font(name='游ゴシック', size=10)
                     ws.cell(row=row, column=2, value=overtime_row[1] or '-').font = Font(name='游ゴシック', size=10)
                     ws.cell(row=row, column=3, value=overtime_row[2] or '-').font = Font(name='游ゴシック', size=10)
-                    ws.cell(row=row, column=4, value=f"{(overtime_row[3] or 0) / 60:.1f}h" if overtime_row[3] else '-').font = Font(name='游ゴシック', size=10)
-                    ws.cell(row=row, column=5, value=f"{(overtime_row[4] or 0) / 60:.1f}h" if overtime_row[4] else '-').font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=4, value=f"{(overtime_row[3] or 0) / 60:.2f}h" if overtime_row[3] else '-').font = Font(name='游ゴシック', size=10)
+                    ws.cell(row=row, column=5, value=f"{(overtime_row[4] or 0) / 60:.2f}h" if overtime_row[4] else '-').font = Font(name='游ゴシック', size=10)
                     
                     # 深夜時間は赤文字で表示
-                    night_cell = ws.cell(row=row, column=6, value=f"{(overtime_row[5] or 0) / 60:.1f}h" if overtime_row[5] else '-')
+                    night_cell = ws.cell(row=row, column=6, value=f"{(overtime_row[5] or 0) / 60:.2f}h" if overtime_row[5] else '-')
                     night_cell.font = Font(name='游ゴシック', size=10, color='FF0000')  # 赤文字
                     
                     # G列からJ列までをマージして作業内容を表示（縮小して表示）

@@ -9,6 +9,7 @@ import os
 import re
 from datetime import datetime
 from config import Config
+from constants import AttendanceConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -37,10 +38,6 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             # 相対パスの場合は、データベースパスと同じディレクトリのPDFフォルダを使用
             pdf_dir = os.path.join(os.path.dirname(Config.DATABASE_PATH), 'PDF')
         
-        # フォルダが存在しない場合は作成
-        os.makedirs(pdf_dir, exist_ok=True)
-        logger.debug(f"PDF保存先: {pdf_dir}")
-        
         # ファイル名に使用できない文字を除去（Windowsのファイル名に使用できない文字）
         safe_employee_name = ''
         if employee_name:
@@ -48,16 +45,38 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             safe_employee_name = re.sub(r'[<>:"/\\|?*]', '', employee_name)
             safe_employee_name = safe_employee_name.strip()
         
+        # 月度を取得（YYYYMM形式）
+        try:
+            date_obj = datetime.strptime(date_str, AttendanceConstants.DATE_FORMAT)
+            month_str = date_obj.strftime(AttendanceConstants.DATE_FORMAT_YM)  # YYYYMM形式
+        except (ValueError, TypeError):
+            # 日付の解析に失敗した場合は現在の年月を使用
+            month_str = datetime.now().strftime(AttendanceConstants.DATE_FORMAT_YM)
+            logger.warning(f"日付の解析に失敗したため、現在の年月を使用: {date_str}")
+        
+        # サブフォルダ名を生成（名前_月度）
+        if safe_employee_name:
+            subfolder_name = f'{safe_employee_name}_{month_str}'
+        else:
+            subfolder_name = f'{employee_num}_{month_str}'
+        
+        # サブフォルダのパスを作成
+        subfolder_path = os.path.join(pdf_dir, subfolder_name)
+        
+        # サブフォルダが存在しない場合は作成
+        os.makedirs(subfolder_path, exist_ok=True)
+        logger.debug(f"PDF保存先: {subfolder_path}")
+        
         # ファイル名を生成（日付_名前_時刻形式）
         now = datetime.now()
-        timestamp_str = now.strftime('%H%M%S')  # 時刻のみ（HHMMSS形式）
-        date_str_clean = date_str.replace('-', '')  # YYYYMMDD形式
+        timestamp_str = now.strftime(AttendanceConstants.TIME_FORMAT_HMS)  # 時刻のみ（HHMMSS形式）
+        date_str_clean = date_str.replace('-', '')  # YYYYMMDD形式（DATE_FORMAT_YMDを使用する場合はstrftimeを使用）
         
         if safe_employee_name:
             filename = f'{date_str_clean}_{safe_employee_name}_{timestamp_str}.pdf'
         else:
             filename = f'{date_str_clean}_{employee_num}_{timestamp_str}.pdf'
-        pdf_path = os.path.join(pdf_dir, filename)
+        pdf_path = os.path.join(subfolder_path, filename)
         
         # weasyprint を使用してPDF生成
         try:
@@ -84,7 +103,7 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             css = CSS(string=base_css + additional_css, font_config=font_config)
             
             HTML(string=html_content).write_pdf(pdf_path, stylesheets=[css], font_config=font_config)
-            logger.info(f"PDF保存成功: {filename} -> {pdf_dir}")
+            logger.info(f"PDF保存成功: {filename} -> {subfolder_path}")
             logger.debug(f"PDF保存パス: {pdf_path}")
             return {
                 'success': True,
@@ -96,7 +115,7 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
         except ImportError:
             # weasyprint が利用できない場合は、HTMLとして保存
             txt_filename = filename.replace('.pdf', '.html')
-            txt_path = os.path.join(pdf_dir, txt_filename)
+            txt_path = os.path.join(subfolder_path, txt_filename)
             with open(txt_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             logger.info(f"HTML保存: {txt_filename}")

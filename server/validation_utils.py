@@ -7,6 +7,7 @@
 
 from datetime import date
 from config import Config
+from constants import AttendanceConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -81,10 +82,10 @@ def calculate_date_range(search_month):
             prev_month = month - 1
         
         # 検索範囲の開始日：前月16日（設定から取得）
-        start_date = date(prev_year, prev_month, Config.PAYROLL_START_DAY).strftime('%Y-%m-%d')
+        start_date = date(prev_year, prev_month, Config.PAYROLL_START_DAY).strftime(AttendanceConstants.DATE_FORMAT)
         
         # 検索範囲の終了日：当月15日（設定から取得）
-        end_date = date(year, month, Config.PAYROLL_END_DAY).strftime('%Y-%m-%d')
+        end_date = date(year, month, Config.PAYROLL_END_DAY).strftime(AttendanceConstants.DATE_FORMAT)
         
         return start_date, end_date
         

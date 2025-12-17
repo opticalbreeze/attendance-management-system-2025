@@ -13,8 +13,9 @@ from flask import request, jsonify, flash
 from werkzeug.utils import secure_filename
 
 from config import Config
-from utils import get_database_connection, get_db_connection
+from utils import get_database_connection, get_db_connection, format_response
 from auth import login_required
+from constants import AttendanceConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -68,8 +69,8 @@ def import_csv_to_schedule(csv_file_path):
                         
                         # 日付フォーマット変換 (YYYY/MM/DD -> YYYY-MM-DD)
                         try:
-                            date_obj = datetime.strptime(date_str, '%Y/%m/%d')
-                            work_date = date_obj.strftime('%Y-%m-%d')
+                            date_obj = datetime.strptime(date_str, AttendanceConstants.DATE_FORMAT_SLASH)
+                            work_date = date_obj.strftime(AttendanceConstants.DATE_FORMAT)
                         except ValueError:
                             error_messages.append(f"行 {row_num}: 日付フォーマットエラー ({date_str})")
                             error_count += 1
@@ -118,25 +119,21 @@ def import_csv_to_schedule(csv_file_path):
             cursor.execute("SELECT COUNT(*) FROM attend_schedule")
             after_count = cursor.fetchone()[0]
             
-            result = {
-                'success': True,
-                'message': f'インポート完了: {imported_count}件処理, {error_count}件エラー',
-                'details': {
+            result = format_response('success',
+                message=f'インポート完了: {imported_count}件処理, {error_count}件エラー',
+                details={
                     'processed': imported_count,
                     'errors': error_count,
                     'before_count': before_count,
                     'after_count': after_count,
                     'increase': after_count - before_count,
                     'error_messages': error_messages[:10]  # 最初の10個のエラーメッセージのみ
-                }
-            }
+                })
             
         except Exception as e:
-            result = {
-                'success': False,
-                'message': f'ファイル読み込みエラー: {str(e)}',
-                'details': {'error_messages': [str(e)]}
-            }
+            result = format_response('error',
+                message=f'ファイル読み込みエラー: {str(e)}',
+                details={'error_messages': [str(e)]})
         
         return result
 
@@ -153,24 +150,15 @@ def register_admin_api_routes(app):
             
             # ファイル存在チェック
             if 'file' not in request.files:
-                return jsonify({
-                    'success': False,
-                    'message': 'ファイルが選択されていません'
-                })
+                return jsonify(format_response('error', message='ファイルが選択されていません'))
             
             file = request.files['file']
             if file.filename == '':
-                return jsonify({
-                    'success': False,
-                    'message': 'ファイルが選択されていません'
-                })
+                return jsonify(format_response('error', message='ファイルが選択されていません'))
             
             # ファイル形式チェック
             if not allowed_file(file.filename):
-                return jsonify({
-                    'success': False,
-                    'message': '許可されていないファイル形式です（.csvのみ許可）'
-                })
+                return jsonify(format_response('error', message='許可されていないファイル形式です（.csvのみ許可）'))
             
             # ファイル保存
             filename = secure_filename(file.filename)
@@ -190,10 +178,7 @@ def register_admin_api_routes(app):
             return jsonify(result)
             
         except Exception as e:
-            return jsonify({
-                'success': False,
-                'message': f'システムエラー: {str(e)}'
-            })
+            return jsonify(format_response('error', message=f'システムエラー: {str(e)}'))
     
     @app.route('/api/admin/database/stats', methods=['GET'])
     @login_required
@@ -235,26 +220,20 @@ def register_admin_api_routes(app):
                 """)
                 monthly_stats = cursor.fetchall()
                 
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'basic': {
-                            'employees': basic_stats[0] if basic_stats[0] else 0,
-                            'total_records': basic_stats[1] if basic_stats[1] else 0,
-                            'start_date': basic_stats[2],
-                            'end_date': basic_stats[3]
-                        },
-                        'work_types': [{'type': row[0], 'count': row[1]} for row in work_type_stats],
-                        'monthly': [{'month': row[0], 'records': row[1]} for row in monthly_stats]
-                    }
-                })
+                return jsonify(format_response('success', data={
+                    'basic': {
+                        'employees': basic_stats[0] if basic_stats[0] else 0,
+                        'total_records': basic_stats[1] if basic_stats[1] else 0,
+                        'start_date': basic_stats[2],
+                        'end_date': basic_stats[3]
+                    },
+                    'work_types': [{'type': row[0], 'count': row[1]} for row in work_type_stats],
+                    'monthly': [{'month': row[0], 'records': row[1]} for row in monthly_stats]
+                }))
             
         except Exception as e:
             logger.error(f"データベース統計情報取得エラー: {str(e)}", exc_info=True)
-            return jsonify({
-                'success': False,
-                'message': f'統計情報取得エラー: {str(e)}'
-            })
+            return jsonify(format_response('error', message=f'統計情報取得エラー: {str(e)}'))
 
     # バックアップ管理API
     @app.route('/api/admin/backup/start', methods=['POST'])

@@ -10,7 +10,7 @@ from datetime import datetime, time, timedelta
 from config import Config
 from utils import get_database_connection, get_db_connection, time_to_minutes, calculate_duration_minutes
 from logger_config import setup_logger
-from constants import AttendanceConstants
+from constants import AttendanceConstants, DatabaseConstants
 from work_type_constants import is_off_day_shift, WORK_TYPE_OFF_DAY
 
 logger = setup_logger(__name__)
@@ -67,8 +67,8 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
         if work_type and is_off_day_shift(work_type):
             # 前日の日付を計算
             from datetime import datetime, timedelta
-            current_date = datetime.strptime(work_date, '%Y-%m-%d').date()
-            prev_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
+            current_date = datetime.strptime(work_date, AttendanceConstants.DATE_FORMAT).date()
+            prev_date = (current_date - timedelta(days=1)).strftime(AttendanceConstants.DATE_FORMAT)
             
             # 前日の24勤・夜勤スケジュールを取得
             cursor.execute("""
@@ -108,8 +108,8 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
                 overtime_start_hour = int(start_time.split(':')[0])
                 if overtime_start_hour <= 8:  # 8時以前の場合は前日の24勤の可能性
                     from datetime import datetime, timedelta
-                    current_date = datetime.strptime(work_date, '%Y-%m-%d').date()
-                    prev_date = (current_date - timedelta(days=1)).strftime('%Y-%m-%d')
+                    current_date = datetime.strptime(work_date, AttendanceConstants.DATE_FORMAT).date()
+                    prev_date = (current_date - timedelta(days=1)).strftime(AttendanceConstants.DATE_FORMAT)
                     
                     # 前日の24勤・夜勤スケジュールを取得
                     cursor.execute("""
@@ -149,7 +149,7 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
     
     # 日をまたぐ場合の処理
     if overtime_end_min < overtime_start_min:
-        overtime_end_min += 1440  # 24時間 = 1440分
+        overtime_end_min += AttendanceConstants.MINUTES_PER_DAY  # 24時間 = 1440分
         logger.info(f"[時間外分類デバッグ] 時間外作業が日をまたぐため調整: overtime_end_min={overtime_end_min}分")
         
     # スケジュールが日をまたぐ場合の処理（24勤など）
@@ -157,20 +157,20 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
     if work_type and (is_off_day_shift(work_type) or '24勤' in work_type):
         # 24勤の終了時刻が翌日の場合（例：8:30 → 翌8:30）
         if scheduled_end == scheduled_start:  # 同じ時刻 = 24時間勤務
-            scheduled_end_min = scheduled_start_min + 1440  # 翌日の同時刻
+            scheduled_end_min = scheduled_start_min + AttendanceConstants.MINUTES_PER_DAY  # 翌日の同時刻
             logger.info(f"[時間外分類デバッグ] 24勤: 終了時刻を翌日に調整 scheduled_end_min={scheduled_end_min}分")
             
             # 時間外作業が翌日の早朝の場合、翌日の時刻として調整
             if overtime_start_min < scheduled_start_min:
-                overtime_start_min += 1440  # 翌日の時刻
-                overtime_end_min += 1440
+                overtime_start_min += AttendanceConstants.MINUTES_PER_DAY  # 翌日の時刻
+                overtime_end_min += AttendanceConstants.MINUTES_PER_DAY
                 logger.info(f"[時間外分類デバッグ] 24勤の翌日早朝時間外: {overtime_start_min//60:02d}:{overtime_start_min%60:02d}-{overtime_end_min//60:02d}:{overtime_end_min%60:02d} に調整")
                 
         elif scheduled_end_min <= scheduled_start_min:
-            scheduled_end_min += 1440  # 翌日に調整
+            scheduled_end_min += AttendanceConstants.MINUTES_PER_DAY  # 翌日に調整
             logger.info(f"[時間外分類デバッグ] 24勤: 終了時刻を翌日に調整 scheduled_end_min={scheduled_end_min}分")
     elif scheduled_end_min < scheduled_start_min:
-        scheduled_end_min += 1440
+            scheduled_end_min += AttendanceConstants.MINUTES_PER_DAY
         logger.info(f"[時間外分類デバッグ] スケジュールが日をまたぐため調整: scheduled_end_min={scheduled_end_min}分")
     
     inner_minutes = 0
@@ -196,10 +196,10 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
         # 24勤の場合、当日の終了時刻（例：8:30）以降は外残業とする
         if work_type and '24勤' in work_type and scheduled_end == scheduled_start:
             # 当日の終了時刻（調整前の値）
-            original_end_min = scheduled_start_min  # 8:30 = 510分
+            original_end_min = scheduled_start_min  # 8:30 = 510分（AttendanceConstants.get_default_shift_start_minutes()で取得可能）
             
-            # 翌日に調整された時間外作業の場合（1440分以上）
-            if overtime_start_min >= 1440:
+            # 翌日に調整された時間外作業の場合（1日分以上）
+            if overtime_start_min >= AttendanceConstants.MINUTES_PER_DAY:
                 # 翌日の時間外作業 → 24勤の勤務時間内として処理
                 inner_start_min = max(overtime_start_min, scheduled_start_min)
                 inner_end_min = min(overtime_end_min, scheduled_end_min)
@@ -422,8 +422,8 @@ def get_overtime_applications(employee_num=None, work_date=None, status=None, li
                     # YYYY/MM/DD形式の場合はYYYY-MM-DDに変換
                     if '/' in work_date_str:
                         try:
-                            date_obj = datetime.strptime(work_date_str, '%Y/%m/%d')
-                            work_date_str = date_obj.strftime('%Y-%m-%d')
+                            date_obj = datetime.strptime(work_date_str, AttendanceConstants.DATE_FORMAT_SLASH)
+                            work_date_str = date_obj.strftime(AttendanceConstants.DATE_FORMAT)
                         except ValueError:
                             pass
                     params.append(work_date_str)
@@ -457,9 +457,9 @@ def approve_overtime(overtime_id, approved_by):
     from utils import update_request_status
     
     result = update_request_status(
-        table_name='overtime_applications',
+        table_name=DatabaseConstants.TABLE_OVERTIME_APPLICATIONS,
         request_id=overtime_id,
-        status='approved',
+        status=AttendanceConstants.STATUS_APPROVED,
         updated_by=approved_by
     )
     
@@ -473,9 +473,9 @@ def reject_overtime(overtime_id, rejected_by):
     from utils import update_request_status
     
     result = update_request_status(
-        table_name='overtime_applications',
+        table_name=DatabaseConstants.TABLE_OVERTIME_APPLICATIONS,
         request_id=overtime_id,
-        status='rejected',
+        status=AttendanceConstants.STATUS_REJECTED,
         updated_by=rejected_by
     )
     
@@ -498,9 +498,9 @@ def withdraw_overtime(overtime_id):
     from utils import update_request_status
     
     result = update_request_status(
-        table_name='overtime_applications',
+        table_name=DatabaseConstants.TABLE_OVERTIME_APPLICATIONS,
         request_id=overtime_id,
-        status='withdrawn'
+        status=AttendanceConstants.STATUS_WITHDRAWN
     )
     
     if result['success']:
@@ -543,12 +543,12 @@ def get_monthly_overtime_summary(employee_num, year, month):
                     SUM(outer_overtime_minutes) as total_outer,
                     SUM(night_overtime_minutes) as total_night,
                     SUM(inner_overtime_minutes + outer_overtime_minutes) as total_all
-                FROM overtime_applications
+                FROM {DatabaseConstants.TABLE_OVERTIME_APPLICATIONS}
                 WHERE employee_num = ?
                   AND work_date >= ?
                   AND work_date <= ?
-                  AND status = 'approved'
-            """, (employee_num, start_date.isoformat(), end_date.isoformat()))
+                  AND status = ?
+            """, (employee_num, start_date.isoformat(), end_date.isoformat(), AttendanceConstants.STATUS_APPROVED))
             
             row = cursor.fetchone()
             

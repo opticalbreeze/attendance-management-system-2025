@@ -6,6 +6,32 @@ PDF生成用HTML生成モジュール
 """
 
 from datetime import datetime
+from utils import calculate_duration_minutes
+
+def calculate_duration(start_time, end_time):
+    """
+    時間差を計算（HH:MM形式）- time_utils.pyを使用
+    
+    Args:
+        start_time: 開始時刻 (HH:MM)
+        end_time: 終了時刻 (HH:MM)
+    
+    Returns:
+        str: 時間差（例: "2時間30分"）
+    """
+    try:
+        total_minutes = calculate_duration_minutes(start_time, end_time)
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+        
+        if hours > 0 and minutes > 0:
+            return f"{hours}時間{minutes}分"
+        elif hours > 0:
+            return f"{hours}時間"
+        else:
+            return f"{minutes}分"
+    except:
+        return "計算不可"
 
 def generate_overtime_html(employee_name, application_date, work_date, overtime_entries):
     """
@@ -193,38 +219,5 @@ def generate_leave_html(employee_name, application_date, leave_date_from, leave_
     
     return html
 
-def calculate_duration(start_time, end_time):
-    """
-    時間差を計算（HH:MM形式）
-    
-    Args:
-        start_time: 開始時刻 (HH:MM)
-        end_time: 終了時刻 (HH:MM)
-    
-    Returns:
-        str: 時間差（例: "2時間30分"）
-    """
-    try:
-        start_parts = start_time.split(':')
-        end_parts = end_time.split(':')
-        
-        start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
-        end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
-        
-        # 日をまたぐ場合
-        if end_minutes < start_minutes:
-            end_minutes += 24 * 60
-        
-        total_minutes = end_minutes - start_minutes
-        hours = total_minutes // 60
-        minutes = total_minutes % 60
-        
-        if hours > 0 and minutes > 0:
-            return f"{hours}時間{minutes}分"
-        elif hours > 0:
-            return f"{hours}時間"
-        else:
-            return f"{minutes}分"
-    except:
-        return "計算不可"
+
 

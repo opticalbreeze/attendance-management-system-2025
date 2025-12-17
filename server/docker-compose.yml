@@ -62,6 +62,10 @@ services:
       - type: bind
         source: ../../backup
         target: /backup
+      # Dドライブバックアップディレクトリをマウント（Dドライブが存在する場合）
+      - type: bind
+        source: D:/AttendanceBackup_Mirror
+        target: /app/D_drive_backup
       # auto_save.pyのマウント
       - type: bind
         source: ./auto_save.py

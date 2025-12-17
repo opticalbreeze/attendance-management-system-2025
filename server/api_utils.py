@@ -7,6 +7,7 @@ API応答フォーマットと汎用処理の専門モジュール
 
 from datetime import datetime
 from database_utils import get_db_connection
+from constants import AttendanceConstants, DatabaseConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -83,7 +84,7 @@ def update_request_status(table_name, request_id, status, updated_by=None):
             cursor = conn.cursor()
             
             # テーブル名のバリデーション
-            valid_tables = ['overtime_applications', 'leave_requests']
+            valid_tables = [DatabaseConstants.TABLE_OVERTIME_APPLICATIONS, DatabaseConstants.TABLE_LEAVE_REQUESTS]
             if table_name not in valid_tables:
                 return {
                     'success': False,
@@ -91,7 +92,7 @@ def update_request_status(table_name, request_id, status, updated_by=None):
                 }
             
             # ステータスのバリデーション
-            valid_statuses = ['approved', 'rejected', 'withdrawn']
+            valid_statuses = [AttendanceConstants.STATUS_APPROVED, AttendanceConstants.STATUS_REJECTED, AttendanceConstants.STATUS_WITHDRAWN]
             if status not in valid_statuses:
                 return {
                     'success': False,
@@ -99,7 +100,7 @@ def update_request_status(table_name, request_id, status, updated_by=None):
                 }
             
             # 取り下げの場合は現在のステータスを確認
-            if status == 'withdrawn':
+            if status == AttendanceConstants.STATUS_WITHDRAWN:
                 cursor.execute(f"SELECT status FROM {table_name} WHERE id = ?", (request_id,))
                 result = cursor.fetchone()
                 
@@ -110,7 +111,7 @@ def update_request_status(table_name, request_id, status, updated_by=None):
                     }
                 
                 current_status = result[0]
-                if current_status != 'pending':
+                if current_status != AttendanceConstants.STATUS_PENDING:
                     return {
                         'success': False,
                         'message': f'申請は既に承認済みまたは却下済みのため取り下げできません（現在のステータス: {current_status}）'
@@ -119,7 +120,7 @@ def update_request_status(table_name, request_id, status, updated_by=None):
             # ステータス更新
             now = datetime.now().isoformat()
             
-            if status in ['approved', 'rejected']:
+            if status in [AttendanceConstants.STATUS_APPROVED, AttendanceConstants.STATUS_REJECTED]:
                 # 承認/却下の場合はapproved_byとapproved_atも設定
                 cursor.execute(f"""
                     UPDATE {table_name}
@@ -128,7 +129,7 @@ def update_request_status(table_name, request_id, status, updated_by=None):
                         approved_at = ?,
                         updated_at = ?
                     WHERE id = ?
-                """, (status, updated_by or 'admin', now, now, request_id))
+                """, (status, updated_by or AttendanceConstants.SYSTEM_USER_ADMIN, now, now, request_id))
             else:
                 # 取り下げの場合はupdated_atのみ更新
                 cursor.execute(f"""
@@ -139,9 +140,9 @@ def update_request_status(table_name, request_id, status, updated_by=None):
                 """, (status, now, request_id))
             
             status_names = {
-                'approved': '承認',
-                'rejected': '却下',
-                'withdrawn': '取り下げ'
+                AttendanceConstants.STATUS_APPROVED: '承認',
+                AttendanceConstants.STATUS_REJECTED: '却下',
+                AttendanceConstants.STATUS_WITHDRAWN: '取り下げ'
             }
             
             return {

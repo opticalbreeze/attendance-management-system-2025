@@ -167,6 +167,73 @@ def register_leave_api_routes(app):
             logger.error(f"休暇願取り下げエラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
+    @app.route('/api/leave/<int:leave_id>/reprint_pdf', methods=['POST'])
+    def reprint_leave_pdf(leave_id):
+        """休暇願PDFを再出力（既存の申請データから）"""
+        try:
+            from database_utils import get_db_connection
+            from constants import DatabaseConstants
+            
+            # データベースから休暇願データを取得
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"""
+                    SELECT * FROM {DatabaseConstants.TABLE_LEAVE_REQUESTS}
+                    WHERE id = ?
+                """, (leave_id,))
+                
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify(format_response('error', message='休暇願が見つかりません')), 404
+                
+                # カラム名を取得
+                columns = [desc[0] for desc in cursor.description]
+                leave_data = dict(zip(columns, row))
+            
+            # データから必要な情報を取得
+            employee_name = leave_data.get('employee_name', '')
+            employee_num = leave_data.get('employee_num', '')
+            application_date = leave_data.get('application_date', '')
+            leave_date_from = leave_data.get('leave_date_from', '')
+            leave_date_to = leave_data.get('leave_date_to', '')
+            leave_type = leave_data.get('leave_type', '')
+            leave_subtype = leave_data.get('leave_subtype')
+            substitute_work_date = leave_data.get('substitute_work_date')
+            other_reason = leave_data.get('other_reason')
+            
+            # HTMLを生成（既存の関数を使用）
+            html_content = generate_leave_html(
+                employee_name=employee_name,
+                application_date=application_date,
+                leave_date_from=leave_date_from,
+                leave_date_to=leave_date_to,
+                leave_type=leave_type,
+                leave_subtype=leave_subtype,
+                substitute_work_date=substitute_work_date,
+                other_reason=other_reason
+            )
+            
+            # PDFを保存（既存の関数を使用、開始日を使用）
+            result = save_pdf_from_html(
+                html_content=html_content,
+                filename_prefix='休暇願',
+                employee_num=str(employee_num),
+                date_str=leave_date_from,
+                employee_name=employee_name
+            )
+            
+            if result['success']:
+                return jsonify(format_response('success', 
+                    message=result['message'], 
+                    filename=result['filename'], 
+                    path=result['path']))
+            else:
+                return jsonify(format_response('error', message=result['message'])), 500
+            
+        except Exception as e:
+            logger.error(f"PDF再出力エラー: {e}", exc_info=True)
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
     @app.route('/api/leave/save_pdf', methods=['POST'])
     def save_leave_pdf():
         """休暇願PDFをサーバーに保存"""

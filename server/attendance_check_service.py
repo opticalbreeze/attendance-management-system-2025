@@ -105,6 +105,18 @@ def calculate_actual_clock_times(result: AttendanceCheckResult, cursor) -> None:
     if not result.attendance_records:
         return
     
+    # 短時間での連続打刻をチェック（5分以内）
+    if len(result.attendance_records) >= 2:
+        for i in range(len(result.attendance_records) - 1):
+            time1 = extract_time_from_timestamp(result.attendance_records[i]['time'])
+            time2 = extract_time_from_timestamp(result.attendance_records[i + 1]['time'])
+            if time1 and time2:
+                diff_minutes = abs(time_to_minutes(time2) - time_to_minutes(time1))
+                if diff_minutes <= 5:
+                    _add_alert(result, AttendanceConstants.ALERT_WARNING,
+                              '短時間連続打刻',
+                              f'{time1}と{time2}の間隔が{diff_minutes}分です')
+    
     if is_24hour_or_night_shift(work_type):
         # 24勤・夜勤: 一番早い時間が出勤
         result.actual_clock_in = result.attendance_records[0]['time']
@@ -254,11 +266,15 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
             logger.info(f"  明勤務チェック: {is_off_day_shift(work_type)}")
             
             # 打刻が全くない場合
+            # 「明」勤務の場合は、check_off_day_shift_attendance関数でより具体的な「退勤打刻漏れ」エラーを追加するため、ここではスキップ
             if punch_count == 0:
-                logger.info(f"  打刻なしエラーを追加")
-                _add_alert(result, AttendanceConstants.ALERT_ERROR,
-                          AttendanceConstants.MSG_MISSING_PUNCH,
-                          f'勤務タイプ: {work_type}、スケジュール: {result.schedule["start_time"]} - {result.schedule["end_time"]}')
+                if is_off_day_shift(work_type):
+                    logger.info(f"  「明」勤務のため、check_off_day_shift_attendance関数で「退勤打刻漏れ」エラーを追加するため、ここではスキップ")
+                else:
+                    logger.info(f"  打刻なしエラーを追加")
+                    _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                              AttendanceConstants.MSG_MISSING_PUNCH,
+                              f'勤務タイプ: {work_type}、スケジュール: {result.schedule["start_time"]} - {result.schedule["end_time"]}')
             # 日勤（24勤・夜勤・明勤務以外）で打刻が1回しかない場合
             # この場合はcheck_time_difference_errorsで「出勤打刻漏れ」または「退勤打刻漏れ」を判定するため、
             # ここでは汎用的な「打刻漏れ」エラーを出さない
@@ -673,14 +689,65 @@ def _check_overtime_coverage(schedule_end: str, actual_end: str, overtime_apps: 
     
     return _check_overtime_overlap(schedule_end_minutes, actual_end_minutes, overtime_apps)
 
+def _check_prev_day_24hour_punch_leak(cursor, result: AttendanceCheckResult, prev_date: str) -> None:
+    """
+    前日の24勤で出勤・退勤両方の打刻漏れがあった場合、明勤務の日にも「打刻漏れ」を表示
+    検証レポート課題11への対応
+    """
+    try:
+        # 前日の24勤の打刻状況をチェック
+        cursor.execute("""
+            SELECT employee_id, work_date, work_type FROM attend_schedule 
+            WHERE employee_id = ? AND work_date = ? AND work_type LIKE '%24%'
+        """, (result.employee_id, prev_date))
+        
+        prev_schedule = cursor.fetchone()
+        if not prev_schedule:
+            return
+            
+        # 前日の24勤の打刻データを取得
+        cursor.execute("""
+            SELECT idm FROM employee_master WHERE employee_num = ?
+        """, (result.employee_id,))
+        
+        idm_result = cursor.fetchone()
+        if not idm_result:
+            return
+            
+        idm = idm_result[0]
+        
+        cursor.execute("""
+            SELECT timestamp FROM attendance 
+            WHERE idm = ? AND date(timestamp) = ?
+            ORDER BY timestamp ASC
+        """, (idm, prev_date))
+        
+        prev_day_punches = cursor.fetchall()
+        
+        # 前日の24勤で打刻が全くない場合、明勤務の日に「打刻漏れ」を追加
+        if not prev_day_punches:
+            _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                      '打刻漏れ',
+                      f'前日({prev_date})の24勤で出勤・退勤ともに打刻漏れ')
+            logger.info(f"[明勤務] 前日24勤の打刻漏れを検出: {prev_date}")
+            
+    except Exception as e:
+        logger.warning(f"前日24勤打刻漏れチェックエラー: {e}")
+
 def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_date: str) -> None:
     """明勤務の前日24勤・夜勤チェック"""
     work_type = result.schedule['work_type'] if result.schedule else None
+    logger.info(f"[「明」勤務チェック開始] 日付={result.check_date}, 勤務タイプ={work_type}, prev_date={prev_date}")
+    
     if not is_off_day_shift(work_type):
+        logger.info(f"[「明」勤務チェック] 勤務タイプが「明」ではないためスキップ: work_type={work_type}")
         return
+    
+    logger.info(f"[「明」勤務チェック] prev_day_night_shift={result.prev_day_night_shift}, attendance_records={len(result.attendance_records)}件")
     
     # 前日の24勤・夜勤スケジュールがない場合の警告
     if not result.prev_day_night_shift and result.attendance_records:
+        logger.info(f"[「明」勤務チェック] 前日の24勤・夜勤スケジュールが見つからないため警告を追加")
         _add_alert(result, AttendanceConstants.ALERT_WARNING,
                   AttendanceConstants.MSG_OFF_DAY_NO_PREV_SHIFT,
                   f'前日({prev_date})のスケジュールを確認してください')
@@ -691,6 +758,9 @@ def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_d
         prev_schedule_end = result.prev_day_night_shift.get('end_time')
         actual_end = result.actual_clock_out  # 「明」勤務の日の打刻時刻（前日の退勤時刻）
         
+        logger.info(f"[「明」勤務チェック] 前日スケジュール情報: work_type={result.prev_day_night_shift.get('work_type')}, start_time={result.prev_day_night_shift.get('start_time')}, end_time={prev_schedule_end}")
+        logger.info(f"[「明」勤務チェック] 実際の打刻時刻: actual_clock_out={actual_end}")
+        
         if prev_schedule_end and actual_end:
             from database import get_early_leave_requests
             
@@ -698,7 +768,7 @@ def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_d
             if diff_end is not None:
                 # 「明」勤務の日の早退申告を取得（前日の24勤・夜勤の早退申告として扱う）
                 early_leave_requests = get_early_leave_requests(
-                    employee_num=result.employee_num,
+                    employee_num=result.employee_id,
                     work_date=result.check_date,
                     status=AttendanceConstants.STATUS_APPROVED
                 )
@@ -717,9 +787,17 @@ def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_d
                                   adjusted_diff=adjusted_diff_end))
         elif prev_schedule_end and not actual_end:
             # 「明」勤務の日の打刻がない場合（前日の24勤・夜勤の退勤打刻がない）
-            _add_alert(result, AttendanceConstants.ALERT_ERROR,
-                      AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
-                      AttendanceConstants.DETAIL_CLOCK_OUT_MISSING.format(schedule=prev_schedule_end))
+            # 既に「打刻なし」エラーが追加されている場合はスキップ（重複を防ぐ）
+            if not _has_punch_leak_alert(result):
+                logger.info(f"[「明」勤務チェック] 退勤打刻漏れエラーを追加: 前日スケジュール={prev_schedule_end}, 実際の打刻なし")
+                _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                          AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
+                          AttendanceConstants.DETAIL_CLOCK_OUT_MISSING.format(schedule=prev_schedule_end))
+    
+    # 前日の24勤で打刻漏れがあった場合の処理（検証レポート課題11への対応）
+    _check_prev_day_24hour_punch_leak(cursor, result, prev_date)
+            else:
+                logger.info(f"[「明」勤務チェック] 既に打刻漏れエラーが存在するため、退勤打刻漏れエラーの追加をスキップ")
 
 def check_attendance_vs_schedule(employee_id: str, check_date: str) -> Dict[str, Any]:
     """

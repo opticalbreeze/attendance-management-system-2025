@@ -18,11 +18,11 @@ from api_attendance import register_attendance_api_routes
 from api_overtime import register_overtime_api_routes
 from api_leave import register_leave_api_routes
 from api_monthly_report import register_monthly_report_api_routes
+from utils import format_response
 from api_check_status import register_check_status_api_routes
 from auth import init_auth, login_required, verify_admin_password, verify_db_password, set_db_access_granted
 from utils import get_database_connection
 from logger_config import setup_logger
-from auto_save import auto_save_manager
 
 logger = setup_logger(__name__)
 
@@ -52,8 +52,8 @@ def register_web_routes(app):
     
     @app.route('/favicon.ico')
     def favicon():
-        """ファビコンを提供"""
-        return send_file('static/favicon.ico', mimetype='image/vnd.microsoft.icon')
+        """favicon.icoの404エラーを防ぐ"""
+        return '', 204  # No Content
     
     @app.route('/')
     def index():
@@ -143,19 +143,13 @@ def register_auth_routes(app):
         try:
             data = request.get_json()
             if not data:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'データが送信されていません'
-                }), 400
+                return jsonify(format_response('error', message='データが送信されていません')), 400
             
             password = data.get('password', '').strip()
             db_access = data.get('db_access', False)
             
             if not password:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'パスワードを入力してください'
-                }), 400
+                return jsonify(format_response('error', message='パスワードを入力してください')), 400
             
             # 管理者パスワードを検証
             if verify_admin_password(password):
@@ -176,32 +170,21 @@ def register_auth_routes(app):
                 else:
                     set_db_access_granted(False)
                 
-                return jsonify({
-                    'status': 'success',
-                    'message': 'ログインに成功しました',
-                    'db_access': session.get('db_access_granted', False)
-                })
+                return jsonify(format_response('success', 
+                    message='ログインに成功しました',
+                    db_access=session.get('db_access_granted', False)))
             else:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'パスワードが正しくありません'
-                }), 401
+                return jsonify(format_response('error', message='パスワードが正しくありません')), 401
                 
         except Exception as e:
             logger.error(f"ログインエラー: {e}", exc_info=True)
-            return jsonify({
-                'status': 'error',
-                'message': f'エラー: {str(e)}'
-            }), 500
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
     
     @app.route('/api/logout', methods=['POST'])
     def logout_api():
         """ログアウトAPI"""
         session.clear()
-        return jsonify({
-            'status': 'success',
-            'message': 'ログアウトしました'
-        })
+        return jsonify(format_response('success', message='ログアウトしました'))
     
     @app.route('/api/auth/check', methods=['GET'])
     def check_auth():
@@ -272,13 +255,6 @@ def main():
     
     # データベース初期化（全テーブルを一元管理）
     init_database()
-    
-    # 自動バックアップ機能を開始
-    try:
-        auto_save_manager.start_scheduler()
-        logger.info("自動バックアップ機能が開始されました")
-    except Exception as e:
-        logger.error(f"自動バックアップ機能の開始に失敗しました: {e}")
     
     # ルート登録
     register_web_routes(app)

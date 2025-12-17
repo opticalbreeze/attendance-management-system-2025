@@ -195,6 +195,75 @@ def register_overtime_api_routes(app):
             logger.error(f"月次集計エラー: {e}", exc_info=True)
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
+    @app.route('/api/overtime/<int:overtime_id>/reprint_pdf', methods=['POST'])
+    def reprint_overtime_pdf(overtime_id):
+        """時間外申告PDFを再出力（既存の申請データから）"""
+        try:
+            from database_utils import get_db_connection
+            from constants import DatabaseConstants
+            
+            # データベースから時間外申告データを取得
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"""
+                    SELECT * FROM {DatabaseConstants.TABLE_OVERTIME_APPLICATIONS}
+                    WHERE id = ?
+                """, (overtime_id,))
+                
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify(format_response('error', message='時間外申告が見つかりません')), 404
+                
+                # カラム名を取得
+                columns = [desc[0] for desc in cursor.description]
+                overtime_data = dict(zip(columns, row))
+            
+            # データから必要な情報を取得
+            employee_name = overtime_data.get('employee_name', '')
+            employee_num = overtime_data.get('employee_num', '')
+            application_date = overtime_data.get('application_date', '')
+            work_date = overtime_data.get('work_date', '')
+            start_time = overtime_data.get('start_time', '')
+            end_time = overtime_data.get('end_time', '')
+            description = overtime_data.get('description', '')
+            
+            # 時間外作業エントリを生成
+            overtime_entries = [{
+                'start_time': start_time,
+                'end_time': end_time,
+                'description': description
+            }]
+            
+            # HTMLを生成（既存の関数を使用）
+            html_content = generate_overtime_html(
+                employee_name=employee_name,
+                application_date=application_date,
+                work_date=work_date,
+                overtime_entries=overtime_entries
+            )
+            
+            # PDFを保存（既存の関数を使用）
+            result = save_pdf_from_html(
+                html_content=html_content,
+                filename_prefix='時間外',
+                employee_num=str(employee_num),
+                date_str=work_date,
+                employee_name=employee_name,
+                additional_css='.overtime-item { border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }'
+            )
+            
+            if result['success']:
+                return jsonify(format_response('success', 
+                    message=result['message'], 
+                    filename=result['filename'], 
+                    path=result['path']))
+            else:
+                return jsonify(format_response('error', message=result['message'])), 500
+            
+        except Exception as e:
+            logger.error(f"PDF再出力エラー: {e}", exc_info=True)
+            return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
+
     @app.route('/api/overtime/save_pdf', methods=['POST'])
     def save_overtime_pdf():
         """時間外申告PDFをサーバーに保存"""

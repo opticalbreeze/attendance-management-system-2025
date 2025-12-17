@@ -9,6 +9,7 @@ import sqlite3
 from datetime import datetime
 from config import Config
 from utils import get_database_connection, get_db_connection
+from constants import AttendanceConstants, DatabaseConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -93,7 +94,7 @@ def get_leave_requests(employee_num=None, leave_date=None, status=None, limit=10
         with get_db_connection() as conn:
             cursor = conn.cursor()
             
-            query = "SELECT * FROM leave_requests WHERE 1=1"
+            query = f"SELECT * FROM {DatabaseConstants.TABLE_LEAVE_REQUESTS} WHERE 1=1"
             params = []
             
             if employee_num:
@@ -132,9 +133,9 @@ def approve_leave_request(leave_id, approved_by):
     from utils import update_request_status
     
     result = update_request_status(
-        table_name='leave_requests',
+        table_name=DatabaseConstants.TABLE_LEAVE_REQUESTS,
         request_id=leave_id,
-        status='approved',
+        status=AttendanceConstants.STATUS_APPROVED,
         updated_by=approved_by
     )
     
@@ -148,9 +149,9 @@ def reject_leave_request(leave_id, rejected_by):
     from utils import update_request_status
     
     result = update_request_status(
-        table_name='leave_requests',
+        table_name=DatabaseConstants.TABLE_LEAVE_REQUESTS,
         request_id=leave_id,
-        status='rejected',
+        status=AttendanceConstants.STATUS_REJECTED,
         updated_by=rejected_by
     )
     
@@ -173,9 +174,9 @@ def withdraw_leave_request(leave_id):
     from utils import update_request_status
     
     result = update_request_status(
-        table_name='leave_requests',
+        table_name=DatabaseConstants.TABLE_LEAVE_REQUESTS,
         request_id=leave_id,
-        status='withdrawn'
+        status=AttendanceConstants.STATUS_WITHDRAWN
     )
     
     if result['success']:
@@ -198,35 +199,32 @@ def get_leaves_for_date_range(employee_num, start_date, end_date):
         list: 休暇願のリスト
     """
     try:
-        conn = get_database_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT * FROM leave_requests
-            WHERE employee_num = ?
-              AND status = 'approved'
-              AND (
-                  (leave_date_from >= ? AND leave_date_from <= ?)
-                  OR (leave_date_to >= ? AND leave_date_to <= ?)
-                  OR (leave_date_from <= ? AND leave_date_to >= ?)
-              )
-            ORDER BY leave_date_from
-        """, (employee_num, start_date, end_date, start_date, end_date, start_date, end_date))
-        
-        rows = cursor.fetchall()
-        
-        # 結果を辞書形式に変換
-        columns = [desc[0] for desc in cursor.description]
-        results = []
-        for row in rows:
-            results.append(dict(zip(columns, row)))
-        
-        conn.close()
-        return results
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute(f"""
+                SELECT * FROM {DatabaseConstants.TABLE_LEAVE_REQUESTS}
+                WHERE employee_num = ?
+                  AND status = ?
+                  AND (
+                      (leave_date_from >= ? AND leave_date_from <= ?)
+                      OR (leave_date_to >= ? AND leave_date_to <= ?)
+                      OR (leave_date_from <= ? AND leave_date_to >= ?)
+                  )
+                ORDER BY leave_date_from
+            """, (employee_num, AttendanceConstants.STATUS_APPROVED, start_date, end_date, start_date, end_date, start_date, end_date))
+            
+            rows = cursor.fetchall()
+            
+            # 結果を辞書形式に変換
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in rows:
+                results.append(dict(zip(columns, row)))
+            
+            return results
         
     except Exception as e:
         logger.error(f"休暇願取得エラー: {e}", exc_info=True)
-        if conn:
-            conn.close()
         return []
 

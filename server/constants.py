@@ -111,13 +111,34 @@ class AttendanceConstants:
         """2日目の深夜終了時間を分で取得（当日の時刻として）"""
         return cls.NIGHT_END_HOUR * cls.MINUTES_PER_HOUR
     
+    # デフォルト勤務時間設定
+    DEFAULT_SHIFT_START_HOUR = 8   # デフォルト開始時間（時）
+    DEFAULT_SHIFT_START_MINUTE = 30  # デフォルト開始時間（分）
+    
+    # システムユーザー名
+    SYSTEM_USER_ADMIN = 'admin'  # システム管理者ユーザー名
+    
+    @classmethod
+    def get_default_shift_start_minutes(cls):
+        """デフォルト勤務開始時刻を分単位で取得（8:30 = 510分）"""
+        return cls.DEFAULT_SHIFT_START_HOUR * cls.MINUTES_PER_HOUR + cls.DEFAULT_SHIFT_START_MINUTE
+    
     # 日付フォーマット
     DATE_FORMAT = '%Y-%m-%d'  # 標準日付フォーマット（YYYY-MM-DD）
     DATE_FORMAT_SLASH = '%Y/%m/%d'  # スラッシュ区切り日付フォーマット（YYYY/MM/DD）
+    DATE_FORMAT_YMD = '%Y%m%d'  # 日付フォーマット（YYYYMMDD）
+    DATE_FORMAT_YM = '%Y%m'  # 月度フォーマット（YYYYMM）
+    TIME_FORMAT_HMS = '%H%M%S'  # 時刻フォーマット（HHMMSS）
     
     # ステータス
     STATUS_APPROVED = 'approved'
     STATUS_PENDING = 'pending'
+    STATUS_REJECTED = 'rejected'
+    STATUS_WITHDRAWN = 'withdrawn'
+    
+    # API応答ステータス
+    API_STATUS_SUCCESS = 'success'
+    API_STATUS_ERROR = 'error'
     
     # アラートタイプ
     ALERT_ERROR = 'error'
@@ -143,6 +164,17 @@ class AttendanceConstants:
     DETAIL_CLOCK_OUT_MISSING_SINGLE_PUNCH = '退勤時刻: スケジュール {schedule} / 実際の打刻なし（打刻1回のみで開始時間に近い）'
     DETAIL_CLOCK_IN_TIME_DIFF = '出勤時刻: スケジュール {schedule} / 実際 {actual} (差異: {diff:+d}分, 遅刻申告調整後: {adjusted_diff:+d}分)'
     DETAIL_CLOCK_OUT_TIME_DIFF = '退勤時刻: スケジュール {schedule} / 実際 {actual} (差異: {diff:+d}分, 早退申告調整後: {adjusted_diff:+d}分)'
+
+class DatabaseConstants:
+    """データベーステーブル名定数"""
+    TABLE_ATTENDANCE = 'attendance'
+    TABLE_ATTEND_SCHEDULE = 'attend_schedule'
+    TABLE_EMPLOYEE_MASTER = 'employee_master'
+    TABLE_OVERTIME_APPLICATIONS = 'overtime_applications'
+    TABLE_LEAVE_REQUESTS = 'leave_requests'
+    TABLE_LATE_ARRIVAL_REQUESTS = 'late_arrival_requests'
+    TABLE_EARLY_LEAVE_REQUESTS = 'early_leave_requests'
+    TABLE_ATTENDANCE_CHECK_STATUS = 'attendance_check_status'
 
 class UIConfig:
     """UI設定定数"""
