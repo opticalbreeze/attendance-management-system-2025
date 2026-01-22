@@ -1,0 +1,30 @@
+# 「欠」の勤務種別を追加する場合の修正案
+
+# work_type_constants.py に追加する内容：
+
+CSV_WORK_TYPE_MAPPING = {
+    '日勤': '通常',
+    '夜勤': '夜勤',
+    '法': '法定休日',
+    '所': '所定休日',
+    '有': '有給',
+    '代': '代休',
+    '特': '特休',
+    '明': '明',
+    '24勤A': '24勤A',
+    '24勤B': '24勤B',
+    '欠': '欠勤'  # 新規追加
+}
+
+# 欠勤判定関数も追加可能：
+def is_absence(work_type):
+    """
+    欠勤かどうかを判定
+    
+    Args:
+        work_type: 勤務タイプ文字列
+        
+    Returns:
+        bool: 欠勤の場合True
+    """
+    return work_type and ('欠' in work_type)

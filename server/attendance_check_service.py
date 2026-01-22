@@ -793,11 +793,11 @@ def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_d
                 _add_alert(result, AttendanceConstants.ALERT_ERROR,
                           AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
                           AttendanceConstants.DETAIL_CLOCK_OUT_MISSING.format(schedule=prev_schedule_end))
+            else:
+                logger.info(f"[「明」勤務チェック] 既に打刻漏れエラーが存在するため、退勤打刻漏れエラーの追加をスキップ")
     
     # 前日の24勤で打刻漏れがあった場合の処理（検証レポート課題11への対応）
     _check_prev_day_24hour_punch_leak(cursor, result, prev_date)
-            else:
-                logger.info(f"[「明」勤務チェック] 既に打刻漏れエラーが存在するため、退勤打刻漏れエラーの追加をスキップ")
 
 def check_attendance_vs_schedule(employee_id: str, check_date: str) -> Dict[str, Any]:
     """

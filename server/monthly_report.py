@@ -714,11 +714,10 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         for col_letter in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']:
             ws.column_dimensions[col_letter].width = 8.2
         
-        # 時間外申告と休暇申告の詳細を追加
-        row += 3  # 空行を追加
+        # 時間外申告と休暇申告の詳細を追加（行を詰めてA4に収まるように調整）
+        row += 1  # 空行を追加（3行から1行に削減）
         
         # 時間外申告セクション
-        row += 1
         header_cell = ws.cell(row=row, column=1, value="時間外申告")
         header_cell.font = Font(name='游ゴシック', size=10, bold=True)
         header_cell.alignment = Alignment(horizontal='left', vertical='center')
@@ -815,8 +814,8 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                 ws.cell(row=row, column=1).alignment = center_alignment
                 ws.cell(row=row, column=1).border = thin_border
         
-        # 休暇申告セクション
-        row += 2  # 空行を追加
+        # 休暇申告セクション（行を詰めてA4に収まるように調整）
+        row += 1  # 空行を追加（2行から1行に削減）
         header_cell = ws.cell(row=row, column=1, value="休暇申告")
         header_cell.font = Font(name='游ゴシック', size=10, bold=True)
         header_cell.alignment = Alignment(horizontal='left', vertical='center')

@@ -84,6 +84,14 @@
             font-size: var(--font-size-sm);
         }
         .btn-danger:hover { background: var(--bg-hover); }
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+            border-color: #17a2b8;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
+        }
+        .btn-info:hover { background: #138496; border-color: #117a8b; }
         .summary-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -323,10 +331,16 @@
                         <div class="action-buttons">
                             <button class="btn-success" onclick="approveLeave(${item.id})">承認</button>
                             <button class="btn-danger" onclick="rejectLeave(${item.id})">却下</button>
+                            <button class="btn-info" onclick="reprintPdf(${item.id})" title="PDF再出力">PDF再出力</button>
                         </div>
                     `;
                 } else {
-                    actionButtons = `<span class="time-info">${item.approved_by || '-'}</span>`;
+                    actionButtons = `
+                        <div class="action-buttons">
+                            <span class="time-info">${item.approved_by || '-'}</span>
+                            <button class="btn-info" onclick="reprintPdf(${item.id})" title="PDF再出力">PDF再出力</button>
+                        </div>
+                    `;
                 }
 
                 row.innerHTML = `
@@ -428,6 +442,31 @@
                     searchLeaveRequests();
                 } else {
                     showAlert('error', result.message || '却下に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        async function reprintPdf(leaveId) {
+            try {
+                showAlert('info', 'PDF再出力中です...');
+
+                const response = await fetch(`/api/leave/${leaveId}/reprint_pdf`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', `PDF再出力完了: ${result.filename}`);
+                    console.log('PDF保存パス:', result.path);
+                } else {
+                    showAlert('error', result.message || 'PDF再出力に失敗しました');
                 }
             } catch (error) {
                 showAlert('error', 'サーバーエラーが発生しました');

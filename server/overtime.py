@@ -170,7 +170,7 @@ def calculate_overtime_categories(employee_num, work_date, start_time, end_time)
             scheduled_end_min += AttendanceConstants.MINUTES_PER_DAY  # 翌日に調整
             logger.info(f"[時間外分類デバッグ] 24勤: 終了時刻を翌日に調整 scheduled_end_min={scheduled_end_min}分")
     elif scheduled_end_min < scheduled_start_min:
-            scheduled_end_min += AttendanceConstants.MINUTES_PER_DAY
+        scheduled_end_min += AttendanceConstants.MINUTES_PER_DAY
         logger.info(f"[時間外分類デバッグ] スケジュールが日をまたぐため調整: scheduled_end_min={scheduled_end_min}分")
     
     inner_minutes = 0

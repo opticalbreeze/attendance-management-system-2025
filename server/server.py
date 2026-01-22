@@ -256,6 +256,17 @@ def main():
     # データベース初期化（全テーブルを一元管理）
     init_database()
     
+    # 自動バックアップスケジューラー開始
+    try:
+        from auto_save import auto_save_manager
+        result = auto_save_manager.start_scheduler()
+        if result:
+            logger.info("自動バックアップスケジューラーを開始しました")
+        else:
+            logger.warning("自動バックアップスケジューラーの開始に失敗しました")
+    except Exception as e:
+        logger.error(f"自動バックアップ初期化エラー: {e}")
+    
     # ルート登録
     register_web_routes(app)
     register_auth_routes(app)
