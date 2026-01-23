@@ -67,7 +67,7 @@ def verify_db_password(password):
 
 def login_required(f):
     """
-    ログインが必要なページを保護するデコレータ
+    ログインが必要なページを保護するデコレータ（開発モード：無効化）
     
     使用例:
         @app.route('/admin')
@@ -77,15 +77,7 @@ def login_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'admin_logged_in' not in session or not session.get('admin_logged_in'):
-            if request.is_json:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'ログインが必要です'
-                }), 401
-            # ログインページにリダイレクト（nextパラメータで元のURLを保持）
-            next_url = request.url
-            return redirect(f'/login?next={next_url}')
+        # 開発モード：認証をバイパス
         return f(*args, **kwargs)
     return decorated_function
 

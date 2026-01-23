@@ -127,6 +127,30 @@ def register_web_routes(app):
         """管理者ページ"""
         return _add_no_cache_headers(make_response(render_template('admin.html')))
     
+    @app.route('/employee-check/<employee_id>')
+    def employee_check(employee_id):
+        """従業員専用勤怠チェック画面（認証不要）"""
+        from datetime import datetime
+        
+        # 現在の日付から適切な月度を計算
+        today = datetime.now()
+        year = today.year
+        month = today.month
+        day = today.day
+        
+        # 16日以降なら翌月度、15日以前なら当月度
+        if day >= 16:
+            # 翌月度
+            if month == 12:
+                current_month = f"{year + 1}/1"
+            else:
+                current_month = f"{year}/{month + 1}"
+        else:
+            # 当月度
+            current_month = f"{year}/{month}"
+        
+        return render_template('employee_check.html', employee_id=employee_id, current_month=current_month)
+    
     @app.route('/attendance-check')
     @login_required
     def attendance_check_page():
@@ -276,6 +300,176 @@ def main():
     register_monthly_report_api_routes(app)
     register_check_status_api_routes(app)  # 打刻チェック状況管理API
     register_admin_api_routes(app)  # 管理者機能を有効化
+    
+    # 通知API（簡易版）
+    @app.route('/api/notifications', methods=['GET'])
+    def get_notifications():
+        """通知データを取得"""
+        import os
+        import json
+        try:
+            # notification_data.jsonファイルのパスを構築
+            # 開発コンテナ内では/app/notification_data.json
+            # ローカル環境では../notification_data.json
+            notification_file = '/app/notification_data.json'
+            if not os.path.exists(notification_file):
+                # ローカル環境の場合
+                notification_file = os.path.join(os.path.dirname(__file__), '..', 'notification_data.json')
+            
+            if os.path.exists(notification_file):
+                with open(notification_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return jsonify(data)
+            else:
+                logger.warning(f"通知データファイルが見つかりません: {notification_file}")
+                return jsonify({"notifications": []}), 200
+        except Exception as e:
+            logger.error(f"通知データ読み込みエラー: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # 従業員専用勤怠チェックAPI
+    @app.route('/api/attendance-check/employee/<employee_id>', methods=['GET'])
+    def get_employee_attendance_check(employee_id):
+        """指定従業員の勤怠チェック結果を取得（認証不要）"""
+        try:
+            import os
+            import json
+            
+            # notification_data.jsonから該当従業員の通知を取得
+            notification_file = '/app/notification_data.json'
+            if not os.path.exists(notification_file):
+                notification_file = os.path.join(os.path.dirname(__file__), '..', 'notification_data.json')
+            
+            if not os.path.exists(notification_file):
+                return jsonify({
+                    'status': 'error',
+                    'message': '通知データが見つかりません'
+                }), 404
+            
+            with open(notification_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 指定従業員のデータのみ抽出
+            employee_errors = []
+            employee_warnings = []
+            employee_name = None
+            
+            for notification in data.get('notifications', []):
+                if notification.get('employee_id') == employee_id:
+                    if not employee_name:
+                        employee_name = notification.get('employee_name', employee_id)
+                    
+                    alert_type = notification.get('alert_type', '')
+                    message = notification.get('message', '')
+                    detail = notification.get('detail', '')
+                    work_date = notification.get('work_date', '')
+                    
+                    alert_data = {
+                        'date': work_date,
+                        'message': message,
+                        'detail': detail
+                    }
+                    
+                    if alert_type == 'error':
+                        employee_errors.append(alert_data)
+                    elif alert_type == 'warning':
+                        employee_warnings.append(alert_data)
+            
+            # 従業員名が見つからない場合は従業員IDを使用
+            if not employee_name:
+                employee_name = f"従業員 {employee_id}"
+            
+            return jsonify({
+                'status': 'success',
+                'data': {
+                    'employee_id': employee_id,
+                    'name': employee_name,
+                    'section': '設備',  # デフォルト値
+                    'errors': employee_errors,
+                    'warnings': employee_warnings
+                }
+            })
+            
+        except Exception as e:
+            logger.error(f"従業員勤怠チェックエラー: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': f'エラーが発生しました: {str(e)}'
+            }), 500
+    
+    @app.route('/api/attendance-check/employee/<employee_id>/attendance', methods=['GET'])
+    def get_employee_detailed_attendance(employee_id):
+        """指定従業員の詳細勤怠データを取得（認証不要）"""
+        try:
+            import os
+            import json
+            from datetime import datetime, timedelta
+            
+            # notification_data.jsonから該当従業員の通知を取得
+            notification_file = '/app/notification_data.json'
+            if not os.path.exists(notification_file):
+                notification_file = os.path.join(os.path.dirname(__file__), '..', 'notification_data.json')
+            
+            if not os.path.exists(notification_file):
+                return jsonify({
+                    'status': 'error',
+                    'message': '通知データが見つかりません'
+                }), 404
+            
+            with open(notification_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # 指定従業員のデータをworkDateごとに整理
+            attendance_by_date = {}
+            
+            for notification in data.get('notifications', []):
+                if notification.get('employee_id') == employee_id:
+                    work_date = notification.get('work_date', '')
+                    if work_date not in attendance_by_date:
+                        attendance_by_date[work_date] = {
+                            'work_date': work_date,
+                            'work_type': '通常',
+                            'start_time': '08:30',
+                            'end_time': '17:30',
+                            'attendance_times': [],
+                            'errors': [],
+                            'warnings': [],
+                            'overtime_status': '-',
+                            'leave_status': '-'
+                        }
+                    
+                    # エラー・警告を分類
+                    alert_type = notification.get('alert_type', '')
+                    message = notification.get('message', '')
+                    
+                    if alert_type == 'error':
+                        attendance_by_date[work_date]['errors'].append(message)
+                    elif alert_type == 'warning':
+                        attendance_by_date[work_date]['warnings'].append(message)
+                    
+                    # 詳細情報から打刻時間を抽出（簡易実装）
+                    detail = notification.get('detail', '')
+                    if '実際:' in detail:
+                        import re
+                        times = re.findall(r'(\d{2}:\d{2})', detail)
+                        if times:
+                            attendance_by_date[work_date]['attendance_times'].extend(times)
+            
+            # リスト形式に変換してソート
+            attendance_list = list(attendance_by_date.values())
+            attendance_list.sort(key=lambda x: x['work_date'], reverse=True)
+            
+            return jsonify({
+                'status': 'success',
+                'data': attendance_list
+            })
+            
+        except Exception as e:
+            logger.error(f"従業員詳細勤怠データエラー: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': f'エラーが発生しました: {str(e)}'
+            }), 500
     
     # 起動情報表示
     print_startup_info()

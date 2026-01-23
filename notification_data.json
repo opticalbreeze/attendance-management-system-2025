@@ -1,0 +1,2685 @@
+{
+  "notifications": [
+    {
+      "id": "2952089_2026-01-05_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-05",
+      "alert_type": "error",
+      "message": "打刻なし",
+      "detail": "",
+      "schedule": {
+        "id": 2049,
+        "work_date": "2026-01-05",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:56.784846"
+    },
+    {
+      "id": "2952089_2026-01-06_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-06",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2050,
+        "work_date": "2026-01-06",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:26",
+      "actual_clock_out": "08:26",
+      "created_at": "2026-01-22T16:43:56.807395"
+    },
+    {
+      "id": "2952089_2026-01-07_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-07",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2051,
+        "work_date": "2026-01-07",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:57",
+      "actual_clock_out": "07:57",
+      "created_at": "2026-01-22T16:43:56.828753"
+    },
+    {
+      "id": "2952089_2026-01-07_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-07",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2051,
+        "work_date": "2026-01-07",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:57",
+      "actual_clock_out": "07:57",
+      "created_at": "2026-01-22T16:43:56.828771"
+    },
+    {
+      "id": "2952089_2026-01-08_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-08",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2052,
+        "work_date": "2026-01-08",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:49",
+      "actual_clock_out": "08:04",
+      "created_at": "2026-01-22T16:43:56.845645"
+    },
+    {
+      "id": "2952089_2026-01-08_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-08",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2052,
+        "work_date": "2026-01-08",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:49",
+      "actual_clock_out": "08:04",
+      "created_at": "2026-01-22T16:43:56.845658"
+    },
+    {
+      "id": "2952089_2026-01-09_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-09",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2053,
+        "work_date": "2026-01-09",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:32",
+      "actual_clock_out": "07:32",
+      "created_at": "2026-01-22T16:43:56.863628"
+    },
+    {
+      "id": "2952089_2026-01-09_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-09",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2053,
+        "work_date": "2026-01-09",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:32",
+      "actual_clock_out": "07:32",
+      "created_at": "2026-01-22T16:43:56.863642"
+    },
+    {
+      "id": "2952089_2026-01-10_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-10",
+      "alert_type": "error",
+      "message": "休日なのに打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2054,
+        "work_date": "2026-01-10",
+        "work_type": "所",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": "08:43",
+      "actual_clock_out": "08:43",
+      "created_at": "2026-01-22T16:43:56.987707"
+    },
+    {
+      "id": "2952089_2026-01-13_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-13",
+      "alert_type": "error",
+      "message": "打刻なし",
+      "detail": "",
+      "schedule": {
+        "id": 2057,
+        "work_date": "2026-01-13",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.038764"
+    },
+    {
+      "id": "2952089_2026-01-14_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-14",
+      "alert_type": "error",
+      "message": "打刻なし",
+      "detail": "",
+      "schedule": {
+        "id": 2058,
+        "work_date": "2026-01-14",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.055138"
+    },
+    {
+      "id": "2952089_2026-01-15_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-15",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2059,
+        "work_date": "2026-01-15",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:23",
+      "actual_clock_out": "07:23",
+      "created_at": "2026-01-22T16:43:57.077428"
+    },
+    {
+      "id": "2952089_2026-01-15_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-15",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2059,
+        "work_date": "2026-01-15",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:23",
+      "actual_clock_out": "07:23",
+      "created_at": "2026-01-22T16:43:57.077441"
+    },
+    {
+      "id": "2952089_2026-01-16_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2525,
+        "work_date": "2026-01-16",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:37",
+      "actual_clock_out": "07:37",
+      "created_at": "2026-01-22T16:43:57.102039"
+    },
+    {
+      "id": "2952089_2026-01-16_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2525,
+        "work_date": "2026-01-16",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:37",
+      "actual_clock_out": "07:37",
+      "created_at": "2026-01-22T16:43:57.102052"
+    },
+    {
+      "id": "2952089_2026-01-17_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-17",
+      "alert_type": "error",
+      "message": "休日なのに打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2526,
+        "work_date": "2026-01-17",
+        "work_type": "所",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": "15:56",
+      "actual_clock_out": "15:56",
+      "created_at": "2026-01-22T16:43:57.110989"
+    },
+    {
+      "id": "2952089_2026-01-19_error",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-19",
+      "alert_type": "error",
+      "message": "打刻なし",
+      "detail": "",
+      "schedule": {
+        "id": 2528,
+        "work_date": "2026-01-19",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.125529"
+    },
+    {
+      "id": "2952089_2026-01-20_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-20",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2529,
+        "work_date": "2026-01-20",
+        "work_type": "日勤",
+        "start_time": "8:00",
+        "end_time": "17:00"
+      },
+      "actual_clock_in": "08:17",
+      "actual_clock_out": "08:17",
+      "created_at": "2026-01-22T16:43:57.140164"
+    },
+    {
+      "id": "2952089_2026-01-21_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-21",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2530,
+        "work_date": "2026-01-21",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:26",
+      "actual_clock_out": "08:26",
+      "created_at": "2026-01-22T16:43:57.157504"
+    },
+    {
+      "id": "2952089_2026-01-21_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-21",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2530,
+        "work_date": "2026-01-21",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:26",
+      "actual_clock_out": "08:26",
+      "created_at": "2026-01-22T16:43:57.157523"
+    },
+    {
+      "id": "2952089_2026-01-22_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2531,
+        "work_date": "2026-01-22",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:26",
+      "actual_clock_out": "08:26",
+      "created_at": "2026-01-22T16:43:57.177204"
+    },
+    {
+      "id": "2952089_2026-01-22_warning",
+      "employee_id": "2952089",
+      "employee_name": "横山　正明",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2531,
+        "work_date": "2026-01-22",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:26",
+      "actual_clock_out": "08:26",
+      "created_at": "2026-01-22T16:43:57.177217"
+    },
+    {
+      "id": "3252023_2026-01-11_warning",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-11",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2148,
+        "work_date": "2026-01-11",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "08:49",
+      "created_at": "2026-01-22T16:43:57.449707"
+    },
+    {
+      "id": "3252023_2026-01-21_warning",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-21",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2623,
+        "work_date": "2026-01-21",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "08:48",
+      "created_at": "2026-01-22T16:43:57.614472"
+    },
+    {
+      "id": "3252023_2026-01-22_warning",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2624,
+        "work_date": "2026-01-22",
+        "work_type": "24勤A",
+        "start_time": "8:30",
+        "end_time": "8:30"
+      },
+      "actual_clock_in": "08:15",
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.633071"
+    },
+    {
+      "id": "3252023_2026-01-23_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-23",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2625,
+        "work_date": "2026-01-23",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.639588"
+    },
+    {
+      "id": "3252023_2026-01-26_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-26",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2628,
+        "work_date": "2026-01-26",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.661617"
+    },
+    {
+      "id": "3252023_2026-01-26_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-26",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2628,
+        "work_date": "2026-01-26",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.661630"
+    },
+    {
+      "id": "3252023_2026-01-29_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-29",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2631,
+        "work_date": "2026-01-29",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.681492"
+    },
+    {
+      "id": "3252023_2026-01-29_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-29",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2631,
+        "work_date": "2026-01-29",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.681510"
+    },
+    {
+      "id": "3252023_2026-01-31_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-31",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2633,
+        "work_date": "2026-01-31",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.694986"
+    },
+    {
+      "id": "3252023_2026-01-31_error",
+      "employee_id": "3252023",
+      "employee_name": "田中　宏和",
+      "work_date": "2026-01-31",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2633,
+        "work_date": "2026-01-31",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:57.694998"
+    },
+    {
+      "id": "3652025_2026-01-04_warning",
+      "employee_id": "3652025",
+      "employee_name": "藤原　敬史",
+      "work_date": "2026-01-04",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2172,
+        "work_date": "2026-01-04",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "08:40",
+      "created_at": "2026-01-22T16:43:57.739951"
+    },
+    {
+      "id": "3652025_2026-01-25_error",
+      "employee_id": "3652025",
+      "employee_name": "藤原　敬史",
+      "work_date": "2026-01-25",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2658,
+        "work_date": "2026-01-25",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.055795"
+    },
+    {
+      "id": "3652025_2026-01-25_error",
+      "employee_id": "3652025",
+      "employee_name": "藤原　敬史",
+      "work_date": "2026-01-25",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2658,
+        "work_date": "2026-01-25",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.055807"
+    },
+    {
+      "id": "3652025_2026-01-28_error",
+      "employee_id": "3652025",
+      "employee_name": "藤原　敬史",
+      "work_date": "2026-01-28",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2661,
+        "work_date": "2026-01-28",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.078576"
+    },
+    {
+      "id": "3652025_2026-01-28_error",
+      "employee_id": "3652025",
+      "employee_name": "藤原　敬史",
+      "work_date": "2026-01-28",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2661,
+        "work_date": "2026-01-28",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.078590"
+    },
+    {
+      "id": "3852035_2026-01-03_warning",
+      "employee_id": "3852035",
+      "employee_name": "大仲　五十夫",
+      "work_date": "2026-01-03",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2233,
+        "work_date": "2026-01-03",
+        "work_type": "夜勤",
+        "start_time": "20:00",
+        "end_time": "07:00"
+      },
+      "actual_clock_in": "19:43",
+      "actual_clock_out": "07:01",
+      "created_at": "2026-01-22T16:43:58.139519"
+    },
+    {
+      "id": "3852035_2026-01-04_warning",
+      "employee_id": "3852035",
+      "employee_name": "大仲　五十夫",
+      "work_date": "2026-01-04",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2234,
+        "work_date": "2026-01-04",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "07:01",
+      "created_at": "2026-01-22T16:43:58.158358"
+    },
+    {
+      "id": "3852035_2026-01-19_warning",
+      "employee_id": "3852035",
+      "employee_name": "大仲　五十夫",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2714,
+        "work_date": "2026-01-19",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "07:02",
+      "created_at": "2026-01-22T16:43:58.341026"
+    },
+    {
+      "id": "3852035_2026-01-25_error",
+      "employee_id": "3852035",
+      "employee_name": "大仲　五十夫",
+      "work_date": "2026-01-25",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2720,
+        "work_date": "2026-01-25",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.484998"
+    },
+    {
+      "id": "3852035_2026-01-29_error",
+      "employee_id": "3852035",
+      "employee_name": "大仲　五十夫",
+      "work_date": "2026-01-29",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2724,
+        "work_date": "2026-01-29",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.538430"
+    },
+    {
+      "id": "3852035_2026-01-31_error",
+      "employee_id": "3852035",
+      "employee_name": "大仲　五十夫",
+      "work_date": "2026-01-31",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2726,
+        "work_date": "2026-01-31",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.554479"
+    },
+    {
+      "id": "3852120_2026-01-04_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-04",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2203,
+        "work_date": "2026-01-04",
+        "work_type": "24勤A",
+        "start_time": "08:30",
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "08:13",
+      "actual_clock_out": "09:00",
+      "created_at": "2026-01-22T16:43:58.604091"
+    },
+    {
+      "id": "3852120_2026-01-05_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-05",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2204,
+        "work_date": "2026-01-05",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:00",
+      "created_at": "2026-01-22T16:43:58.622964"
+    },
+    {
+      "id": "3852120_2026-01-08_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-08",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2207,
+        "work_date": "2026-01-08",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.653495"
+    },
+    {
+      "id": "3852120_2026-01-10_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-10",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2209,
+        "work_date": "2026-01-10",
+        "work_type": "24勤A",
+        "start_time": "08:30",
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "08:28",
+      "actual_clock_out": "08:50",
+      "created_at": "2026-01-22T16:43:58.671331"
+    },
+    {
+      "id": "3852120_2026-01-14_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-14",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2213,
+        "work_date": "2026-01-14",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.737137"
+    },
+    {
+      "id": "3852120_2026-01-16_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2680,
+        "work_date": "2026-01-16",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "10:18",
+      "created_at": "2026-01-22T16:43:58.778368"
+    },
+    {
+      "id": "3852120_2026-01-19_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2683,
+        "work_date": "2026-01-19",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:05",
+      "created_at": "2026-01-22T16:43:58.828747"
+    },
+    {
+      "id": "3852120_2026-01-19_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2683,
+        "work_date": "2026-01-19",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:05",
+      "created_at": "2026-01-22T16:43:58.828761"
+    },
+    {
+      "id": "3852120_2026-01-21_warning",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-21",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2685,
+        "work_date": "2026-01-21",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:00",
+      "created_at": "2026-01-22T16:43:58.872093"
+    },
+    {
+      "id": "3852120_2026-01-24_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-24",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2688,
+        "work_date": "2026-01-24",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.890223"
+    },
+    {
+      "id": "3852120_2026-01-24_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-24",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2688,
+        "work_date": "2026-01-24",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.890236"
+    },
+    {
+      "id": "3852120_2026-01-27_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-27",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2691,
+        "work_date": "2026-01-27",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.909702"
+    },
+    {
+      "id": "3852120_2026-01-27_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-27",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2691,
+        "work_date": "2026-01-27",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.909714"
+    },
+    {
+      "id": "3852120_2026-01-30_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-30",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2694,
+        "work_date": "2026-01-30",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.928090"
+    },
+    {
+      "id": "3852120_2026-01-30_error",
+      "employee_id": "3852120",
+      "employee_name": "楠本　忠晴",
+      "work_date": "2026-01-30",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2694,
+        "work_date": "2026-01-30",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:58.928115"
+    },
+    {
+      "id": "3952012_2026-01-14_warning",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-14",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2089,
+        "work_date": "2026-01-14",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:40",
+      "actual_clock_out": "17:58",
+      "created_at": "2026-01-22T16:43:59.132650"
+    },
+    {
+      "id": "3952012_2026-01-15_warning",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-15",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2090,
+        "work_date": "2026-01-15",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "06:37",
+      "actual_clock_out": "17:59",
+      "created_at": "2026-01-22T16:43:59.156466"
+    },
+    {
+      "id": "3952012_2026-01-16_warning",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2556,
+        "work_date": "2026-01-16",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "06:59",
+      "actual_clock_out": "06:59",
+      "created_at": "2026-01-22T16:43:59.177539"
+    },
+    {
+      "id": "3952012_2026-01-16_warning",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2556,
+        "work_date": "2026-01-16",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "06:59",
+      "actual_clock_out": "06:59",
+      "created_at": "2026-01-22T16:43:59.177552"
+    },
+    {
+      "id": "3952012_2026-01-19_error",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-19",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2559,
+        "work_date": "2026-01-19",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:24",
+      "actual_clock_out": "08:24",
+      "created_at": "2026-01-22T16:43:59.210016"
+    },
+    {
+      "id": "3952012_2026-01-21_error",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-21",
+      "alert_type": "error",
+      "message": "打刻なし",
+      "detail": "",
+      "schedule": {
+        "id": 2561,
+        "work_date": "2026-01-21",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:59.234938"
+    },
+    {
+      "id": "3952012_2026-01-22_warning",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2562,
+        "work_date": "2026-01-22",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:15",
+      "actual_clock_out": "12:49",
+      "created_at": "2026-01-22T16:43:59.250592"
+    },
+    {
+      "id": "3952012_2026-01-22_warning",
+      "employee_id": "3952012",
+      "employee_name": "齊藤　宗宏",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2562,
+        "work_date": "2026-01-22",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:15",
+      "actual_clock_out": "12:49",
+      "created_at": "2026-01-22T16:43:59.250607"
+    },
+    {
+      "id": "4052003_2026-01-03_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-03",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2109,
+        "work_date": "2026-01-03",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:26",
+      "actual_clock_out": "17:37",
+      "created_at": "2026-01-22T16:43:59.326854"
+    },
+    {
+      "id": "4052003_2026-01-10_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-10",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2116,
+        "work_date": "2026-01-10",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:28",
+      "actual_clock_out": "19:09",
+      "created_at": "2026-01-22T16:43:59.434940"
+    },
+    {
+      "id": "4052003_2026-01-10_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-10",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2116,
+        "work_date": "2026-01-10",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:28",
+      "actual_clock_out": "19:09",
+      "created_at": "2026-01-22T16:43:59.434952"
+    },
+    {
+      "id": "4052003_2026-01-11_error",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-11",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2117,
+        "work_date": "2026-01-11",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:24",
+      "actual_clock_out": "08:24",
+      "created_at": "2026-01-22T16:43:59.450036"
+    },
+    {
+      "id": "4052003_2026-01-15_error",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-15",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2121,
+        "work_date": "2026-01-15",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:24",
+      "actual_clock_out": "08:24",
+      "created_at": "2026-01-22T16:43:59.505542"
+    },
+    {
+      "id": "4052003_2026-01-16_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2587,
+        "work_date": "2026-01-16",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:22",
+      "actual_clock_out": "18:00",
+      "created_at": "2026-01-22T16:43:59.522146"
+    },
+    {
+      "id": "4052003_2026-01-18_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-18",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2589,
+        "work_date": "2026-01-18",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:24",
+      "actual_clock_out": "19:49",
+      "created_at": "2026-01-22T16:43:59.547628"
+    },
+    {
+      "id": "4052003_2026-01-19_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2590,
+        "work_date": "2026-01-19",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:23",
+      "actual_clock_out": "17:51",
+      "created_at": "2026-01-22T16:43:59.562216"
+    },
+    {
+      "id": "4052003_2026-01-19_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2590,
+        "work_date": "2026-01-19",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:23",
+      "actual_clock_out": "17:51",
+      "created_at": "2026-01-22T16:43:59.562229"
+    },
+    {
+      "id": "4052003_2026-01-20_warning",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-20",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2591,
+        "work_date": "2026-01-20",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:25",
+      "actual_clock_out": "19:10",
+      "created_at": "2026-01-22T16:43:59.577827"
+    },
+    {
+      "id": "4052003_2026-01-22_error",
+      "employee_id": "4052003",
+      "employee_name": "杉原　新一",
+      "work_date": "2026-01-22",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2593,
+        "work_date": "2026-01-22",
+        "work_type": "日勤",
+        "start_time": "8:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:25",
+      "actual_clock_out": "08:25",
+      "created_at": "2026-01-22T16:43:59.612700"
+    },
+    {
+      "id": "4252061_2026-01-03_warning",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-03",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2264,
+        "work_date": "2026-01-03",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "08:49",
+      "created_at": "2026-01-22T16:43:59.708663"
+    },
+    {
+      "id": "4252061_2026-01-07_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-07",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2268,
+        "work_date": "2026-01-07",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:59.748088"
+    },
+    {
+      "id": "4252061_2026-01-10_warning",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-10",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2271,
+        "work_date": "2026-01-10",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:13",
+      "created_at": "2026-01-22T16:43:59.791439"
+    },
+    {
+      "id": "4252061_2026-01-10_warning",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-10",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2271,
+        "work_date": "2026-01-10",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:13",
+      "created_at": "2026-01-22T16:43:59.791451"
+    },
+    {
+      "id": "4252061_2026-01-12_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-12",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2273,
+        "work_date": "2026-01-12",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:43:59.815554"
+    },
+    {
+      "id": "4252061_2026-01-14_warning",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-14",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2275,
+        "work_date": "2026-01-14",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "19:22",
+      "created_at": "2026-01-22T16:43:59.974879"
+    },
+    {
+      "id": "4252061_2026-01-15_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-15",
+      "alert_type": "error",
+      "message": "休日なのに打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2276,
+        "work_date": "2026-01-15",
+        "work_type": "所",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": "07:06",
+      "actual_clock_out": "07:06",
+      "created_at": "2026-01-22T16:43:59.985902"
+    },
+    {
+      "id": "4252061_2026-01-20_warning",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-20",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2746,
+        "work_date": "2026-01-20",
+        "work_type": "24勤A",
+        "start_time": "8:30",
+        "end_time": "8:30"
+      },
+      "actual_clock_in": "07:47",
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.048619"
+    },
+    {
+      "id": "4252061_2026-01-21_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-21",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2747,
+        "work_date": "2026-01-21",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.057540"
+    },
+    {
+      "id": "4252061_2026-01-24_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-24",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2750,
+        "work_date": "2026-01-24",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.075578"
+    },
+    {
+      "id": "4252061_2026-01-24_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-24",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2750,
+        "work_date": "2026-01-24",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.075590"
+    },
+    {
+      "id": "4252061_2026-01-26_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-26",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2752,
+        "work_date": "2026-01-26",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.091138"
+    },
+    {
+      "id": "4252061_2026-01-26_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-26",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2752,
+        "work_date": "2026-01-26",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.091151"
+    },
+    {
+      "id": "4252061_2026-01-28_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-28",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2754,
+        "work_date": "2026-01-28",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.107898"
+    },
+    {
+      "id": "4252061_2026-01-28_error",
+      "employee_id": "4252061",
+      "employee_name": "玉置　公一",
+      "work_date": "2026-01-28",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2754,
+        "work_date": "2026-01-28",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.107911"
+    },
+    {
+      "id": "4252120_2026-01-05_warning",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-05",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2297,
+        "work_date": "2026-01-05",
+        "work_type": "24勤B",
+        "start_time": "08:30",
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "08:20",
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.188594"
+    },
+    {
+      "id": "4252120_2026-01-06_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-06",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2298,
+        "work_date": "2026-01-06",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.197849"
+    },
+    {
+      "id": "4252120_2026-01-12_warning",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-12",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2304,
+        "work_date": "2026-01-12",
+        "work_type": "24勤A",
+        "start_time": null,
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "08:17",
+      "actual_clock_out": "08:53",
+      "created_at": "2026-01-22T16:44:00.268484"
+    },
+    {
+      "id": "4252120_2026-01-18_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-18",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2775,
+        "work_date": "2026-01-18",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.355021"
+    },
+    {
+      "id": "4252120_2026-01-22_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-22",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2779,
+        "work_date": "2026-01-22",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.392909"
+    },
+    {
+      "id": "4252120_2026-01-25_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-25",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2782,
+        "work_date": "2026-01-25",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.413628"
+    },
+    {
+      "id": "4252120_2026-01-25_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-25",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2782,
+        "work_date": "2026-01-25",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.413648"
+    },
+    {
+      "id": "4252120_2026-01-27_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-27",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2784,
+        "work_date": "2026-01-27",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.434403"
+    },
+    {
+      "id": "4252120_2026-01-27_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-27",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2784,
+        "work_date": "2026-01-27",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.434418"
+    },
+    {
+      "id": "4252120_2026-01-29_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-29",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2786,
+        "work_date": "2026-01-29",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.450411"
+    },
+    {
+      "id": "4252120_2026-01-29_error",
+      "employee_id": "4252120",
+      "employee_name": "永濱　伸二",
+      "work_date": "2026-01-29",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2786,
+        "work_date": "2026-01-29",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.450423"
+    },
+    {
+      "id": "4452133_2026-01-04_warning",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-04",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2327,
+        "work_date": "2026-01-04",
+        "work_type": "24勤B",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:13",
+      "actual_clock_out": "08:51",
+      "created_at": "2026-01-22T16:44:00.528419"
+    },
+    {
+      "id": "4452133_2026-01-05_warning",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-05",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2328,
+        "work_date": "2026-01-05",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "08:51",
+      "created_at": "2026-01-22T16:44:00.545070"
+    },
+    {
+      "id": "4452133_2026-01-12_error",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-12",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2335,
+        "work_date": "2026-01-12",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.653547"
+    },
+    {
+      "id": "4452133_2026-01-22_warning",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2810,
+        "work_date": "2026-01-22",
+        "work_type": "24勤B",
+        "start_time": "8:30",
+        "end_time": "8:30"
+      },
+      "actual_clock_in": "08:15",
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.753478"
+    },
+    {
+      "id": "4452133_2026-01-23_error",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-23",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2811,
+        "work_date": "2026-01-23",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.760200"
+    },
+    {
+      "id": "4452133_2026-01-27_error",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-27",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2815,
+        "work_date": "2026-01-27",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.790732"
+    },
+    {
+      "id": "4452133_2026-01-27_error",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-27",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2815,
+        "work_date": "2026-01-27",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.790746"
+    },
+    {
+      "id": "4452133_2026-01-31_error",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-31",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2819,
+        "work_date": "2026-01-31",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.814029"
+    },
+    {
+      "id": "4452133_2026-01-31_error",
+      "employee_id": "4452133",
+      "employee_name": "井上　誠二",
+      "work_date": "2026-01-31",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2819,
+        "work_date": "2026-01-31",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:00.814041"
+    },
+    {
+      "id": "4452697_2026-01-05_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-05",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2359,
+        "work_date": "2026-01-05",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:31",
+      "created_at": "2026-01-22T16:44:00.877387"
+    },
+    {
+      "id": "4452697_2026-01-10_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-10",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2364,
+        "work_date": "2026-01-10",
+        "work_type": "24勤B",
+        "start_time": "08:30",
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "08:12",
+      "actual_clock_out": "10:20",
+      "created_at": "2026-01-22T16:44:00.934215"
+    },
+    {
+      "id": "4452697_2026-01-11_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-11",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2365,
+        "work_date": "2026-01-11",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "10:20",
+      "created_at": "2026-01-22T16:44:00.952537"
+    },
+    {
+      "id": "4452697_2026-01-11_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-11",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2365,
+        "work_date": "2026-01-11",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "10:20",
+      "created_at": "2026-01-22T16:44:00.952551"
+    },
+    {
+      "id": "4452697_2026-01-14_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-14",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2368,
+        "work_date": "2026-01-14",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:10",
+      "actual_clock_out": "18:28",
+      "created_at": "2026-01-22T16:44:00.979694"
+    },
+    {
+      "id": "4452697_2026-01-16_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-16",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2835,
+        "work_date": "2026-01-16",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:49",
+      "created_at": "2026-01-22T16:44:01.016527"
+    },
+    {
+      "id": "4452697_2026-01-19_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2838,
+        "work_date": "2026-01-19",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:00",
+      "created_at": "2026-01-22T16:44:01.056058"
+    },
+    {
+      "id": "4452697_2026-01-19_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-19",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2838,
+        "work_date": "2026-01-19",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "09:00",
+      "created_at": "2026-01-22T16:44:01.056073"
+    },
+    {
+      "id": "4452697_2026-01-22_warning",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-22",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2841,
+        "work_date": "2026-01-22",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "08:53",
+      "created_at": "2026-01-22T16:44:01.219575"
+    },
+    {
+      "id": "4452697_2026-01-24_error",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-24",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2843,
+        "work_date": "2026-01-24",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:01.246315"
+    },
+    {
+      "id": "4452697_2026-01-24_error",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-24",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2843,
+        "work_date": "2026-01-24",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:01.246331"
+    },
+    {
+      "id": "4452697_2026-01-28_error",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-28",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2847,
+        "work_date": "2026-01-28",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:01.276007"
+    },
+    {
+      "id": "4452697_2026-01-28_error",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-28",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2847,
+        "work_date": "2026-01-28",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:01.276024"
+    },
+    {
+      "id": "4452697_2026-01-30_error",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-30",
+      "alert_type": "error",
+      "message": "退勤打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2849,
+        "work_date": "2026-01-30",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:01.291969"
+    },
+    {
+      "id": "4452697_2026-01-30_error",
+      "employee_id": "4452697",
+      "employee_name": "堀江　敦",
+      "work_date": "2026-01-30",
+      "alert_type": "error",
+      "message": "打刻漏れ",
+      "detail": "",
+      "schedule": {
+        "id": 2849,
+        "work_date": "2026-01-30",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": null,
+      "created_at": "2026-01-22T16:44:01.291984"
+    },
+    {
+      "id": "4552092_2026-01-04_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-04",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2420,
+        "work_date": "2026-01-04",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:09",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.330931"
+    },
+    {
+      "id": "4552092_2026-01-05_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-05",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2421,
+        "work_date": "2026-01-05",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:11",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.346460"
+    },
+    {
+      "id": "4552092_2026-01-07_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-07",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2423,
+        "work_date": "2026-01-07",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:56",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.374962"
+    },
+    {
+      "id": "4552092_2026-01-08_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-08",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2424,
+        "work_date": "2026-01-08",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:40",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.391002"
+    },
+    {
+      "id": "4552092_2026-01-09_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-09",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2425,
+        "work_date": "2026-01-09",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:38",
+      "actual_clock_out": "17:37",
+      "created_at": "2026-01-22T16:44:01.408079"
+    },
+    {
+      "id": "4552092_2026-01-12_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-12",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2428,
+        "work_date": "2026-01-12",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:00",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.431869"
+    },
+    {
+      "id": "4552092_2026-01-12_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-12",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2428,
+        "work_date": "2026-01-12",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "08:00",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.431881"
+    },
+    {
+      "id": "4552092_2026-01-13_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-13",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2429,
+        "work_date": "2026-01-13",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:46",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.452573"
+    },
+    {
+      "id": "4552092_2026-01-14_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-14",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2430,
+        "work_date": "2026-01-14",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:40",
+      "actual_clock_out": "17:30",
+      "created_at": "2026-01-22T16:44:01.471769"
+    },
+    {
+      "id": "4552092_2026-01-15_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-15",
+      "alert_type": "warning",
+      "message": "出勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2431,
+        "work_date": "2026-01-15",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:28",
+      "actual_clock_out": "07:28",
+      "created_at": "2026-01-22T16:44:01.491667"
+    },
+    {
+      "id": "4552092_2026-01-15_warning",
+      "employee_id": "4552092",
+      "employee_name": "永井　康貴",
+      "work_date": "2026-01-15",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2431,
+        "work_date": "2026-01-15",
+        "work_type": "日勤",
+        "start_time": "08:30",
+        "end_time": "17:30"
+      },
+      "actual_clock_in": "07:28",
+      "actual_clock_out": "07:28",
+      "created_at": "2026-01-22T16:44:01.491679"
+    },
+    {
+      "id": "4552899_2026-01-05_warning",
+      "employee_id": "4552899",
+      "employee_name": "松浦　真司",
+      "work_date": "2026-01-05",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2390,
+        "work_date": "2026-01-05",
+        "work_type": "24勤B",
+        "start_time": "08:30",
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "08:11",
+      "actual_clock_out": "08:36",
+      "created_at": "2026-01-22T16:44:01.559038"
+    },
+    {
+      "id": "4552899_2026-01-09_warning",
+      "employee_id": "4552899",
+      "employee_name": "松浦　真司",
+      "work_date": "2026-01-09",
+      "alert_type": "warning",
+      "message": "退勤時刻に差異あり",
+      "detail": "",
+      "schedule": {
+        "id": 2394,
+        "work_date": "2026-01-09",
+        "work_type": "明",
+        "start_time": null,
+        "end_time": null
+      },
+      "actual_clock_in": null,
+      "actual_clock_out": "16:00",
+      "created_at": "2026-01-22T16:44:01.612489"
+    },
+    {
+      "id": "4552899_2026-01-12_warning",
+      "employee_id": "4552899",
+      "employee_name": "松浦　真司",
+      "work_date": "2026-01-12",
+      "alert_type": "warning",
+      "message": "短時間連続打刻",
+      "detail": "",
+      "schedule": {
+        "id": 2397,
+        "work_date": "2026-01-12",
+        "work_type": "24勤B",
+        "start_time": "08:30",
+        "end_time": "08:30"
+      },
+      "actual_clock_in": "07:45",
+      "actual_clock_out": "08:45",
+      "created_at": "2026-01-22T16:44:01.640768"
+    }
+  ],
+  "generated_at": "2026-01-22T16:44:01.675193",
+  "total_count": 141
+}

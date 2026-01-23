@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>従業員勤怠確認 - {{ employee_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .employee-info-section {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .results-section {
+            margin-top: var(--spacing-lg);
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .results-count {
+            color: var(--text-secondary);
+        }
+        
+        .btn-refresh {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .btn-refresh:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .btn-export {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+            margin-left: var(--spacing-sm);
+        }
+        
+        .btn-export:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .results-table {
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .results-table thead {
+            background: var(--bg-secondary);
+        }
+        
+        .results-table th {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-weight: 400;
+        }
+        
+        /* 列幅の最適化 */
+        .results-table th:nth-child(1) { width: 90px; }  /* 勤務日 */
+        .results-table th:nth-child(2) { width: 90px; }  /* 勤務タイプ */
+        .results-table th:nth-child(3) { width: 70px; }  /* 開始時刻 */
+        .results-table th:nth-child(4) { width: 70px; }  /* 終了時刻 */
+        .results-table th:nth-child(5) { width: 120px; } /* 打刻時間 */
+        .results-table th:nth-child(6) { width: 150px; } /* エラー */
+        .results-table th:nth-child(7) { width: 80px; }  /* 時間外 */
+        .results-table th:nth-child(8) { width: 80px; }  /* 休暇 */
+        
+        .work-type {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
+            font-weight: 400;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-primary);
+        }
+        
+        .attendance-times {
+            font-family: 'Courier New', monospace;
+            font-size: var(--font-size-sm);
+        }
+        
+        .attendance-time {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            margin: 1px;
+            font-weight: 400;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        
+        .attendance-time.valid-clock-in {
+            background: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .attendance-time.valid-clock-out {
+            background: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .no-attendance {
+            color: var(--text-secondary);
+            font-style: normal;
+        }
+        
+        .alert-item {
+            display: block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            margin: var(--spacing-xs) 0;
+            font-size: var(--font-size-sm);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        
+        .error-alert {
+            background: #f8d7da;
+            border-color: #f5c2c7;
+            color: #842029;
+        }
+        
+        .warning-alert {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        
+        .employee-id {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: var(--spacing-md);">
+            <a href="/" class="back-link">トップページに戻る</a>
+            <a href="/search" class="back-link" style="margin-left: var(--spacing-md);">勤怠検索</a>
+            <a href="/check" class="back-link" style="margin-left: var(--spacing-md);">勤怠チェック</a>
+        </div>
+        
+        <h1>従業員勤怠確認</h1>
+        
+        <div class="employee-info-section">
+            <div class="form-group">
+                <label>従業員ID</label>
+                <div class="employee-id">{{ employee_id }}</div>
+            </div>
+            <div class="form-group">
+                <label>従業員名</label>
+                <div id="employee-name">読み込み中...</div>
+            </div>
+            <div class="form-group">
+                <label>セクション</label>
+                <div id="employee-section">読み込み中...</div>
+            </div>
+            <div class="form-group">
+                <label>確認対象月</label>
+                <div id="target-month">{{ current_month }}</div>
+            </div>
+            <div>
+                <button type="button" class="btn btn-refresh" onclick="refreshData()">🔄 最新データに更新</button>
+                <button type="button" class="btn btn-export" onclick="exportEmployeeCSV()">CSV出力</button>
+            </div>
+        </div>
+        
+        <div id="error-message" style="display: none;" class="error"></div>
+        
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <div class="results-count" id="results-count">勤怠データ: 0 件</div>
+                <div>
+                    <span id="error-count" style="color: #d63384;">エラー: 0件</span>
+                    <span id="warning-count" style="color: #fd7e14; margin-left: var(--spacing-md);">警告: 0件</span>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>勤務日 📅↑</th>
+                            <th>勤務タイプ</th>
+                            <th>開始時刻</th>
+                            <th>終了時刻</th>
+                            <th>実際の打刻時間 🕐</th>
+                            <th>エラー・警告</th>
+                            <th>時間外申告</th>
+                            <th>休暇願</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            データを読み込み中...
+        </div>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            勤怠データが見つかりませんでした。
+        </div>
+    </div>
+    
+    <!-- 共通ライブラリを読み込み -->
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
+    
+    <script>
+        let attendanceData = [];
+        let employeeInfo = null;
+        const employeeId = '{{ employee_id }}';
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadEmployeeData();
+        });
+        
+        async function loadEmployeeData() {
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('error-message');
+            
+            try {
+                loading.style.display = 'block';
+                errorMessage.style.display = 'none';
+                
+                // 従業員情報と勤怠データを同時取得
+                const [employeeResponse, attendanceResponse] = await Promise.all([
+                    fetch(`/api/attendance-check/employee/${employeeId}`),
+                    fetch(`/api/attendance-check/employee/${employeeId}/attendance`)
+                ]);
+                
+                if (!employeeResponse.ok) {
+                    throw new Error(`従業員情報の取得に失敗しました: ${employeeResponse.status}`);
+                }
+                
+                if (!attendanceResponse.ok) {
+                    throw new Error(`勤怠データの取得に失敗しました: ${attendanceResponse.status}`);
+                }
+                
+                const employeeResult = await employeeResponse.json();
+                const attendanceResult = await attendanceResponse.json();
+                
+                if (employeeResult.status === 'success' && employeeResult.data) {
+                    employeeInfo = employeeResult.data;
+                    document.getElementById('employee-name').textContent = employeeInfo.name || '不明';
+                    document.getElementById('employee-section').textContent = employeeInfo.section || '設備';
+                }
+                
+                if (attendanceResult.status === 'success' && attendanceResult.data) {
+                    attendanceData = attendanceResult.data;
+                    displayResults();
+                } else {
+                    showNoResults();
+                }
+                
+            } catch (error) {
+                console.error('データ読み込みエラー:', error);
+                showError(`データの読み込み中にエラーが発生しました: ${error.message}`);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        function displayResults() {
+            const resultsSection = document.getElementById('results-section');
+            const resultsBody = document.getElementById('results-body');
+            const resultsCount = document.getElementById('results-count');
+            const errorCount = document.getElementById('error-count');
+            const warningCount = document.getElementById('warning-count');
+            const noResults = document.getElementById('no-results');
+            
+            if (!attendanceData || attendanceData.length === 0) {
+                showNoResults();
+                return;
+            }
+            
+            // エラー・警告カウント
+            let errors = 0, warnings = 0;
+            attendanceData.forEach(item => {
+                errors += item.errors ? item.errors.length : 0;
+                warnings += item.warnings ? item.warnings.length : 0;
+            });
+            
+            // 表示更新
+            resultsCount.textContent = `勤怠データ: ${attendanceData.length} 件`;
+            errorCount.textContent = `エラー: ${errors}件`;
+            warningCount.textContent = `警告: ${warnings}件`;
+            
+            // テーブル行を生成
+            resultsBody.innerHTML = attendanceData.map(item => {
+                const alerts = [];
+                if (item.errors) {
+                    alerts.push(...item.errors.map(error => `<span class="alert-item error-alert">${error}</span>`));
+                }
+                if (item.warnings) {
+                    alerts.push(...item.warnings.map(warning => `<span class="alert-item warning-alert">${warning}</span>`));
+                }
+                
+                const attendanceTimes = item.attendance_times && item.attendance_times.length > 0 
+                    ? item.attendance_times.map(time => `<span class="attendance-time">${time}</span>`).join(' ')
+                    : '<span class="no-attendance">打刻なし</span>';
+                
+                return `
+                    <tr>
+                        <td>${item.work_date}</td>
+                        <td><span class="work-type">${item.work_type || '通常'}</span></td>
+                        <td>${item.start_time || '-'}</td>
+                        <td>${item.end_time || '-'}</td>
+                        <td class="attendance-times">${attendanceTimes}</td>
+                        <td>${alerts.join('')}</td>
+                        <td>${item.overtime_status || '-'}</td>
+                        <td>${item.leave_status || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            resultsSection.style.display = 'block';
+            noResults.style.display = 'none';
+        }
+        
+        function showNoResults() {
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'block';
+        }
+        
+        function showError(message) {
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        async function refreshData() {
+            await loadEmployeeData();
+        }
+        
+        function exportEmployeeCSV() {
+            if (!attendanceData || attendanceData.length === 0) {
+                alert('エクスポートするデータがありません。');
+                return;
+            }
+            
+            const csvData = generateEmployeeCSV(attendanceData, employeeInfo);
+            downloadCSV(csvData, `attendance_${employeeId}_${new Date().getTime()}.csv`);
+        }
+        
+        function generateEmployeeCSV(data, employee) {
+            const headers = ['勤務日', '勤務タイプ', '開始時刻', '終了時刻', '打刻時間', 'エラー', '警告', '時間外申告', '休暇願'];
+            const rows = data.map(item => [
+                item.work_date,
+                item.work_type || '通常',
+                item.start_time || '',
+                item.end_time || '',
+                item.attendance_times ? item.attendance_times.join(' / ') : '',
+                item.errors ? item.errors.join(' / ') : '',
+                item.warnings ? item.warnings.join(' / ') : '',
+                item.overtime_status || '',
+                item.leave_status || ''
+            ]);
+            
+            const csvContent = [
+                `従業員ID,${employeeId}`,
+                `従業員名,${employee ? employee.name : '不明'}`,
+                `セクション,${employee ? employee.section : '設備'}`,
+                `出力日時,${new Date().toLocaleString('ja-JP')}`,
+                '',
+                headers.join(','),
+                ...rows.map(row => row.join(','))
+            ].join('\n');
+            
+            return csvContent;
+        }
+        
+        function downloadCSV(csvData, filename) {
+            const blob = new Blob(['\uFEFF' + csvData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
+        .attendance-table td {
+            padding: var(--spacing-sm);
+            text-align: left;
+            border-bottom: var(--border-width) solid var(--border-color);
+        }
+        
+        .attendance-table th {
+            background-color: var(--bg-secondary);
+            font-weight: 600;
+        }
+        
+        .status-error {
+            color: var(--danger-color);
+            font-weight: 600;
+        }
+        
+        .status-warning {
+            color: #856404;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 勤怠確認</h1>
+            <p>あなたの勤怠状況を確認できます</p>
+        </header>
+
+        <div class="employee-info">
+            <h3>対象従業員: <span id="employee-name">読み込み中...</span></h3>
+            <p>従業員ID: {{ employee_id }}</p>
+        </div>
+
+        <div id="loading" style="text-align: center; padding: var(--spacing-lg);">
+            <p>勤怠データを読み込み中...</p>
+        </div>
+
+        <div id="attendance-data" style="display: none;">
+            <!-- 勤怠データがここに表示されます -->
+        </div>
+    </div>
+
+    <script>
+        const employeeId = '{{ employee_id }}';
+        
+        // 勤怠データを取得して表示
+        async function loadAttendanceData() {
+            try {
+                // 直接従業員専用APIを呼び出し
+                const response = await fetch(`/api/attendance-check/employee/${employeeId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayAttendanceData(data);
+                } else {
+                    showError(data.message || 'データの取得に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError(`データの取得中にエラーが発生しました: ${error.message}`);
+            }
+        }
+        
+        function displayAttendanceData(data) {
+            const loadingElement = document.getElementById('loading');
+            const dataElement = document.getElementById('attendance-data');
+            const nameElement = document.getElementById('employee-name');
+            
+            loadingElement.style.display = 'none';
+            dataElement.style.display = 'block';
+            
+            if (data.employee_name) {
+                nameElement.textContent = data.employee_name;
+            }
+            
+            let html = '';
+            
+            // エラーメッセージがある場合
+            if (data.errors && data.errors.length > 0) {
+                data.errors.forEach(error => {
+                    html += `
+                        <div class="alert alert-danger">
+                            <strong>⚠️ ${error.date}</strong><br>
+                            ${error.message}
+                            ${error.detail ? `<br><small>${error.detail}</small>` : ''}
+                        </div>
+                    `;
+                });
+            }
+            
+            // 警告メッセージがある場合
+            if (data.warnings && data.warnings.length > 0) {
+                data.warnings.forEach(warning => {
+                    html += `
+                        <div class="alert alert-warning">
+                            <strong>⏰ ${warning.date}</strong><br>
+                            ${warning.message}
+                            ${warning.detail ? `<br><small>${warning.detail}</small>` : ''}
+                        </div>
+                    `;
+                });
+            }
+            
+            // メッセージがない場合
+            if ((!data.errors || data.errors.length === 0) && 
+                (!data.warnings || data.warnings.length === 0)) {
+                html += `
+                    <div class="alert" style="background-color: #d1f2eb; border-color: #a3e4d7; color: #0e5e47;">
+                        ✅ 問題のある勤怠記録は見つかりませんでした
+                    </div>
+                `;
+            }
+            
+            dataElement.innerHTML = html;
+        }
+        
+        function showError(message) {
+            const loadingElement = document.getElementById('loading');
+            const dataElement = document.getElementById('attendance-data');
+            
+            loadingElement.style.display = 'none';
+            dataElement.style.display = 'block';
+            dataElement.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>エラー</strong><br>
+                    ${message}
+                </div>
+            `;
+        }
+        
+        // ページ読み込み時に実行
+        document.addEventListener('DOMContentLoaded', loadAttendanceData);
+    </script>
+</body>
+</html>
