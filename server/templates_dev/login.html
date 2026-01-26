@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理画面ログイン</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .login-container {
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+        }
+        
+        .subtitle {
+            text-align: center;
+        }
+        
+        .error {
+            display: none;
+        }
+        
+        .info {
+            font-size: var(--font-size-sm);
+        }
+        
+        .password-toggle {
+            position: relative;
+        }
+        
+        .password-toggle-btn {
+            position: absolute;
+            right: var(--spacing-sm);
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+            padding: var(--spacing-xs);
+        }
+        
+        .password-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+        
+        .form-group label input[type="checkbox"] {
+            width: auto;
+            margin-right: var(--spacing-sm);
+        }
+    </style>
+</head>
+<body>
+    <div class="container login-container">
+        <h1>管理画面ログイン</h1>
+        <p class="subtitle">管理者パスワードを入力してください</p>
+        
+        <div id="error-message" class="alert alert-error"></div>
+        
+        <div class="alert alert-info">
+            注意: デフォルトパスワードは「admin」です。本番環境では必ず環境変数で変更してください。
+        </div>
+        
+        <form id="login-form">
+            <div class="form-group">
+                <label for="password">パスワード</label>
+                <div class="password-toggle">
+                    <input type="password" id="password" name="password" required autofocus>
+                    <button type="button" class="password-toggle-btn" onclick="togglePassword()">表示</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="db-access" name="db_access" onchange="toggleDbPassword()">
+                    データベースアクセス権限も取得する
+                </label>
+            </div>
+            
+            <div class="form-group" id="db-password-group" style="display: none;">
+                <label for="db-password">データベースパスワード</label>
+                <div class="password-toggle">
+                    <input type="password" id="db-password" name="db_password">
+                    <button type="button" class="password-toggle-btn" onclick="toggleDbPasswordVisibility()">表示</button>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">ログイン</button>
+        </form>
+        
+        <div style="margin-top: var(--spacing-lg); text-align: center;">
+            <a href="/" class="back-link">トップページに戻る</a>
+        </div>
+    </div>
+    
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleBtn = passwordInput.nextElementSibling;
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleBtn.textContent = '非表示';
+            } else {
+                passwordInput.type = 'password';
+                toggleBtn.textContent = '表示';
+            }
+        }
+        
+        function toggleDbPasswordVisibility() {
+            const dbPasswordInput = document.getElementById('db-password');
+            const toggleBtn = dbPasswordInput.nextElementSibling;
+            
+            if (dbPasswordInput.type === 'password') {
+                dbPasswordInput.type = 'text';
+                toggleBtn.textContent = '非表示';
+            } else {
+                dbPasswordInput.type = 'password';
+                toggleBtn.textContent = '表示';
+            }
+        }
+        
+        function toggleDbPassword() {
+            const dbAccessCheckbox = document.getElementById('db-access');
+            const dbPasswordGroup = document.getElementById('db-password-group');
+            
+            if (dbAccessCheckbox.checked) {
+                dbPasswordGroup.style.display = 'block';
+                document.getElementById('db-password').required = true;
+            } else {
+                dbPasswordGroup.style.display = 'none';
+                document.getElementById('db-password').required = false;
+                document.getElementById('db-password').value = '';
+            }
+        }
+        
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const password = document.getElementById('password').value;
+            const dbAccess = document.getElementById('db-access').checked;
+            const dbPassword = document.getElementById('db-password').value;
+            const errorDiv = document.getElementById('error-message');
+            
+            errorDiv.style.display = 'none';
+            
+            try {
+                const loginData = {
+                    password: password,
+                    db_access: dbAccess
+                };
+                
+                if (dbAccess && dbPassword) {
+                    loginData.db_password = dbPassword;
+                }
+                
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(loginData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'success') {
+                    // ログイン成功
+                    const redirectUrl = new URLSearchParams(window.location.search).get('next') || '/';
+                    window.location.href = redirectUrl;
+                } else {
+                    // ログイン失敗
+                    errorDiv.textContent = data.message || 'ログインに失敗しました';
+                    errorDiv.style.display = 'block';
+                    document.getElementById('password').value = '';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'サーバーとの通信エラーが発生しました: ' + error.message;
+                errorDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+

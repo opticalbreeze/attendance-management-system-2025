@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理者ページ - 勤怠管理システム</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+        }
+        
+        .admin-section {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .upload-area {
+            border: var(--border-width) dashed var(--border-color);
+            padding: var(--spacing-xl);
+            text-align: center;
+            background: var(--bg-primary);
+            margin: var(--spacing-md) 0;
+        }
+        
+        .upload-area.dragover {
+            background: var(--bg-hover);
+            border-color: var(--accent-color);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: var(--spacing-md) 0;
+        }
+        
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-button {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+            cursor: pointer;
+            display: inline-block;
+        }
+        
+        .file-input-button:hover {
+            background: var(--bg-hover);
+        }
+        
+        .selected-file {
+            margin: var(--spacing-md) 0;
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border: var(--border-width) solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .import-button {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: var(--border-width) solid var(--accent-color);
+            cursor: pointer;
+        }
+        
+        .import-button:hover:not(:disabled) {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .import-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .progress {
+            display: none;
+            margin: var(--spacing-md) 0;
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border: var(--border-width) solid var(--border-color);
+            text-align: center;
+        }
+        
+        .result {
+            margin: var(--spacing-md) 0;
+            padding: var(--spacing-md);
+            display: none;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+        
+        .stats-card {
+            background: var(--bg-primary);
+            padding: var(--spacing-lg);
+            text-align: center;
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .stats-number {
+            font-size: 32px;
+            font-weight: 400;
+            color: var(--text-primary);
+        }
+        
+        .stats-label {
+            color: var(--text-secondary);
+            margin-top: var(--spacing-sm);
+        }
+        
+        .work-type-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: var(--bg-primary);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .work-type-item {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--spacing-sm) 0;
+            border-bottom: var(--border-width) solid var(--border-color);
+        }
+        
+        .work-type-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .work-type-item:last-child {
+            border-bottom: none;
+        }
+        
+        .loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        .navigation-links {
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+        }
+        
+        .navigation-links a {
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            text-decoration: none;
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .navigation-links a:hover {
+            background: var(--bg-hover);
+        }
+    </style>
+</head>
+<body>
+    <div class="container admin-container">
+        <!-- ナビゲーション -->
+        <div class="navigation-links">
+            <a href="/">トップページ</a>
+            <a href="/search">検索</a>
+            <a href="/check">勤怠チェック</a>
+            <a href="/attendance-check">打刻チェック確認</a>
+            <a href="/monthly-report">月間レポート</a>
+            <a href="/logout">ログアウト</a>
+        </div>
+        
+        <h1>管理者ページ</h1>
+        
+        <!-- 管理機能へのクイックアクセス -->
+        <div class="admin-section">
+            <h2>管理機能へのアクセス</h2>
+            <div class="buttons">
+                <a href="/overtime/list" class="btn btn-primary">時間外一覧（管理）</a>
+                <a href="/leave/list" class="btn btn-primary">休暇願一覧（管理）</a>
+                <a href="/search" class="btn btn-primary">打刻データ検索</a>
+                <a href="/attendance-check" class="btn btn-primary">打刻チェック確認</a>
+                <a href="/check" class="btn btn-primary">勤怠チェック</a>
+                <a href="/monthly-report" class="btn btn-primary">月間集計レポート</a>
+            </div>
+        </div>
+        
+        <!-- CSVインポート機能 -->
+        <div class="admin-section">
+            <h2>CSVファイル インポート</h2>
+            <p>勤怠スケジュールデータをCSVファイルからインポートできます。</p>
+            
+            <div class="upload-area" id="uploadArea">
+                <div>
+                    <p>CSVファイルをここにドラッグ＆ドロップ</p>
+                    <p>または</p>
+                    
+                    <div class="file-input-wrapper">
+                        <input type="file" id="csvFile" class="file-input" accept=".csv">
+                        <label for="csvFile" class="file-input-button">ファイルを選択</label>
+                    </div>
+                </div>
+                
+                <div class="selected-file" id="selectedFile" style="display: none;">
+                    <span id="fileName"></span>
+                    <button onclick="clearSelectedFile()" style="background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 0;">閉じる</button>
+                </div>
+                
+                <button class="import-button" id="importButton" onclick="importCSV()" disabled>インポート実行</button>
+            </div>
+            
+            <div class="progress" id="progress">
+                <p>インポート処理中...</p>
+            </div>
+            
+            <div class="result" id="result">
+                <div id="resultMessage"></div>
+                <div id="resultDetails"></div>
+            </div>
+        </div>
+        
+        <!-- 自動バックアップ管理 -->
+        <div class="admin-section">
+            <h2>自動バックアップ管理</h2>
+            <div style="margin-bottom: 20px;">
+                <button onclick="toggleAutoBackup()" class="btn btn-success" id="toggleBackupBtn">自動バックアップを開始</button>
+                <button onclick="manualBackup()" class="btn btn-primary">手動バックアップ実行</button>
+                <button onclick="loadBackupStatus()" class="btn btn-info">バックアップ状況確認</button>
+            </div>
+            
+            <div id="backupStatus" style="display: none;">
+                <h3>バックアップ状況</h3>
+                <div id="backupStatusContent">
+                    <!-- バックアップ状況がここに表示される -->
+                </div>
+            </div>
+            
+            <div class="info-box" style="margin-top: 20px;">
+                <h4>📁 デュアルバックアップ保存先</h4>
+                <ul>
+                    <li><strong>プライマリ</strong>: C:/AttendanceBackup/ （メイン保存先）</li>
+                    <li><strong>セカンダリ</strong>: D:/AttendanceBackup_Mirror/ （安全性向上のためのミラー）</li>
+                </ul>
+                <h4>⏰ 自動スケジュール</h4>
+                <ul>
+                    <li><strong>日次バックアップ</strong>: 毎日午前3時に実行（30日間保持）</li>
+                    <li><strong>週次バックアップ</strong>: 毎週日曜日午前2時に実行（90日間保持）</li>
+                    <li><strong>月次バックアップ</strong>: 毎月1日午前1時に実行（365日間保持）</li>
+                    <li><strong>レポートデータ</strong>: 週次でCSV形式保存（60日間保持）</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- データベース統計情報 -->
+        <div class="admin-section">
+            <h2>データベース統計情報</h2>
+            <button onclick="loadDatabaseStats()" class="btn btn-primary">統計情報を更新</button>
+            
+            <div class="stats-grid" id="statsGrid">
+                <!-- 統計情報がここに表示される -->
+            </div>
+            
+            <div class="work-type-list" id="workTypeList" style="display: none;">
+                <h3>勤務区分別データ</h3>
+                <!-- 勤務区分別統計がここに表示される -->
+            </div>
+        </div>
+        
+        <!-- 今後の機能拡張エリア -->
+        <div class="admin-section">
+            <h2>今後の機能</h2>
+            <ul>
+                <li>データベースバックアップ・復元</li>
+                <li>ユーザー管理機能</li>
+                <li>システム設定管理</li>
+                <li>ログ管理・監査機能</li>
+                <li>自動メール通知設定</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        
+        // ファイル選択イベント
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                selectFile(e.target.files[0]);
+            }
+        });
+        
+        // ドラッグ＆ドロップ機能
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.toLowerCase().endsWith('.csv')) {
+                selectFile(files[0]);
+            } else {
+                showResult('error', 'CSVファイルを選択してください');
+            }
+        });
+        
+        function selectFile(file) {
+            selectedFile = file;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('selectedFile').style.display = 'flex';
+            document.getElementById('importButton').disabled = false;
+            hideResult();
+        }
+        
+        function clearSelectedFile() {
+            selectedFile = null;
+            document.getElementById('selectedFile').style.display = 'none';
+            document.getElementById('importButton').disabled = true;
+            document.getElementById('csvFile').value = '';
+            hideResult();
+        }
+        
+        function importCSV() {
+            if (!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            showProgress();
+            hideResult();
+            
+            fetch('/api/admin/csv/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgress();
+                
+                if (data.success) {
+                    showResult('success', data.message, data.details);
+                    clearSelectedFile();
+                    // 統計情報を自動更新
+                    loadDatabaseStats();
+                } else {
+                    showResult('error', data.message, data.details);
+                }
+            })
+            .catch(error => {
+                hideProgress();
+                showResult('error', 'ネットワークエラー: ' + error.message);
+            });
+        }
+        
+        function showProgress() {
+            document.getElementById('progress').style.display = 'block';
+            document.querySelector('.admin-container').classList.add('loading');
+        }
+        
+        function hideProgress() {
+            document.getElementById('progress').style.display = 'none';
+            document.querySelector('.admin-container').classList.remove('loading');
+        }
+        
+        function showResult(type, message, details = null) {
+            const resultDiv = document.getElementById('result');
+            const messageDiv = document.getElementById('resultMessage');
+            const detailsDiv = document.getElementById('resultDetails');
+            
+            resultDiv.className = 'result alert alert-' + type;
+            messageDiv.textContent = message;
+            
+            if (details) {
+                let detailsHtml = '';
+                if (details.processed !== undefined) {
+                    detailsHtml += `<p>処理済み: ${details.processed}件</p>`;
+                }
+                if (details.errors !== undefined) {
+                    detailsHtml += `<p>エラー: ${details.errors}件</p>`;
+                }
+                if (details.increase !== undefined) {
+                    detailsHtml += `<p>追加レコード: ${details.increase}件</p>`;
+                }
+                if (details.error_messages && details.error_messages.length > 0) {
+                    detailsHtml += '<p>エラーメッセージ:</p><ul>';
+                    details.error_messages.forEach(msg => {
+                        detailsHtml += `<li>${msg}</li>`;
+                    });
+                    detailsHtml += '</ul>';
+                }
+                detailsDiv.innerHTML = detailsHtml;
+            } else {
+                detailsDiv.innerHTML = '';
+            }
+            
+            resultDiv.style.display = 'block';
+        }
+        
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+        
+        function loadDatabaseStats() {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = '<p>読み込み中...</p>';
+            
+            fetch('/api/admin/database/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayStats(data.data);
+                } else {
+                    statsGrid.innerHTML = '<p>統計情報の取得に失敗しました</p>';
+                }
+            })
+            .catch(error => {
+                statsGrid.innerHTML = '<p>ネットワークエラー</p>';
+            });
+        }
+        
+        function displayStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            const workTypeList = document.getElementById('workTypeList');
+            
+            // 基本統計
+            statsGrid.innerHTML = `
+                <div class="stats-card">
+                    <div class="stats-number">${stats.basic.employees}</div>
+                    <div class="stats-label">従業員数</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number">${stats.basic.total_records}</div>
+                    <div class="stats-label">総レコード数</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number">${stats.basic.start_date || '-'}</div>
+                    <div class="stats-label">開始日</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number">${stats.basic.end_date || '-'}</div>
+                    <div class="stats-label">最終日</div>
+                </div>
+            `;
+            
+            // 勤務区分別統計
+            if (stats.work_types && stats.work_types.length > 0) {
+                let workTypeHtml = '<h3>勤務区分別データ</h3>';
+                stats.work_types.forEach(item => {
+                    workTypeHtml += `
+                        <div class="work-type-item">
+                            <span>${item.type}</span>
+                            <strong>${item.count}件</strong>
+                        </div>
+                    `;
+                });
+                workTypeList.innerHTML = workTypeHtml;
+                workTypeList.style.display = 'block';
+            }
+        }
+        
+        // バックアップ管理機能
+        let autoBackupRunning = false;
+        
+        function toggleAutoBackup() {
+            const btn = document.getElementById('toggleBackupBtn');
+            const action = autoBackupRunning ? 'stop' : 'start';
+            
+            fetch(`/api/admin/backup/${action}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    autoBackupRunning = !autoBackupRunning;
+                    btn.textContent = autoBackupRunning ? '自動バックアップを停止' : '自動バックアップを開始';
+                    btn.className = autoBackupRunning ? 'btn btn-warning' : 'btn btn-success';
+                    showMessage(data.message, 'success');
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('ネットワークエラー', 'error');
+            });
+        }
+        
+        function manualBackup() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '実行中...';
+            
+            fetch('/api/admin/backup/manual', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(`手動バックアップ完了: ${data.filename}`, 'success');
+                    loadBackupStatus(); // 状況更新
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('バックアップエラー', 'error');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '手動バックアップ実行';
+            });
+        }
+        
+        function loadBackupStatus() {
+            const statusDiv = document.getElementById('backupStatus');
+            const contentDiv = document.getElementById('backupStatusContent');
+            
+            statusDiv.style.display = 'block';
+            contentDiv.innerHTML = '読み込み中...';
+            
+            fetch('/api/admin/backup/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayBackupStatus(data.data);
+                } else {
+                    contentDiv.innerHTML = '<p>状況取得に失敗しました</p>';
+                }
+            })
+            .catch(error => {
+                contentDiv.innerHTML = '<p>ネットワークエラー</p>';
+            });
+        }
+        
+        function displayBackupStatus(status) {
+            const contentDiv = document.getElementById('backupStatusContent');
+            
+            let html = '';
+            
+            // Dドライブ利用可否表示
+            const driveStatus = status.d_drive_available ? 
+                '<span style="color: green;">✓ Dドライブ利用可能（デュアルバックアップ有効）</span>' :
+                '<span style="color: orange;">⚠ Dドライブ利用不可（Cドライブのみ）</span>';
+            
+            html += `<div style="margin-bottom: 20px; font-weight: bold;">${driveStatus}</div>`;
+            
+            // プライマリ（Cドライブ）状況
+            html += '<h4>📁 プライマリ (Cドライブ)</h4>';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+            
+            const typeNames = {
+                'daily': '日次',
+                'weekly': '週次', 
+                'monthly': '月次',
+                'reports': 'レポート'
+            };
+            
+            Object.keys(typeNames).forEach(type => {
+                const typeData = status.primary[type];
+                const size = typeData.total_size ? (typeData.total_size / (1024 * 1024)).toFixed(2) : '0';
+                const latest = typeData.latest ? new Date(typeData.latest).toLocaleString('ja-JP') : 'なし';
+                
+                html += `
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; border: 1px solid #28a745;">
+                        <h5 style="margin: 0 0 10px 0; color: #155724;">C:/ ${typeNames[type]}</h5>
+                        <p style="margin: 5px 0;">ファイル数: ${typeData.count}</p>
+                        <p style="margin: 5px 0;">合計: ${size} MB</p>
+                        <p style="margin: 5px 0;">最新: ${latest}</p>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            // セカンダリ（Dドライブ）状況
+            if (status.d_drive_available && status.secondary) {
+                html += '<h4>💽 セカンダリ (Dドライブ)</h4>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
+                
+                Object.keys(typeNames).forEach(type => {
+                    const typeData = status.secondary[type];
+                    const size = typeData.total_size ? (typeData.total_size / (1024 * 1024)).toFixed(2) : '0';
+                    const latest = typeData.latest ? new Date(typeData.latest).toLocaleString('ja-JP') : 'なし';
+                    
+                    html += `
+                        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; border: 1px solid #2196f3;">
+                            <h5 style="margin: 0 0 10px 0; color: #0d47a1;">D:/ ${typeNames[type]}</h5>
+                            <p style="margin: 5px 0;">ファイル数: ${typeData.count}</p>
+                            <p style="margin: 5px 0;">合計: ${size} MB</p>
+                            <p style="margin: 5px 0;">最新: ${latest}</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            contentDiv.innerHTML = html;
+        }
+        
+        function showMessage(message, type) {
+            const resultDiv = document.getElementById('result');
+            const messageDiv = document.getElementById('resultMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = type === 'success' ? 'success' : 'error';
+            resultDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        // ページ読み込み時に統計情報を取得
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDatabaseStats();
+        });
+    </script>
+</body>
+</html>

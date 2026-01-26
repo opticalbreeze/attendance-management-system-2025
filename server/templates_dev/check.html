@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>勤怠チェック</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .check-form {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .btn-check {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .btn-check:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .btn-clear {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+            margin-left: var(--spacing-sm);
+        }
+        
+        .btn-clear:hover {
+            background: var(--bg-hover);
+        }
+        
+        .results-section {
+            margin-top: var(--spacing-lg);
+        }
+        
+        .employee-info {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .employee-info h2 {
+            margin-bottom: var(--spacing-sm);
+            font-size: var(--font-size-lg);
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+        
+        .info-item {
+            background: var(--bg-primary);
+            padding: var(--spacing-sm);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .info-label {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .info-value {
+            font-size: var(--font-size-lg);
+            font-weight: 400;
+            color: var(--text-primary);
+        }
+        
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-primary);
+            margin-bottom: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .schedule-table thead {
+            background: var(--bg-secondary);
+        }
+        
+        .schedule-table th,
+        .schedule-table td {
+            padding: var(--spacing-md);
+            text-align: left;
+            border-bottom: var(--border-width) solid var(--border-color);
+        }
+        
+        .schedule-table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+        
+        .alerts-section {
+            margin-top: 30px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .alert-icon {
+            font-size: 1.5em;
+        }
+        
+        .alert-content {
+            flex: 1;
+        }
+        
+        .alert-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .alert-details {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .attendance-times {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .attendance-time {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 2px;
+            font-weight: bold;
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-style: italic;
+        }
+        
+        .loading, .no-results {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            font-size: 1.1em;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .work-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .work-type.shift-24 {
+            background: #dc3545;
+        }
+        
+        .work-type.day-shift {
+            background: #28a745;
+        }
+        
+        .work-type.night-shift {
+            background: #6f42c1;
+        }
+        
+        .work-type.office {
+            background: #fd7e14;
+        }
+        
+        .work-type.off-day {
+            background: #6c757d;
+        }
+        
+        .work-type.holiday {
+            background: #17a2b8;
+        }
+        
+        .work-type.paid-leave {
+            background: #ffc107;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/" class="back-link">← トップページに戻る</a>
+            <a href="/search" class="back-link" style="margin-left: 20px;">🔍 勤怠スケジュール検索</a>
+            <a href="/admin" class="back-link" style="margin-left: 20px;">⚙️ 管理者ページ</a>
+        </div>
+        
+        <h1>✅ 勤怠チェック</h1>
+        
+        <div class="check-form">
+            <form id="check-form">
+                <div style="margin-bottom: 20px;">
+                    <h3>個人の月度勤怠チェック</h3>
+                    <p style="color: #666; margin-bottom: 15px;">指定した従業員の月度勤怠をチェックします。</p>
+                </div>
+                
+                <div id="monthly-mode" class="check-mode-section">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="section-select">セクション</label>
+                            <select id="section-select">
+                                <option value="">すべてのセクション</option>
+                            </select>
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                セクションで絞り込み
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label for="monthly-employee-id">従業員（必須）</label>
+                            <select id="monthly-employee-id" name="monthly_employee_id" required>
+                                <option value="">▼ 従業員を選択</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="search-month">検索月（必須）</label>
+                            <input type="text" id="search-month" name="search_month" placeholder="2026/2" pattern="\d{4}/\d{1,2}" required>
+                            <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                                YYYY/MM形式（例: 2026/2）勤怠月度16日～15日
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <button type="submit" class="btn btn-check">🔍 チェック実行</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="error-message" style="display: none;" class="error"></div>
+        
+        <div id="results-section" style="display: none;">
+            <div class="employee-info" id="employee-info">
+                <h2 id="employee-name">-</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">従業員ID</div>
+                        <div class="info-value" id="employee-id-display">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">チェック日付</div>
+                        <div class="info-value" id="check-date-display">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <table class="schedule-table">
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>スケジュール</th>
+                        <th>実際の打刻</th>
+                        <th>差異</th>
+                    </tr>
+                </thead>
+                <tbody id="schedule-body">
+                </tbody>
+            </table>
+            
+            <div class="alerts-section" id="alerts-section">
+                <h2 style="margin-bottom: 15px; color: #333;">アラート</h2>
+                <div id="alerts-container"></div>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 15px;">
+                <h2 style="margin-bottom: 15px; color: #333;">📝 遅刻・早退申告</h2>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn btn-primary" onclick="openLateArrivalModal()" style="background: #ffc107; color: #333;">
+                        ⏰ 遅刻申告
+                    </button>
+                    <button class="btn btn-primary" onclick="openEarlyLeaveModal()" style="background: #17a2b8; color: white;">
+                        🏃 早退申告
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 遅刻申告モーダル -->
+        <div id="lateArrivalModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                <h2 style="margin-bottom: 20px;">⏰ 遅刻申告</h2>
+                <form id="lateArrivalForm">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>勤務日</label>
+                        <input type="date" id="late-work-date" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>遅刻時間（分）</label>
+                        <input type="number" id="late-minutes" min="1" required placeholder="例: 30">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>理由（任意）</label>
+                        <textarea id="late-reason" rows="3" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-check">登録</button>
+                        <button type="button" class="btn btn-clear" onclick="closeLateArrivalModal()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- 早退申告モーダル -->
+        <div id="earlyLeaveModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                <h2 style="margin-bottom: 20px;">🏃 早退申告</h2>
+                <form id="earlyLeaveForm">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>勤務日</label>
+                        <input type="date" id="early-work-date" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>早退時間（分）</label>
+                        <input type="number" id="early-minutes" min="1" required placeholder="例: 60">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label>理由（任意）</label>
+                        <textarea id="early-reason" rows="3" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-check">登録</button>
+                        <button type="button" class="btn btn-clear" onclick="closeEarlyLeaveModal()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            チェック中...
+        </div>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            チェックを実行してください。
+        </div>
+    </div>
+    
+    <script>
+        // 全従業員データを保持
+        let allEmployees = [];
+        
+        // エラー表示関数
+        function showError(message) {
+            console.error('[ERROR]', message);
+            const errorDiv = document.getElementById('error-message');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+        }
+        
+        // 成功メッセージ表示関数
+        function showSuccess(message) {
+            console.log('[SUCCESS]', message);
+        }
+        
+        // 給与計算期間を考慮した月度を計算
+        function calculateCurrentPayrollMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            
+            if (day >= 16) {
+                return month === 12 ? `${year + 1}/01` : `${year}/${String(month + 1).padStart(2, '0')}`;
+            } else {
+                return `${year}/${String(month).padStart(2, '0')}`;
+            }
+        }
+        
+        // セクション選択肢を設定する関数
+        function populateSectionSelect(selectElement, defaultText) {
+            if (!selectElement || !Array.isArray(allEmployees)) return;
+            
+            const sections = [...new Set(allEmployees.map(emp => emp.section || '設備'))].sort();
+            selectElement.innerHTML = `<option value="">${defaultText}</option>`;
+            
+            sections.forEach(section => {
+                const option = document.createElement('option');
+                option.value = section;
+                option.textContent = section;
+                selectElement.appendChild(option);
+            });
+        }
+        
+        // 従業員リスト更新
+        function updateEmployeeList() {
+            console.log('[DEBUG] updateEmployeeList開始');
+            
+            const monthlyEmployeeSelect = document.getElementById('monthly-employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            
+            if (!monthlyEmployeeSelect) {
+                console.error('[DEBUG] monthly-employee-id要素が見つかりません');
+                return;
+            }
+            
+            const selectedSection = sectionSelect ? sectionSelect.value : '';
+            console.log('[DEBUG] 選択されたセクション:', selectedSection);
+            
+            monthlyEmployeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+            
+            if (!allEmployees || !Array.isArray(allEmployees)) {
+                console.error('[DEBUG] allEmployeesが無効:', allEmployees);
+                monthlyEmployeeSelect.innerHTML = '<option value="">[エラー] 従業員データなし</option>';
+                return;
+            }
+            
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+                
+            console.log('[DEBUG] フィルタリング結果:', {
+                originalCount: allEmployees.length,
+                filteredCount: filteredEmployees.length
+            });
+            
+            filteredEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.employee_num;
+                option.textContent = `${employee.employee_num} - ${employee.name}`;
+                monthlyEmployeeSelect.appendChild(option);
+            });
+            
+            console.log(`[DEBUG] updateEmployeeList完了: ${filteredEmployees.length}人の従業員を追加`);
+        }
+        
+        // 従業員情報を動的に読み込む
+        async function loadEmployees() {
+            console.log('[DEBUG] loadEmployees開始');
+            
+            const monthlyEmployeeSelect = document.getElementById('monthly-employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            
+            if (monthlyEmployeeSelect) {
+                monthlyEmployeeSelect.innerHTML = '<option value="">🔄 読み込み中...</option>';
+            }
+            
+            try {
+                console.log('[DEBUG] API呼び出し: /api/employees');
+                
+                const response = await fetch('/api/employees');
+                console.log('[DEBUG] API応答:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log('[DEBUG] API結果:', {
+                    status: result.status,
+                    dataLength: Array.isArray(result.data) ? result.data.length : 'not array'
+                });
+                
+                if (result.status === 'success' && result.data) {
+                    allEmployees = result.data;
+                    console.log(`[DEBUG] 従業員データ格納完了: ${allEmployees.length}人`);
+                    
+                    // セクション選択を設定
+                    if (sectionSelect) {
+                        populateSectionSelect(sectionSelect, 'すべてのセクション');
+                    }
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                    
+                    // 成功メッセージを表示
+                    if (monthlyEmployeeSelect && allEmployees.length > 0) {
+                        const tempOption = document.createElement('option');
+                        tempOption.value = '';
+                        tempOption.textContent = `✓ ${allEmployees.length}人の従業員を読み込みました`;
+                        tempOption.style.color = '#28a745';
+                        tempOption.style.fontWeight = 'bold';
+                        tempOption.selected = true;
+                        
+                        monthlyEmployeeSelect.insertBefore(tempOption, monthlyEmployeeSelect.firstChild);
+                        
+                        setTimeout(() => {
+                            if (tempOption.parentNode) {
+                                tempOption.parentNode.removeChild(tempOption);
+                            }
+                        }, 3000);
+                    }
+                    
+                    console.log(`[SUCCESS] 従業員データを読み込みました: ${allEmployees.length}人`);
+                } else {
+                    throw new Error(result.message || '従業員データの取得に失敗しました');
+                }
+            } catch (error) {
+                console.error('[DEBUG] 従業員データ読み込みエラー:', error);
+                showError(`従業員データの読み込みに失敗しました: ${error.message}`);
+                
+                if (monthlyEmployeeSelect) {
+                    monthlyEmployeeSelect.innerHTML = '<option value="">[エラー] 従業員データ読み込み失敗</option>';
+                }
+            }
+        }
+        
+        // 月度チェック実行
+        async function performMonthlyCheck() {
+            const employeeId = document.getElementById('monthly-employee-id').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            if (!employeeId) {
+                showError('従業員を選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            // UIリセット
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const params = new URLSearchParams();
+                params.append('search_month', searchMonth);
+                params.append('employee_id', employeeId);
+                
+                const response = await fetch(`/api/search?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: サーバーエラー`);
+                }
+                
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.status === 'success') {
+                    const resultData = data;
+                    if (!resultData || !resultData.search_params || !resultData.search_params.search_month) {
+                        showError('サーバーからのレスポンス形式が正しくありません: search_paramsが見つかりません');
+                        return;
+                    }
+                    displayMonthlyResults(resultData);
+                    showSuccess('月度チェックが完了しました');
+                } else {
+                    showError(data.message || 'チェック処理でエラーが発生しました');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError(`サーバーとの通信エラー: ${error.message}`);
+            }
+        }
+        
+        // 月度チェック結果を表示
+        function displayMonthlyResults(data) {
+            const resultsSection = document.getElementById('results-section');
+            
+            // エラーと警告の合計数を計算
+            let totalErrors = 0;
+            let totalWarnings = 0;
+            
+            if (data.results && Array.isArray(data.results)) {
+                data.results.forEach(result => {
+                    if (result.alerts && Array.isArray(result.alerts)) {
+                        result.alerts.forEach(alert => {
+                            if (alert.type === 'error') {
+                                totalErrors++;
+                            } else if (alert.type === 'warning') {
+                                totalWarnings++;
+                            }
+                        });
+                    }
+                });
+            }
+            
+            const searchParams = data.search_params || {};
+            const employeeName = data.results && data.results.length > 0 ? data.results[0].employee_name : searchParams.employee_id;
+            
+            resultsSection.innerHTML = `
+                <div style="margin-bottom: 30px;">
+                    <h2>月度勤怠チェック結果</h2>
+                    <div class="info-grid" style="margin-top: 15px;">
+                        <div class="info-item">
+                            <div class="info-label">従業員</div>
+                            <div class="info-value">${employeeName || searchParams.employee_id}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">検索月</div>
+                            <div class="info-value">${searchParams.search_month}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">期間</div>
+                            <div class="info-value">${searchParams.date_range ? searchParams.date_range.start_date : ''} 〜 ${searchParams.date_range ? searchParams.date_range.end_date : ''}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">対象日数</div>
+                            <div class="info-value">${data.count || 0}日</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">エラー件数</div>
+                            <div class="info-value" style="color: #dc3545; font-weight: bold;">${totalErrors}件</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">警告件数</div>
+                            <div class="info-value" style="color: #ffc107; font-weight: bold;">${totalWarnings}件</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="monthly-results-list"></div>
+            `;
+            
+            const resultsList = document.getElementById('monthly-results-list');
+            
+            if (!data.results || data.results.length === 0) {
+                resultsList.innerHTML = '<div class="success-message">チェック対象の勤怠データがありませんでした。</div>';
+            } else if (totalErrors === 0 && totalWarnings === 0) {
+                resultsList.innerHTML = '<div class="success-message">エラー・警告はありませんでした。正常です。</div>';
+            } else {
+                // アラートがある日のみ表示
+                const alertDays = data.results.filter(result => result.alerts && result.alerts.length > 0);
+                
+                if (alertDays.length === 0) {
+                    resultsList.innerHTML = '<div class="success-message">エラー・警告はありませんでした。正常です。</div>';
+                } else {
+                    let alertsHtml = '<h3 style="margin-bottom: 15px;">問題のある日一覧</h3>';
+                    alertDays.forEach(result => {
+                        alertsHtml += `
+                            <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${result.alerts.some(a => a.type === 'error') ? '#dc3545' : '#ffc107'};">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <strong style="font-size: 1.1em;">📅 ${result.work_date}</strong>
+                                    <span style="color: #666; font-size: 0.9em;">${result.work_type}</span>
+                                </div>
+                        `;
+                        
+                        result.alerts.forEach(alert => {
+                            const colorClass = alert.type === 'error' ? '#dc3545' : '#ffc107';
+                            const icon = alert.type === 'error' ? '❌' : '⚠️';
+                            alertsHtml += `
+                                <div style="margin: 8px 0; padding: 10px; background: white; border-radius: 6px; border-left: 3px solid ${colorClass};">
+                                    <strong style="color: ${colorClass};">${icon} ${alert.message}</strong>
+                                    ${alert.details ? `<div style="font-size: 0.9em; color: #666; margin-top: 5px;">${alert.details}</div>` : ''}
+                                </div>
+                            `;
+                        });
+                        
+                        alertsHtml += '</div>';
+                    });
+                    
+                    resultsList.innerHTML = alertsHtml;
+                }
+            }
+            
+            resultsSection.style.display = 'block';
+        }
+        
+        // フォームクリア
+        function clearForm() {
+            document.getElementById('check-form').reset();
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            updateEmployeeList();
+        }
+        
+        // ページ初期化処理
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('[DEBUG] ページ初期化開始');
+            
+            try {
+                // 従業員データを読み込み
+                await loadEmployees();
+                
+                // セクション変更時に従業員リストを更新
+                const sectionSelect = document.getElementById('section-select');
+                if (sectionSelect) {
+                    sectionSelect.addEventListener('change', () => {
+                        console.log('[DEBUG] セクション変更イベント発生');
+                        updateEmployeeList();
+                    });
+                }
+                
+                // 検索月のデフォルト値を設定
+                const searchMonthInput = document.getElementById('search-month');
+                if (searchMonthInput) {
+                    searchMonthInput.value = calculateCurrentPayrollMonth();
+                }
+                
+                // フォーム送信イベント
+                const checkForm = document.getElementById('check-form');
+                if (checkForm) {
+                    checkForm.addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        await performMonthlyCheck();
+                    });
+                }
+                
+                console.log('[DEBUG] ページ初期化完了');
+            } catch (error) {
+                console.error('[DEBUG] ページ初期化エラー:', error);
+                showError('ページの初期化でエラーが発生しました: ' + error.message);
+            }
+        });
+    </script>
+    </script>
+</body>
+</html>
+

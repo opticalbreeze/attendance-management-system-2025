@@ -105,17 +105,44 @@ def calculate_actual_clock_times(result: AttendanceCheckResult, cursor) -> None:
     if not result.attendance_records:
         return
     
-    # 短時間での連続打刻をチェック（5分以内）
+    # 重複打刻の除去：同一時刻（分単位）の打刻を統合
     if len(result.attendance_records) >= 2:
-        for i in range(len(result.attendance_records) - 1):
-            time1 = extract_time_from_timestamp(result.attendance_records[i]['time'])
-            time2 = extract_time_from_timestamp(result.attendance_records[i + 1]['time'])
-            if time1 and time2:
-                diff_minutes = abs(time_to_minutes(time2) - time_to_minutes(time1))
-                if diff_minutes <= 5:
-                    _add_alert(result, AttendanceConstants.ALERT_WARNING,
-                              '短時間連続打刻',
-                              f'{time1}と{time2}の間隔が{diff_minutes}分です')
+        cleaned_records = []
+        for record in result.attendance_records:
+            time_str = extract_time_from_timestamp(record['time'])
+            if time_str:
+                # HH:MM 形式に切り捨て（秒は無視）
+                time_hhmm = time_str[:5] if len(time_str) >= 5 else time_str
+                # 同一時刻（分単位）の重複をチェック
+                is_duplicate = False
+                for existing in cleaned_records:
+                    existing_time = extract_time_from_timestamp(existing['time'])
+                    existing_hhmm = existing_time[:5] if existing_time and len(existing_time) >= 5 else existing_time
+                    if time_hhmm == existing_hhmm:
+                        is_duplicate = True
+
+                        break
+                
+                if not is_duplicate:
+                    cleaned_records.append(record)
+        
+        # 重複除去後の記録で更新
+        if len(cleaned_records) < len(result.attendance_records):
+            logger.info(f"重複打刻除去: {len(result.attendance_records)}件 → {len(cleaned_records)}件")
+            result.attendance_records = cleaned_records
+    
+    # 短時間での連続打刻チェックは無効化（複数打刻として扱う）
+    # 以前のコード: 短時間連続打刻の警告表示
+    # if len(result.attendance_records) >= 2:
+    #     for i in range(len(result.attendance_records) - 1):
+    #         time1 = extract_time_from_timestamp(result.attendance_records[i]['time'])
+    #         time2 = extract_time_from_timestamp(result.attendance_records[i + 1]['time'])
+    #         if time1 and time2:
+    #             diff_minutes = abs(time_to_minutes(time2) - time_to_minutes(time1))
+    #             if diff_minutes <= 5:
+    #                 _add_alert(result, AttendanceConstants.ALERT_WARNING,
+    #                           '短時間連続打刻',
+    #                           f'{time1}と{time2}の間隔が{diff_minutes}分です')
     
     if is_24hour_or_night_shift(work_type):
         # 24勤・夜勤: 一番早い時間が出勤
@@ -133,10 +160,41 @@ def calculate_actual_clock_times(result: AttendanceCheckResult, cursor) -> None:
             result.actual_clock_out = result.attendance_records[-1]['time']
     
     else:
-        # 日勤: 一番早い時間が出勤、一番遅い時間が退勤
+        # 日勤: 打刻回数に応じて処理を分岐
         if result.attendance_records:
-            result.actual_clock_in = result.attendance_records[0]['time']
-            result.actual_clock_out = result.attendance_records[-1]['time']
+            if len(result.attendance_records) == 1:
+                # 打刻が1回のみの場合：時刻ベースで出勤か退勤かを判定
+                single_punch_time = result.attendance_records[0]['time']
+                punch_hour_min = extract_time_from_timestamp(single_punch_time)
+                
+                if punch_hour_min:
+                    try:
+                        # 時刻を分に変換（例：'07:23' → 7*60+23 = 443分）
+                        time_parts = punch_hour_min.split(':')
+                        punch_minutes = int(time_parts[0]) * 60 + int(time_parts[1])
+                        
+                        # 12:00（720分）を境界線として判定
+                        if punch_minutes < 720:  # 12:00より前
+                            # 出勤打刻と判定（退勤打刻漏れ）
+                            result.actual_clock_in = punch_hour_min
+                            result.actual_clock_out = None
+                        else:  # 12:00以降
+                            # 退勤打刻と判定（出勤打刻漏れ）
+                            result.actual_clock_in = None
+                            result.actual_clock_out = punch_hour_min
+                    except (ValueError, IndexError) as e:
+                        # 時刻パースエラーの場合は従来通り
+                        logger.warning(f"1回打刻の時刻解析エラー: {e}, 従来ロジックを使用")
+                        result.actual_clock_in = result.attendance_records[0]['time']
+                        result.actual_clock_out = result.attendance_records[0]['time']
+                else:
+                    # 時刻抽出失敗の場合は従来通り
+                    result.actual_clock_in = result.attendance_records[0]['time']
+                    result.actual_clock_out = result.attendance_records[0]['time']
+            else:
+                # 打刻が2回以上の場合：従来通り一番早いのが出勤、一番遅いのが退勤
+                result.actual_clock_in = result.attendance_records[0]['time']
+                result.actual_clock_out = result.attendance_records[-1]['time']
 
 def check_holiday_punch_errors(result: AttendanceCheckResult) -> None:
     """休日打刻エラーをチェック"""
@@ -242,7 +300,7 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
                 
                 all_leaves = approved_leaves + pending_leaves
                 
-                logger.info(f"  休暇申請チェック: 日付={check_date_normalized}, 従業員ID={result.employee_id}, 承認済み={len(approved_leaves)}件, 承認待ち={len(pending_leaves)}件, 合計={len(all_leaves)}件")
+
                 
                 # get_leave_requestsは既に該当日付を含む休暇申請のみを返すので、
                 # 結果が1件以上あれば休暇申請があると判断
@@ -250,28 +308,26 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
                     has_leave_request = True
                     leave_info = all_leaves[0]
                     leave_status = leave_info.get('status', 'unknown')
-                    logger.info(f"  休暇申請あり: 日付={check_date_normalized}, 休暇種類={leave_info.get('leave_type', '')}, ステータス={leave_status}, 期間={leave_info.get('leave_date_from', '')}～{leave_info.get('leave_date_to', '')}")
+
             except Exception as e:
                 logger.warning(f"休暇申請チェックエラー: {e}", exc_info=True)
             
             # 休暇申請がある場合は「打刻なし」エラーを出さない
             if has_leave_request:
-                logger.info(f"  休暇申請があるため打刻なしエラーをスキップ: 日付={result.check_date}")
+
                 return
             
             punch_count = len(result.attendance_records) if result.attendance_records else 0
             
-            logger.info(f"打刻漏れチェック: 日付={result.check_date}, 勤務タイプ={work_type}, 打刻回数={punch_count}, start_time={result.schedule.get('start_time')}, end_time={result.schedule.get('end_time')}")
-            logger.info(f"  24勤・夜勤チェック: {is_24hour_or_night_shift(work_type)}")
-            logger.info(f"  明勤務チェック: {is_off_day_shift(work_type)}")
+
             
             # 打刻が全くない場合
             # 「明」勤務の場合は、check_off_day_shift_attendance関数でより具体的な「退勤打刻漏れ」エラーを追加するため、ここではスキップ
             if punch_count == 0:
                 if is_off_day_shift(work_type):
-                    logger.info(f"  「明」勤務のため、check_off_day_shift_attendance関数で「退勤打刻漏れ」エラーを追加するため、ここではスキップ")
+                    # 「明」勤務の場合は、check_off_day_shift_attendance関数でより具体的な「退勤打刻漏れ」エラーを追加するため、ここではスキップ
+                    pass
                 else:
-                    logger.info(f"  打刻なしエラーを追加")
                     _add_alert(result, AttendanceConstants.ALERT_ERROR,
                               AttendanceConstants.MSG_MISSING_PUNCH,
                               f'勤務タイプ: {work_type}、スケジュール: {result.schedule["start_time"]} - {result.schedule["end_time"]}')
@@ -468,39 +524,33 @@ def check_time_difference_errors(result: AttendanceCheckResult, late_adjust: int
     if (punch_count == 1 and 
         not is_night_shift_day and 
         not is_off_day_shift(work_type) and
-        schedule_start and schedule_end and
-        actual_start and actual_end):
-        # 打刻が1回しかない場合、その打刻時間が開始時間に近いか、終了時間に近いかを判定
-        single_punch_time = actual_start  # actual_startとactual_endは同じ値
+        schedule_start and schedule_end):
+        # 打刻が1回しかない場合、12:00を基準に出勤・退勤を判定済み
+        single_punch_time = result.attendance_records[0]['time']
+        punch_hour_min = extract_time_from_timestamp(single_punch_time)
         
-        # 開始時間との差異を計算
-        diff_to_start = calculate_time_diff_minutes(schedule_start, single_punch_time)
-        # 終了時間との差異を計算
-        diff_to_end = calculate_time_diff_minutes(schedule_end, single_punch_time)
-        
-        if diff_to_start is not None and diff_to_end is not None:
-            abs_diff_to_start = abs(diff_to_start)
-            abs_diff_to_end = abs(diff_to_end)
-            
-            logger.info(f"打刻1回のみの判定: 打刻時間={single_punch_time}, 開始時間={schedule_start} (差異={diff_to_start}分), 終了時間={schedule_end} (差異={diff_to_end}分), 許容時間={AttendanceConstants.TOLERANCE_MINUTES}分")
-            
-            # 開始時間に近い場合（±15分以内）→ 退勤打刻漏れ
-            if abs_diff_to_start <= AttendanceConstants.TOLERANCE_MINUTES:
-                skip_clock_in_diff = True
-                logger.info(f"打刻1回のみ: 開始時間に近いため、出勤時刻差異エラーをスキップし、退勤打刻漏れエラーを追加: 打刻={single_punch_time}, 開始時間={schedule_start}, 差異={diff_to_start}分")
-                # 退勤打刻漏れエラーを追加
-                _add_alert(result, AttendanceConstants.ALERT_ERROR,
-                          AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
-                          AttendanceConstants.DETAIL_CLOCK_OUT_MISSING_SINGLE_PUNCH.format(schedule=schedule_end))
-            
-            # 終了時間に近い場合（±15分以内）→ 出勤打刻漏れ
-            elif abs_diff_to_end <= AttendanceConstants.TOLERANCE_MINUTES:
-                skip_clock_out_diff = True
-                logger.info(f"打刻1回のみ: 終了時間に近いため、退勤時刻差異エラーをスキップし、出勤打刻漏れエラーを追加: 打刻={single_punch_time}, 終了時間={schedule_end}, 差異={diff_to_end}分")
-                # 出勤打刻漏れエラーを追加
-                _add_alert(result, AttendanceConstants.ALERT_ERROR,
-                          AttendanceConstants.MSG_CLOCK_IN_PUNCH_LEAK,
-                          AttendanceConstants.DETAIL_CLOCK_IN_MISSING_SINGLE_PUNCH.format(schedule=schedule_start))
+        if punch_hour_min:
+            try:
+                time_parts = punch_hour_min.split(':')
+                punch_minutes = int(time_parts[0]) * 60 + int(time_parts[1])
+                
+                if punch_minutes < 720:  # 12:00より前 → 出勤打刻
+                    # 退勤打刻漏れエラーを追加
+                    _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                              AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
+                              f"出勤打刻: {punch_hour_min}、スケジュール退勤時刻: {schedule_end} - 退勤打刻がありません")
+                    skip_clock_out_diff = True
+                    logger.info(f"1回打刻: 出勤判定 → 退勤打刻漏れエラーを追加")
+                else:  # 12:00以降 → 退勤打刻
+                    # 出勤打刻漏れエラーを追加
+                    _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                              AttendanceConstants.MSG_CLOCK_IN_PUNCH_LEAK,
+                              f"退勤打刻: {punch_hour_min}、スケジュール出勤時刻: {schedule_start} - 出勤打刻がありません")
+                    skip_clock_in_diff = True
+                    logger.info(f"1回打刻: 退勤判定 → 出勤打刻漏れエラーを追加")
+            except (ValueError, IndexError):
+                # 従来のロジックにフォールバック
+                pass
     
     # 出勤時刻チェック（24勤・夜勤以外）
     _check_clock_in_time_diff(result, schedule_start, actual_start, late_adjust, is_night_shift_day, overtime_apps, skip_clock_in_diff, punch_count)
@@ -523,6 +573,11 @@ def _check_clock_in_time_diff(result: AttendanceCheckResult, schedule_start: str
     """出勤時刻差異をチェック"""
     # 出勤打刻漏れのチェック（スケジュールがあるが打刻がない場合、または打刻が1回のみで終了時間に近い場合）
     if schedule_start and not actual_start and not is_night_shift_day:
+        # 打刻漏れエラーが既に存在する場合は重複追加を防ぐ
+        if _has_punch_leak_alert(result):
+            logger.info(f"出勤時刻: 打刻漏れエラーが既に存在するため、重複エラーをスキップ")
+            return
+        
         logger.info(f"出勤打刻漏れエラー追加: スケジュール={schedule_start}, 実際の打刻なし")
         _add_alert(result, AttendanceConstants.ALERT_ERROR,
                   AttendanceConstants.MSG_CLOCK_IN_PUNCH_LEAK,
@@ -571,6 +626,11 @@ def _check_clock_out_time_diff(result: AttendanceCheckResult, schedule_end: str,
     """退勤時刻差異をチェック"""
     # 退勤打刻漏れのチェック（スケジュールがあるが打刻がない場合、または打刻が1回のみで開始時間に近い場合）
     if schedule_end and not actual_end and not is_night_shift_day and not is_24hour_or_night_shift(work_type):
+        # 打刻漏れエラーが既に存在する場合は重複追加を防ぐ
+        if _has_punch_leak_alert(result):
+            logger.info(f"退勤時刻: 打刻漏れエラーが既に存在するため、重複エラーをスキップ")
+            return
+        
         logger.info(f"退勤打刻漏れエラー追加: スケジュール={schedule_end}, 実際の打刻なし")
         _add_alert(result, AttendanceConstants.ALERT_ERROR,
                   AttendanceConstants.MSG_CLOCK_OUT_PUNCH_LEAK,
@@ -830,12 +890,19 @@ def check_attendance_vs_schedule(employee_id: str, check_date: str) -> Dict[str,
                     'end_time': schedule_row[4]
                 }
             
-            # 3. 打刻記録取得・整形
+            # 3. 打刻記録取得・整形（同じ時刻の打刻は最初の1つだけを残す）
             attendance_rows = get_attendance_records(cursor, idm, check_date)
+            seen_times = set()
             for att_row in attendance_rows:
                 timestamp_str = att_row[1]
                 time_only = extract_time_from_timestamp(timestamp_str)
                 
+                # 同じ時刻の打刻が既にある場合はスキップ
+                if time_only in seen_times:
+                    logger.debug(f"同じ時刻の打刻をスキップ: {time_only} (id={att_row[0]})")
+                    continue
+                
+                seen_times.add(time_only)
                 result.attendance_records.append({
                     'id': att_row[0],
                     'time': time_only,

@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>勤怠スケジュール検索</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .search-form {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .results-section {
+            margin-top: var(--spacing-lg);
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .results-count {
+            color: var(--text-secondary);
+        }
+        
+        .btn-search {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .btn-search:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .btn-clear {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        
+        .btn-export {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .btn-export:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .results-table {
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .results-table thead {
+            background: var(--bg-secondary);
+        }
+        
+        .results-table th {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-weight: 400;
+        }
+        
+        /* 列幅の最適化 */
+        .results-table th:nth-child(1) { width: 80px; }  /* 従業員ID */
+        .results-table th:nth-child(2) { width: 100px; } /* 従業員名 */
+        .results-table th:nth-child(3) { width: 90px; }  /* 勤務日 */
+        .results-table th:nth-child(4) { width: 90px; }  /* 勤務タイプ */
+        .results-table th:nth-child(5) { width: 70px; }  /* 開始時刻 */
+        .results-table th:nth-child(6) { width: 70px; }  /* 終了時刻 */
+        .results-table th:nth-child(7) { width: 120px; } /* 打刻時間 */
+        .results-table th:nth-child(8) { width: 150px; } /* エラー */
+        .results-table th:nth-child(9) { width: 80px; } /* 時間外 */
+        .results-table th:nth-child(10) { width: 80px; } /* 休暇 */
+        .results-table th:nth-child(11) { width: 100px; } /* 打刻申告 */
+        
+        .punch-report-cell {
+            text-align: center;
+            vertical-align: middle;
+        }
+        
+        .punch-report-checkbox {
+            margin-right: 8px;
+        }
+        
+        .punch-report-select {
+            font-size: 12px;
+            padding: 4px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+        }
+        
+        .idm-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 400;
+        }
+        
+        .work-type {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
+            font-weight: 400;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-primary);
+        }
+        
+        .attendance-times {
+            font-family: 'Courier New', monospace;
+            font-size: var(--font-size-sm);
+        }
+        
+        .attendance-time {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            margin: 1px;
+            font-weight: 400;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        
+        .attendance-time.valid-clock-in {
+            background: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .attendance-time.valid-clock-out {
+            background: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .no-attendance {
+            color: var(--text-secondary);
+            font-style: normal;
+        }
+        
+        .alert-item {
+            display: block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            margin: var(--spacing-xs) 0;
+            font-size: var(--font-size-sm);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: var(--spacing-md);">
+            <a href="/" class="back-link">トップページに戻る</a>
+            <a href="/check" class="back-link" style="margin-left: var(--spacing-md);">勤怠チェック</a>
+            <a href="/admin" class="back-link" style="margin-left: var(--spacing-md);">管理者ページ</a>
+        </div>
+        
+        <h1>勤怠スケジュール検索</h1>
+        
+        <div class="search-form">
+            <form id="search-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="section-select">セクション</label>
+                        <select id="section-select">
+                            <option value="">すべてのセクション</option>
+                        </select>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            セクションで絞り込み
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee-id">従業員ID（必須）</label>
+                        <select id="employee-id" name="employee_id" required>
+                            <option value="">▼ 従業員を読み込み中...</option>
+                        </select>
+                        <small id="employee-hint" style="color: #666; font-size: 0.8em; margin-top: 3px; display: none;">
+                            選択した従業員の詳細情報が表示されます
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="search-month">検索月（必須）</label>
+                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/12" value="" pattern="[0-9]{4}/[0-9]{1,2}" required>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            yyyy/mm形式で入力（前月16日〜当月15日を検索）
+                        </small>
+                    </div>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-search">🔍 検索</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="error-message" style="display: none;" class="error"></div>
+        
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <div class="results-count" id="results-count">検索結果: 0 件</div>
+                <div id="punch-report-summary" style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; display: none;">
+                    <small style="color: #495057;">
+                        📝 打刻申告状況: <span id="punch-report-count" style="font-weight: bold; color: #007bff;">0件</span>
+                        <button style="margin-left: 10px; font-size: 0.8em; padding: 2px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;" 
+                                onclick="clearAllPunchReports()" title="すべての申告をクリア">全削除</button>
+                    </small>
+                </div>
+                <button class="btn-export" onclick="exportCSV()">CSV出力</button>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>従業員ID</th>
+                            <th>従業員名</th>
+                            <th>勤務日 📅↑</th>
+                            <th>勤務タイプ</th>
+                            <th>開始時刻</th>
+                            <th>終了時刻</th>
+                            <th>実際の打刻時間 🕐</th>
+                            <th>エラー・警告</th>
+                            <th>チェック状況</th>
+                            <th>時間外申告</th>
+                            <th>休暇願</th>
+                            <th>打刻申告</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            検索中...
+        </div>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            検索条件に一致するデータが見つかりませんでした。
+        </div>
+
+
+    </div>
+    
+    <!-- 共通ライブラリを読み込み -->
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/attendance-check.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/employee-list.js') }}"></script>
+    
+    <script>
+        // ============================================
+        // search.html 専用のJavaScript
+        // ============================================
+        
+        // 即座にログ出力（スクリプトが読み込まれたことを確認）
+        console.log('[search.html] ===== スクリプト開始 =====', new Date().toISOString());
+        
+        // デバッグモード（常に有効）
+        const DEBUG = true;
+        function debugLog(...args) {
+            console.log('[search.html]', new Date().toISOString(), ...args);
+        }
+        
+        // エラーログも出力
+        function debugError(...args) {
+            console.error('[search.html ERROR]', new Date().toISOString(), ...args);
+        }
+        
+        // 初期化時にログ出力
+        debugLog('=== search.html スクリプト読み込み完了 ===');
+        
+        // AttendanceSystemが存在するか確認
+        if (typeof AttendanceSystem === 'undefined') {
+            console.error('[search.html ERROR] AttendanceSystemが定義されていません。attendance-common.jsが読み込まれているか確認してください。');
+            // フォールバックとして作成
+            window.AttendanceSystem = window.AttendanceSystem || {};
+        }
+        
+        // 名前空間を使用してグローバル変数の衝突を回避
+        AttendanceSystem.Search = AttendanceSystem.Search || {};
+        AttendanceSystem.Search.searchResults = [];
+        
+        // 後方互換性のため
+        // allEmployeesはemployee-list.jsで既にグローバル変数として定義されているため、ここでは再宣言しない
+        // searchResultsはAttendanceSystem.Search.searchResultsを直接使用（let宣言はしない）
+        // allEmployeesはemployee-list.jsから使用（グローバル変数として既に定義済み）
+        
+        debugLog('スクリプト初期化完了');
+        console.log('[search.html] AttendanceSystem確認:', typeof AttendanceSystem !== 'undefined' ? 'OK' : 'NG');
+        
+        // 現在の日付から適切な月度を計算して設定
+        function calculateCurrentPayrollMonth() {
+            debugLog('calculateCurrentPayrollMonth() 呼び出し');
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1; // 0ベースなので+1
+            const day = today.getDate();
+            
+            // 16日以降なら翌月度、15日以前なら当月度
+            if (day >= 16) {
+                // 翌月度
+                if (month === 12) {
+                    return `${year + 1}/1`;
+                } else {
+                    return `${year}/${month + 1}`;
+                }
+            } else {
+                // 当月度
+                return `${year}/${month}`;
+            }
+        }
+
+        // DOMContentLoadedイベントの前にログ出力
+        console.log('[search.html] DOMContentLoadedリスナー設定前', new Date().toISOString());
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('[search.html] ===== DOMContentLoaded イベント発火 =====', new Date().toISOString());
+            debugLog('=== DOMContentLoaded イベント発火 ===');
+            debugLog('現在のURL:', window.location.href);
+            debugLog('URLパラメータ:', window.location.search);
+            
+            try {
+                // 従業員情報を動的に読み込み（統一APIサービス使用）
+                debugLog('従業員情報の読み込み開始');
+                await loadEmployees('employee-id', 'section-select', '従業員を選択してください', function(employees) {
+                    debugLog('従業員情報読み込み完了:', employees.length, '名');
+                    debugLog('従業員データサンプル:', employees.slice(0, 3));
+                    // ヒント表示を有効化
+                    const employeeHint = document.getElementById('employee-hint');
+                    if (employeeHint) {
+                        employeeHint.style.display = 'block';
+                        employeeHint.textContent = `${employees.length}名の従業員が読み込まれました`;
+                    }
+                });
+                
+                // セクション変更時に従業員リストを更新
+                setupSectionChangeListener('employee-id', 'section-select', '従業員を選択してください');
+                debugLog('セクション変更リスナー設定完了');
+                
+                // 現在の日付から適切な月度を計算して設定
+                const currentMonth = calculateCurrentPayrollMonth();
+                const monthInput = document.getElementById('search-month');
+                if (monthInput) {
+                    monthInput.value = currentMonth;
+                    debugLog('検索月を設定:', currentMonth, '→ 実際の値:', monthInput.value);
+                } else {
+                    debugError('search-month要素が見つかりません');
+                }
+                
+                // URLパラメータから従業員IDを取得
+                const urlParams = new URLSearchParams(window.location.search);
+                const employeeId = urlParams.get('employee_id');
+                debugLog('URLパラメータから取得したemployee_id:', employeeId);
+                debugLog('全URLパラメータ:', Object.fromEntries(urlParams));
+                
+                if (employeeId) {
+                    // 従業員IDを設定
+                    const employeeSelect = document.getElementById('employee-id');
+                    if (employeeSelect) {
+                        employeeSelect.value = employeeId;
+                        debugLog('従業員IDを設定:', employeeId, '→ 実際の値:', employeeSelect.value);
+                        debugLog('従業員選択要素のオプション数:', employeeSelect.options.length);
+                        
+                        // 従業員リスト読み込み完了後に自動検索実行
+                        debugLog('自動検索を実行（URLパラメータから）');
+                        await performSearch();
+                    } else {
+                        debugError('employee-id要素が見つかりません');
+                    }
+                } else {
+                    debugLog('URLパラメータにemployee_idがありません');
+                }
+                
+                debugLog('=== DOMContentLoaded 処理完了 ===');
+            } catch (error) {
+                debugError('DOMContentLoaded処理中にエラー:', error);
+                console.error(error);
+            }
+        });
+        
+        // loadEmployees, updateEmployeeList, setupSectionChangeListener は employee-list.js から使用
+        
+        // フォーム送信（DOMContentLoaded後に設定）
+        console.log('[search.html] フォーム送信リスナー設定前', new Date().toISOString());
+        
+        // DOMContentLoaded後に設定
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchForm = document.getElementById('search-form');
+            if (searchForm) {
+                console.log('[search.html] フォーム要素が見つかりました');
+                searchForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    debugLog('フォーム送信イベント');
+                    await performSearch();
+                });
+            } else {
+                console.error('[search.html ERROR] search-form要素が見つかりません');
+            }
+        });
+        
+        // 検索実行
+        async function performSearch() {
+            debugLog('=== performSearch() 開始 ===');
+            
+            try {
+                // フォーム要素の取得
+                const employeeSelect = document.getElementById('employee-id');
+                const monthInput = document.getElementById('search-month');
+                
+                if (!employeeSelect) {
+                    debugError('employee-id要素が見つかりません');
+                    return;
+                }
+                if (!monthInput) {
+                    debugError('search-month要素が見つかりません');
+                    return;
+                }
+                
+                const employeeId = employeeSelect.value.trim();
+                const searchMonth = monthInput.value.trim();
+                
+                debugLog('フォーム要素から取得した値:');
+                debugLog('  employee-id要素:', employeeSelect);
+                debugLog('  employee-id.value:', employeeId);
+                debugLog('  employee-id.options.length:', employeeSelect.options.length);
+                debugLog('  search-month.value:', searchMonth);
+                debugLog('検索パラメータ:', { employeeId, searchMonth });
+                
+                // バリデーション
+                if (!employeeId) {
+                    debugLog('❌ バリデーションエラー: 従業員IDが空');
+                    showError('従業員IDを入力してください');
+                    return;
+                }
+                
+                if (!searchMonth) {
+                    debugLog('❌ バリデーションエラー: 検索月が空');
+                    showError('検索月を入力してください（yyyy/mm形式）');
+                    return;
+                }
+                
+                // 検索月の形式チェック
+                const monthPattern = /^[0-9]{4}\/[0-9]{1,2}$/;
+                if (!monthPattern.test(searchMonth)) {
+                    debugLog('❌ バリデーションエラー: 検索月の形式が不正', searchMonth);
+                    showError('検索月はyyyy/mm形式で入力してください（例: 2025/10）');
+                    return;
+                }
+                
+                debugLog('✅ バリデーション成功');
+                
+                // UIリセット
+                document.getElementById('results-section').style.display = 'none';
+                document.getElementById('no-results').style.display = 'none';
+                document.getElementById('error-message').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                
+                // クエリパラメータ構築
+                const params = new URLSearchParams();
+                params.append('employee_id', employeeId);
+                params.append('search_month', searchMonth);
+                
+                const searchUrl = `/api/search?${params}`;
+                debugLog('📤 APIリクエストURL:', searchUrl);
+                debugLog('📤 クエリパラメータ詳細:', {
+                    employee_id: params.get('employee_id'),
+                    search_month: params.get('search_month')
+                });
+
+                try {
+                    debugLog('📡 APIリクエスト送信開始');
+                    const requestStartTime = Date.now();
+                    const response = await fetch(searchUrl);
+                    const requestEndTime = Date.now();
+                    const requestDuration = requestEndTime - requestStartTime;
+                    
+                    debugLog('📥 APIレスポンス受信:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        ok: response.ok,
+                        duration: `${requestDuration}ms`
+                    });
+                    
+                    const data = await response.json();
+                    debugLog('📥 APIレスポンスデータ:', {
+                        status: data.status,
+                        results_count: data.results ? data.results.length : 0,
+                        search_params: data.search_params,
+                        full_data: data
+                    });
+
+                    document.getElementById('loading').style.display = 'none';
+
+                    if (data.status === 'success') {
+                        AttendanceSystem.Search.searchResults = data.results;
+                        debugLog('✅ 検索成功:', AttendanceSystem.Search.searchResults.length, '件');
+                        
+                        // デバッグ用：アラート情報を確認
+                        const totalAlerts = data.results.reduce((sum, item) => {
+                            const alertCount = item.alerts ? item.alerts.length : 0;
+                            return sum + alertCount;
+                        }, 0);
+                        debugLog('📊 総アラート数:', totalAlerts);
+                        debugLog('📊 検索結果サンプル（最初の3件）:', data.results.slice(0, 3));
+
+                        await displayResults(data.results, data.search_params);
+
+                    } else {
+                        debugError('❌ APIエラー:', data.message || '不明なエラー');
+                        showError(data.message || '検索エラーが発生しました');
+                    }
+                } catch (error) {
+                    debugError('❌ APIリクエストエラー:', error);
+                    debugError('エラー詳細:', {
+                        message: error.message,
+                        stack: error.stack,
+                        name: error.name
+                    });
+                    document.getElementById('loading').style.display = 'none';
+                    showError('サーバーとの通信エラーが発生しました: ' + error.message);
+                }
+            } catch (error) {
+                debugError('❌ performSearch()処理中にエラー:', error);
+                console.error(error);
+            }
+            
+            debugLog('=== performSearch() 完了 ===');
+        }
+        
+        // 検索結果を表示
+        async function displayResults(results, searchParams) {
+            debugLog('displayResults() 開始:', results.length, '件');
+            
+            if (results.length === 0) {
+                debugLog('検索結果が0件');
+                document.getElementById('no-results').style.display = 'block';
+                return;
+            }
+
+            // 日付順でソート（古い順）
+            results.sort((a, b) => {
+                const dateA = new Date(a.work_date);
+                const dateB = new Date(b.work_date);
+                return dateA - dateB;
+            });
+            debugLog('検索結果をソート完了');
+
+            // 24勤の退勤時刻を翌日の明に移動するための前処理
+            results = processNightShiftEndTimes(results);
+            debugLog('24勤処理完了');
+            
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = '';
+            
+            debugLog('テーブル行の生成開始');
+            results.forEach((item, index) => {
+                debugLog(`行${index + 1}を処理:`, item.work_date);
+                
+                const tr = document.createElement('tr');
+                // 打刻時間を整形（有効な打刻に色を付けるため、全結果を渡す）
+                // 「通常」を「日勤」に変換
+                if (item.work_type) {
+                    item.work_type = item.work_type.replace('通常', '日勤');
+                }
+                const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || [], item.work_type, item.work_date, results);
+                
+                // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
+                // アラート情報を表示（時間外確認機能付き）
+                const alerts = item.alerts || [];
+                const alertsHtml = formatAlertsWithOvertimeCheck(item, alerts);
+                
+                // 打刻申告HTMLを生成
+                const alertMessages = alerts.map(alert => typeof alert === 'string' ? alert : alert.message || alert.details || '');
+                const punchReportHtml = generatePunchReportCell(item, alertMessages);
+                
+                // チェック状況HTMLを生成（打刻漏れチェック用）
+                const checkStatusHtml = generateCheckStatusHTML(item, alerts);
+                
+                tr.innerHTML = `
+                    <td class="idm-cell">${item.employee_id}</td>
+                    <td><strong>${item.employee_name || ''}</strong></td>
+                    <td>${formatDate(item.work_date)}</td>
+                    <td><span class="work-type ${getWorkTypeClass(item.work_type)}">${item.work_type || ''}</span></td>
+                    <td>${formatTime(item.start_time)}</td>
+                    <td>${formatEndTime(item)}</td>
+                    <td class="attendance-times">${attendanceTimesHtml}</td>
+                    <td id="alerts-${item.work_date}" style="font-size: 0.85em;">${alertsHtml}</td>
+                    <td id="check-status-${item.employee_id}-${item.work_date}" style="font-size: 0.85em;">${checkStatusHtml}</td>
+                    <td id="overtime-${item.work_date}" style="font-size: 0.85em; color: #667eea;">-</td>
+                    <td id="leave-${item.work_date}" style="font-size: 0.85em; color: #28a745;">-</td>
+                    <td class="punch-report-cell">${punchReportHtml}</td>
+                `;
+                // 全データを行要素に保存（後で使用可能）
+                tr.dataset.fullData = JSON.stringify(item);
+                tbody.appendChild(tr);
+            });
+            debugLog('テーブル行の生成完了');
+            
+            // チェック状況を読み込む（打刻漏れチェック用）
+            await loadCheckStatuses(results);
+            
+            // 時間外・休暇願データを非同期で取得
+            const employeeId = searchParams.employee_id;
+            debugLog('時間外・休暇願データの取得開始:', employeeId);
+            fetchOvertimeDataForMonth(employeeId, results).then(() => {
+                // 時間外データ取得後に、時間差異アラートがある行のアラートを再描画
+                refreshTimeDiffAlerts(results);
+                // 時間差異確認状態を復元
+                restoreTimeDiffConfirmations(results);
+            });
+            fetchLeaveDataForMonth(employeeId, results);
+            
+            // 検索範囲の情報を表示
+            let rangeInfo = '';
+            if (searchParams && searchParams.date_range) {
+                rangeInfo = ` (${searchParams.date_range.start_date} 〜 ${searchParams.date_range.end_date})`;
+            }
+            
+            document.getElementById('results-count').textContent = `検索結果: ${results.length} 件${rangeInfo}`;
+            document.getElementById('results-section').style.display = 'block';
+            
+            // 打刻申告データを復元
+            restorePunchReportData(results);
+            debugLog('displayResults() 完了');
+        }
+        
+        // 打刻申告データを復元
+        function restorePunchReportData(results) {
+            debugLog('restorePunchReportData() 開始');
+            results.forEach(item => {
+                const employeeId = item.employee_id;
+                const workDate = item.work_date;
+                
+                ['checkin', 'checkout'].forEach(punchType => {
+                    const key = `punch_report_${employeeId}_${workDate}_${punchType}`;
+                    const stored = localStorage.getItem(key);
+                    if (stored) {
+                        const checkbox = document.querySelector(`input[data-employee="${employeeId}"][data-date="${workDate}"][data-type="${punchType}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            debugLog('打刻申告データを復元:', key);
+                        }
+                    }
+                });
+            });
+            updatePunchReportSummary();
+            debugLog('restorePunchReportData() 完了');
+        }
+        
+        // 時間差異アラートを再描画（時間外データ取得後）
+        async function refreshTimeDiffAlerts(results) {
+            debugLog('refreshTimeDiffAlerts() 開始');
+            
+            // 各結果について、データベースから確認状態を取得してから再描画
+            const promises = results.map(async (item) => {
+                const alerts = item.alerts || [];
+                const hasClockInTimeDiff = alerts.some(alert => {
+                    const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                    return alertStr.includes('出勤時刻に差異あり');
+                });
+                
+                if (hasClockInTimeDiff) {
+                    try {
+                        // データベースから確認状態を取得
+                        const response = await AttendanceSystem.API.Check.getStatus(
+                            item.employee_id,
+                            item.work_date,
+                            CheckType.TIME_DIFFERENCE
+                        );
+                        
+                        // 確認状態をitemに追加（formatAlertsWithOvertimeCheckで使用）
+                        if (response.success && response.data && response.data.is_checked) {
+                            const notes = response.data.notes || '';
+                            item._timeDiffChecked = notes.includes('時間外なし');
+                        } else {
+                            item._timeDiffChecked = false;
+                        }
+                        
+                        const alertsCell = document.getElementById(`alerts-${item.work_date}`);
+                        if (alertsCell) {
+                            const newAlertsHtml = formatAlertsWithOvertimeCheck(item, alerts);
+                            alertsCell.innerHTML = newAlertsHtml;
+                            debugLog('時間差異アラートを再描画:', item.work_date);
+                        }
+                    } catch (error) {
+                        console.error(`[refreshTimeDiffAlerts] エラー (${item.work_date}):`, error);
+                    }
+                }
+            });
+            
+            await Promise.all(promises);
+            debugLog('refreshTimeDiffAlerts() 完了');
+        }
+        
+        // 時間差異確認状態を復元（データベースから取得）
+        async function restoreTimeDiffConfirmations(results) {
+            debugLog('restoreTimeDiffConfirmations() 開始');
+            
+            // 各結果について、データベースから確認状態を取得
+            const promises = results.map(async (item) => {
+                const employeeId = item.employee_id;
+                const workDate = item.work_date;
+                
+                try {
+                    const response = await AttendanceSystem.API.Check.getStatus(
+                        employeeId,
+                        workDate,
+                        CheckType.TIME_DIFFERENCE
+                    );
+                    
+                    if (response.success && response.data && response.data.is_checked) {
+                        // notesに「時間外なし」が含まれているか確認
+                        const notes = response.data.notes || '';
+                        if (notes.includes('時間外なし')) {
+                            const checkbox = document.getElementById(`no-overtime-${employeeId}-${workDate}`);
+                            if (checkbox) {
+                                checkbox.checked = true;
+                                updateTimeDiffConfirmationDisplay(employeeId, workDate, true);
+                                debugLog('時間差異確認状態を復元:', { employeeId, workDate });
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`[restoreTimeDiffConfirmations] エラー (${employeeId}, ${workDate}):`, error);
+                }
+            });
+            
+            await Promise.all(promises);
+            debugLog('restoreTimeDiffConfirmations() 完了');
+        }
+
+        // 打刻申告サマリーを更新
+        function updatePunchReportSummary() {
+            const allKeys = Object.keys(localStorage).filter(key => key.startsWith('punch_report_'));
+            const summaryDiv = document.getElementById('punch-report-summary');
+            const countSpan = document.getElementById('punch-report-count');
+            
+            if (allKeys.length > 0) {
+                countSpan.textContent = `${allKeys.length}件`;
+                summaryDiv.style.display = 'block';
+            } else {
+                summaryDiv.style.display = 'none';
+            }
+        }
+
+        // すべての打刻申告をクリア
+        function clearAllPunchReports() {
+            if (!confirm('すべての打刻申告を削除しますか？')) {
+                return;
+            }
+            
+            const allKeys = Object.keys(localStorage).filter(key => key.startsWith('punch_report_'));
+            allKeys.forEach(key => localStorage.removeItem(key));
+            
+            // チェックボックスをリセット
+            const checkboxes = document.querySelectorAll('.punch-report-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+            });
+            
+            // 背景色をリセット
+            const rows = document.querySelectorAll('#results-body tr');
+            rows.forEach(row => {
+                row.style.backgroundColor = '';
+            });
+            
+            updatePunchReportSummary();
+        }
+
+        // 行から全データを取得
+        function getFullDataFromRow(row) {
+            const fullDataStr = row.dataset.fullData;
+            if (fullDataStr) {
+                return JSON.parse(fullDataStr);
+            }
+            return null;
+        }
+
+        // すべての行データを取得
+        function getAllRowData() {
+            const rows = document.querySelectorAll('#results-body tr');
+            return Array.from(rows).map(row => getFullDataFromRow(row)).filter(data => data !== null);
+        }
+
+        // 日時をフォーマット
+        function formatDateTime(datetime) {
+            if (!datetime) return '';
+            const dt = new Date(datetime);
+            return dt.toLocaleString('ja-JP');
+        }
+
+        // エラーメッセージを表示
+        function showError(message) {
+            debugLog('showError() 呼び出し:', message);
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // フォームをクリア
+        function clearForm() {
+            debugLog('clearForm() 呼び出し');
+            document.getElementById('employee-id').value = '';
+            document.getElementById('search-month').value = calculateCurrentPayrollMonth();
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // 時間外申告データを月単位で取得
+        async function fetchOvertimeDataForMonth(employeeId, results) {
+            debugLog('fetchOvertimeDataForMonth() 開始:', employeeId);
+            try {
+                const response = await fetch(`/api/overtime?employee_num=${employeeId}&limit=1000`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    debugLog('時間外データ取得成功:', result.data.length, '件');
+                    result.data.forEach(overtime => {
+                        const cell = document.getElementById(`overtime-${overtime.work_date}`);
+                        if (cell) {
+                            const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
+                            const hours = (totalMin / 60).toFixed(1);
+                            cell.innerHTML = `${overtime.start_time}-${overtime.end_time}<br><small>(${hours}h)</small>`;
+                        }
+                    });
+                }
+                return Promise.resolve();
+            } catch (error) {
+                debugLog('時間外データ取得エラー:', error);
+                console.error('[時間外データ取得エラー]', error);
+                return Promise.reject(error);
+            }
+        }
+        
+        // 休暇願データを月単位で取得
+        async function fetchLeaveDataForMonth(employeeId, results) {
+            debugLog('fetchLeaveDataForMonth() 開始:', employeeId);
+            try {
+                const response = await fetch(`/api/leave?employee_num=${employeeId}&limit=1000`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    debugLog('休暇願データ取得成功:', result.data.length, '件');
+                    result.data.forEach(leave => {
+                        // 休暇期間の各日付をチェック
+                        const startDate = new Date(leave.leave_date_from);
+                        const endDate = new Date(leave.leave_date_to);
+                        
+                        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                            const dateStr = d.toISOString().split('T')[0];
+                            const cell = document.getElementById(`leave-${dateStr}`);
+                            if (cell) {
+                                let detail = leave.leave_type;
+                                if (leave.leave_subtype) {
+                                    detail = leave.leave_subtype.substring(0, 20);
+                                }
+                                cell.innerHTML = `${detail}`;
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                debugLog('休暇願データ取得エラー:', error);
+                console.error('[休暇願データ取得エラー]', error);
+            }
+        }
+        
+        // アラート表示（時間外確認機能付き、チェックボックス付き）
+        function formatAlertsWithOvertimeCheck(item, alerts) {
+            const workDate = item.work_date;
+            const employeeId = item.employee_id;
+            
+            // アラート表示（×マーク付き）
+            let alertsHtml = formatAlerts(alerts);
+            
+            // チェックボックスを追加（打刻漏れ・打刻なしがある場合）
+            const hasPunchLeak = alerts.some(a => (a.message || '').includes('打刻漏れ'));
+            const hasMissingPunch = alerts.some(a => (a.message || '').includes('打刻なし'));
+            
+            let checkboxesHtml = '';
+            if (hasPunchLeak) {
+                checkboxesHtml += `
+                    <div style="display: flex; align-items: center; gap: 5px; margin-top: 3px;">
+                        <input type="checkbox" 
+                               id="alert-check-punchleak-${employeeId}-${workDate}" 
+                               data-type="${CheckType.PUNCH_LEAK}"
+                               data-employee="${employeeId}"
+                               data-date="${workDate}"
+                               style="margin: 0; cursor: pointer;"
+                               onchange="updateCheckStatus(this)">
+                        <label for="alert-check-punchleak-${employeeId}-${workDate}" 
+                               style="font-size: 0.85em; cursor: pointer; margin: 0;">
+                            打刻漏れ確認
+                        </label>
+                    </div>
+                `;
+            }
+            
+            if (hasMissingPunch) {
+                checkboxesHtml += `
+                    <div style="display: flex; align-items: center; gap: 5px; margin-top: 3px;">
+                        <input type="checkbox" 
+                               id="alert-check-missing-${employeeId}-${workDate}" 
+                               data-type="${CheckType.MISSING_PUNCH}"
+                               data-employee="${employeeId}"
+                               data-date="${workDate}"
+                               style="margin: 0; cursor: pointer;"
+                               onchange="updateCheckStatus(this)">
+                        <label for="alert-check-missing-${employeeId}-${workDate}" 
+                               style="font-size: 0.85em; cursor: pointer; margin: 0;">
+                            打刻なし確認
+                        </label>
+                    </div>
+                `;
+            }
+            
+            // 「出勤時刻に差異あり」アラートをチェック
+            const hasClockInTimeDiff = alerts.some(alert => {
+                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                return alertStr.includes('出勤時刻に差異あり');
+            });
+            
+            if (hasClockInTimeDiff) {
+                // 時間外申告データをチェック（非同期で取得済みのデータを使用）
+                const overtimeCell = document.getElementById(`overtime-${workDate}`);
+                const hasOvertime = overtimeCell && overtimeCell.textContent.trim() !== '-' && !overtimeCell.textContent.includes('対象なし');
+                
+                // データベースから「時間差異」確認状態を取得
+                // item._timeDiffCheckedはrefreshTimeDiffAlertsで設定される
+                const isNoOvertimeConfirmed = item._timeDiffChecked === true;
+                
+                if (!hasOvertime && !isNoOvertimeConfirmed) {
+                    // 時間外申告がなく、まだ確認されていない場合のみ表示
+                    alertsHtml += `
+                        <div class="alert-item info" style="margin-top: 5px; padding: 5px; background: #e7f3ff; border: 1px solid #b3d9ff;">
+                            <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                                <span style="font-size: 0.85em;">早朝時間外の可能性</span>
+                                <label style="display: flex; align-items: center; gap: 3px; font-size: 0.75em; cursor: pointer; margin-left: 5px;">
+                                    <input type="checkbox" 
+                                           id="no-overtime-${employeeId}-${workDate}" 
+                                           class="no-overtime-checkbox" 
+                                           data-employee="${employeeId}" 
+                                           data-date="${workDate}"
+                                           style="margin: 0;"
+                                           onchange="handleNoOvertimeChange(this)">
+                                    <span>時間外なし</span>
+                                </label>
+                                <button type="button" 
+                                        class="btn btn-info" 
+                                        style="font-size: 0.75em; padding: 2px 8px; margin-left: 5px;"
+                                        onclick="window.location.href='/overtime?employee_id=${employeeId}&work_date=${workDate}'">
+                                    時間外申告
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else if (isNoOvertimeConfirmed) {
+                    // 「時間外なし」が確認済みの場合
+                    alertsHtml += `
+                        <div style="margin-top: 5px; font-size: 0.7em; color: #28a745;">
+                            ✓ 打刻時間確認済み
+                        </div>
+                    `;
+                }
+            }
+            
+            return alertsHtml;
+        }
+        
+        // 「時間外なし」チェックボックスの変更ハンドラー
+        async function handleNoOvertimeChange(checkbox) {
+            const employeeId = checkbox.dataset.employee;
+            const workDate = checkbox.dataset.date;
+            const isChecked = checkbox.checked;
+            
+            debugLog('handleNoOvertimeChange()', { employeeId, workDate, isChecked });
+            
+            try {
+                // データベースに保存/更新
+                const response = await AttendanceSystem.API.Check.updateStatus({
+                    employee_num: employeeId,
+                    work_date: workDate,
+                    check_type: CheckType.TIME_DIFFERENCE,
+                    is_checked: isChecked,
+                    notes: isChecked ? '時間外なし' : null
+                });
+                
+                if (response.success) {
+                    debugLog('時間差異確認状態をデータベースに保存:', { employeeId, workDate, isChecked });
+                    
+                    if (isChecked) {
+                        // 「出勤時刻に差異あり」アラートを削除
+                        removeClockInTimeDiffAlert(employeeId, workDate);
+                        
+                        // チェックボックスとボタンを非表示にして、「確認済み」メッセージを表示
+                        updateTimeDiffConfirmationDisplay(employeeId, workDate, true);
+                    } else {
+                        // アラートを再表示
+                        restoreClockInTimeDiffAlert(employeeId, workDate);
+                        
+                        // チェックボックスとボタンを再表示
+                        updateTimeDiffConfirmationDisplay(employeeId, workDate, false);
+                    }
+                } else {
+                    console.error('[handleNoOvertimeChange] APIエラー:', response.message);
+                    // エラー時はチェックボックスを元に戻す
+                    checkbox.checked = !isChecked;
+                    alert('確認状態の保存に失敗しました: ' + (response.message || '不明なエラー'));
+                }
+            } catch (error) {
+                console.error('[handleNoOvertimeChange] エラー:', error);
+                // エラー時はチェックボックスを元に戻す
+                checkbox.checked = !isChecked;
+                alert('確認状態の保存に失敗しました: ' + error.message);
+            }
+        }
+        
+        // 「出勤時刻に差異あり」アラートを削除
+        function removeClockInTimeDiffAlert(employeeId, workDate) {
+            const alertsCell = document.getElementById(`alerts-${workDate}`);
+            if (!alertsCell) return;
+            
+            const alertItems = alertsCell.querySelectorAll('.alert-item');
+            alertItems.forEach(alertItem => {
+                const alertText = alertItem.textContent || '';
+                if (alertText.includes('出勤時刻に差異あり')) {
+                    alertItem.remove();
+                    debugLog('出勤時刻差異アラートを削除:', workDate);
+                }
+            });
+        }
+        
+        // 「出勤時刻に差異あり」アラートを再表示
+        function restoreClockInTimeDiffAlert(employeeId, workDate) {
+            const row = document.querySelector(`tr[data-full-data*="${workDate}"]`);
+            if (!row) return;
+            
+            const fullDataStr = row.dataset.fullData;
+            if (!fullDataStr) return;
+            
+            const item = JSON.parse(fullDataStr);
+            const alerts = item.alerts || [];
+            
+            // アラートを再生成
+            const alertsHtml = formatAlertsWithOvertimeCheck(item, alerts);
+            const alertsCell = document.getElementById(`alerts-${workDate}`);
+            if (alertsCell) {
+                alertsCell.innerHTML = alertsHtml;
+            }
+        }
+        
+        // 時間差異確認の表示を更新
+        function updateTimeDiffConfirmationDisplay(employeeId, workDate, isConfirmed) {
+            const alertsCell = document.getElementById(`alerts-${workDate}`);
+            if (!alertsCell) return;
+            
+            const noOvertimeCheckbox = document.getElementById(`no-overtime-${employeeId}-${workDate}`);
+            const overtimeButton = alertsCell.querySelector(`button[onclick*="${workDate}"]`);
+            
+            if (isConfirmed) {
+                // チェックボックスとボタンを非表示
+                if (noOvertimeCheckbox) {
+                    const label = noOvertimeCheckbox.closest('label');
+                    if (label) label.style.display = 'none';
+                }
+                if (overtimeButton) {
+                    overtimeButton.style.display = 'none';
+                }
+                
+                // 「確認済み」メッセージを追加（既に存在しない場合）
+                if (!alertsCell.querySelector('.time-diff-confirmed')) {
+                    const confirmedMsg = document.createElement('div');
+                    confirmedMsg.className = 'time-diff-confirmed';
+                    confirmedMsg.style.cssText = 'margin-top: 5px; font-size: 0.7em; color: #28a745;';
+                    confirmedMsg.textContent = '✓ 打刻時間確認済み';
+                    alertsCell.appendChild(confirmedMsg);
+                }
+            } else {
+                // チェックボックスとボタンを再表示
+                if (noOvertimeCheckbox) {
+                    const label = noOvertimeCheckbox.closest('label');
+                    if (label) label.style.display = '';
+                }
+                if (overtimeButton) {
+                    overtimeButton.style.display = '';
+                }
+                
+                // 「確認済み」メッセージを削除
+                const confirmedMsg = alertsCell.querySelector('.time-diff-confirmed');
+                if (confirmedMsg) {
+                    confirmedMsg.remove();
+                }
+            }
+        }
+        
+        // 打刻申告セルを生成
+        function generatePunchReportCell(item, alerts) {
+            const workDate = item.work_date;
+            const employeeId = item.employee_id;
+            
+            // 打刻漏れ関連のアラートをチェック（出勤・退勤別に）
+            // 「打刻漏れ」のみを対象とし、「時刻に差異あり」は除外する
+            const checkinAlerts = alerts.filter(alert => {
+                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                return alertStr.includes('出勤打刻漏れ');
+            });
+            
+            const checkoutAlerts = alerts.filter(alert => {
+                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                return alertStr.includes('退勤打刻漏れ');
+            });
+            
+            const hasCheckinAlert = checkinAlerts.length > 0;
+            const hasCheckoutAlert = checkoutAlerts.length > 0;
+            
+            if (!hasCheckinAlert && !hasCheckoutAlert) {
+                return '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
+            }
+            
+            // localStorageから既存の申告状態を取得
+            const checkinKey = `punch_report_${employeeId}_${workDate}_checkin`;
+            const checkoutKey = `punch_report_${employeeId}_${workDate}_checkout`;
+            const hasCheckinReport = localStorage.getItem(checkinKey) !== null;
+            const hasCheckoutReport = localStorage.getItem(checkoutKey) !== null;
+            
+            // 既に申告されている場合は非表示にする
+            const checkinDisplay = (hasCheckinAlert && !hasCheckinReport) ? '' : 'display: none;';
+            const checkoutDisplay = (hasCheckoutAlert && !hasCheckoutReport) ? '' : 'display: none;';
+            
+            // 両方非表示の場合は「対象なし」を返す
+            if (checkinDisplay.includes('none') && checkoutDisplay.includes('none')) {
+                return '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
+            }
+            
+            return `
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
+                    ${hasCheckinAlert ? `
+                    <label style="display: flex; align-items: center; gap: 3px; font-size: 0.8em; cursor: pointer; ${checkinDisplay}">
+                        <input type="checkbox" 
+                               id="punch-leak-checkin-${employeeId}-${workDate}" 
+                               class="punch-report-checkbox" 
+                               data-employee="${employeeId}" 
+                               data-date="${workDate}" 
+                               data-type="checkin"
+                               style="margin: 0;"
+                               ${hasCheckinReport ? 'checked' : ''}
+                               onchange="handlePunchReportChange(this)">
+                        <span style="color: #dc3545;">出勤</span>
+                    </label>
+                    ` : ''}
+                    ${hasCheckoutAlert ? `
+                    <label style="display: flex; align-items: center; gap: 3px; font-size: 0.8em; cursor: pointer; ${checkoutDisplay}">
+                        <input type="checkbox" 
+                               id="punch-leak-checkout-${employeeId}-${workDate}" 
+                               class="punch-report-checkbox" 
+                               data-employee="${employeeId}" 
+                               data-date="${workDate}" 
+                               data-type="checkout"
+                               style="margin: 0;"
+                               ${hasCheckoutReport ? 'checked' : ''}
+                               onchange="handlePunchReportChange(this)">
+                        <span style="color: #28a745;">退勤</span>
+                    </label>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // 打刻申告チェックボックスの変更ハンドラー
+        function handlePunchReportChange(checkbox) {
+            const employeeId = checkbox.dataset.employee;
+            const workDate = checkbox.dataset.date;
+            const punchType = checkbox.dataset.type;
+            const isChecked = checkbox.checked;
+            
+            debugLog('handlePunchReportChange()', { employeeId, workDate, punchType, isChecked });
+
+            
+            // 申告データを保存（将来的にAPIに送信）
+            if (isChecked) {
+                savePunchReport(employeeId, workDate, punchType);
+                // 対応するエラー・警告アラートを削除
+                removeAlertForPunchReport(employeeId, workDate, punchType);
+                // チェックボックスを非表示にする
+                hideCheckboxForPunchReport(employeeId, workDate, punchType);
+            } else {
+                removePunchReport(employeeId, workDate, punchType);
+                // エラー・警告アラートを再表示（元のデータから）
+                restoreAlertForPunchReport(employeeId, workDate, punchType);
+                // チェックボックスを再表示
+                showCheckboxForPunchReport(employeeId, workDate, punchType);
+            }
+        }
+        
+        // 打刻申告に対応するエラー・警告アラートを削除
+        function removeAlertForPunchReport(employeeId, workDate, punchType) {
+            const alertsCell = document.getElementById(`alerts-${workDate}`);
+            if (!alertsCell) return;
+            
+            // 現在のアラート要素を取得
+            const alertItems = alertsCell.querySelectorAll('.alert-item');
+            let hasChanges = false;
+            
+            alertItems.forEach(alertItem => {
+                const alertText = alertItem.textContent || '';
+                // 出勤チェックの場合、「出勤打刻漏れ」のみを削除（「出勤時刻に差異あり」は除外）
+                if (punchType === 'checkin' && alertText.includes('出勤打刻漏れ')) {
+                    alertItem.remove();
+                    hasChanges = true;
+                    debugLog('出勤打刻漏れアラートを削除:', workDate);
+                }
+                // 退勤チェックの場合、「退勤打刻漏れ」のみを削除（「退勤時刻に差異あり」は除外）
+                if (punchType === 'checkout' && alertText.includes('退勤打刻漏れ')) {
+                    alertItem.remove();
+                    hasChanges = true;
+                    debugLog('退勤打刻漏れアラートを削除:', workDate);
+                }
+            });
+            
+            // アラートが全て削除された場合の処理
+            if (hasChanges && alertsCell.querySelectorAll('.alert-item').length === 0) {
+                alertsCell.innerHTML = '<span style="color: #999; font-size: 0.8em;">エラーなし</span>';
+            }
+        }
+        
+        // 打刻申告のチェックボックスを非表示にする
+        function hideCheckboxForPunchReport(employeeId, workDate, punchType) {
+            const checkboxId = `punch-leak-${punchType}-${employeeId}-${workDate}`;
+            const checkbox = document.getElementById(checkboxId);
+            if (checkbox) {
+                const label = checkbox.closest('label');
+                if (label) {
+                    label.style.display = 'none';
+                    debugLog('チェックボックスを非表示:', checkboxId);
+                }
+            }
+            
+            // 両方のチェックボックスが非表示になったら、セル全体を「対象なし」に変更
+            const punchReportCell = checkbox?.closest('.punch-report-cell');
+            if (punchReportCell) {
+                const visibleCheckboxes = punchReportCell.querySelectorAll('label[style*="display: none"]');
+                const allCheckboxes = punchReportCell.querySelectorAll('label');
+                if (allCheckboxes.length > 0 && visibleCheckboxes.length === allCheckboxes.length) {
+                    punchReportCell.innerHTML = '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
+                }
+            }
+        }
+        
+        // エラー・警告アラートを再表示（元のデータから）
+        function restoreAlertForPunchReport(employeeId, workDate, punchType) {
+            // 行のデータを取得
+            const row = document.querySelector(`tr[data-full-data*="${workDate}"]`);
+            if (!row) return;
+            
+            const fullDataStr = row.dataset.fullData;
+            if (!fullDataStr) return;
+            
+            const item = JSON.parse(fullDataStr);
+            const alerts = item.alerts || [];
+            
+            // アラートを再生成
+            const alertsHtml = formatAlerts(alerts);
+            const alertsCell = document.getElementById(`alerts-${workDate}`);
+            if (alertsCell) {
+                alertsCell.innerHTML = alertsHtml;
+            }
+        }
+        
+        // チェックボックスを再表示
+        function showCheckboxForPunchReport(employeeId, workDate, punchType) {
+            const checkboxId = `punch-leak-${punchType}-${employeeId}-${workDate}`;
+            const checkbox = document.getElementById(checkboxId);
+            if (checkbox) {
+                const label = checkbox.closest('label');
+                if (label) {
+                    label.style.display = '';
+                    debugLog('チェックボックスを再表示:', checkboxId);
+                }
+            }
+        }
+
+        // 打刻申告データを保存
+        function savePunchReport(employeeId, workDate, punchType) {
+            // ローカルストレージに保存（暫定）
+            const key = `punch_report_${employeeId}_${workDate}_${punchType}`;
+            localStorage.setItem(key, JSON.stringify({
+                employeeId: employeeId,
+                workDate: workDate,
+                punchType: punchType,
+                reportedAt: new Date().toISOString(),
+                status: 'reported'
+            }));
+            
+            debugLog('打刻申告データを保存:', key);
+            
+            // 将来的にはAPIに送信
+            // submitPunchReportToAPI(employeeId, workDate, punchType);
+            
+
+            updateRowBackgroundForPunchReport(employeeId, workDate);
+            updatePunchReportSummary();
+        }
+
+        // 打刻申告データを削除
+        function removePunchReport(employeeId, workDate, punchType) {
+            const key = `punch_report_${employeeId}_${workDate}_${punchType}`;
+            localStorage.removeItem(key);
+            
+            debugLog('打刻申告データを削除:', key);
+
+            updateRowBackgroundForPunchReport(employeeId, workDate);
+            updatePunchReportSummary();
+        }
+
+        // 背景色の管理
+        function updateRowBackgroundForPunchReport(employeeId, workDate) {
+            // 申告データを確認してロウの背景色を更新
+            const hasAnyReport = ['checkin', 'checkout'].some(type => {
+                const key = `punch_report_${employeeId}_${workDate}_${type}`;
+                return localStorage.getItem(key) !== null;
+            });
+            
+            // 該当する行を見つけて背景色を変更
+            const rows = document.querySelectorAll('#results-body tr');
+            rows.forEach(row => {
+                const cells = row.cells;
+                if (cells.length > 2) {
+                    const rowEmployeeId = cells[0].textContent.trim();
+                    const rowDate = cells[2].textContent.trim();
+                    if (rowEmployeeId === employeeId && rowDate === formatDate(workDate)) {
+                        row.style.backgroundColor = hasAnyReport ? '#fff3cd' : '';
+                    }
+                }
+            });
+        }
+
+        // CSV出力
+        function exportCSV() {
+            debugLog('exportCSV() 呼び出し');
+            if (AttendanceSystem.Search.searchResults.length === 0) {
+                alert('出力するデータがありません');
+                return;
+            }
+            
+            let csv = '従業員ID,従業員名,勤務日,勤務タイプ,開始時刻,終了時刻,実際の打刻時間,エラー・警告\n';
+            AttendanceSystem.Search.searchResults.forEach(item => {
+                const attendanceTimes = (item.attendance_records || []).map(record => record.time_only).join(' ');
+                
+                // 退勤時刻の処理（24勤は翌日明に表示、明は前日24勤の退勤時刻を表示）
+                let endTimeForCSV = '';
+                if (item.work_type === '明' && item.night_shift_end_time) {
+                    // 明の行で、前日24勤の退勤時刻がある場合
+                    endTimeForCSV = `${item.night_shift_end_time} (${item.night_shift_work_type}退勤)`;
+                } else if (item.work_type && item.work_type.includes('24勤')) {
+                    // 24勤の場合は退勤時刻を表示しない
+                    endTimeForCSV = '翌日明に表示';
+                } else {
+                    // 通常勤務
+                    endTimeForCSV = item.end_time || '';
+                }
+                
+                // アラート情報をCSVに追加
+                const alertsText = (item.alerts || []).map(alert => {
+                    return alert.details ? `${alert.message}: ${alert.details}` : alert.message;
+                }).join('; ').replace(/"/g, '""');
+                
+                // CSV出力時も「通常」を「日勤」に変換
+                let csvWorkType = item.work_type || '';
+                csvWorkType = csvWorkType.replace('通常', '日勤');
+                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${csvWorkType}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}","${alertsText}"\n`;
+            });
+            
+            // BOM（Byte Order Mark）を追加してExcelで文字化けを防ぐ
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `schedule_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+            
+            debugLog('CSV出力完了');
+        }
+    </script>
+</body>
+</html>
+</html>

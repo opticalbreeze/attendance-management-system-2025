@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月間集計レポート</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <!-- 統合APIサービス -->
+    <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
+    <style>
+        .container {
+            width: 100%;
+            padding: 0 10px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2em;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+            margin-right: var(--spacing-sm);
+        }
+        
+        .btn:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .btn-secondary {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #dc3545;
+            display: none;
+        }
+        
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            display: none;
+            position: relative;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            display: inline-block;
+            vertical-align: middle;
+        }
+        
+        .help-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .button-group button {
+            min-width: 150px;
+            flex: 1 1 auto;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .navigation-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 10px 0;
+        }
+        
+        .navigation-buttons a {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #0066cc;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            border: 1px solid #0052a3;
+            transition: background-color 0.3s, border-color 0.3s;
+            cursor: pointer;
+        }
+        
+        .navigation-buttons a:hover {
+            background: #0052a3;
+            border-color: #003d7a;
+        }
+        
+        .navigation-buttons a:active {
+            background: #003d7a;
+        }
+        
+        /* A4印刷用スタイル */
+        @media print {
+            /* 印刷時に非表示にする要素 */
+            .no-print {
+                display: none !important;
+            }
+            
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            
+            @page {
+                size: A4 landscape;
+                margin: 8mm 6mm;
+            }
+            
+            body {
+                margin: 0;
+                padding: 0;
+                font-size: 8pt;
+                line-height: 1.2;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 0;
+                width: 100%;
+            }
+            
+            .form-section, .back-link, .navigation-buttons, h1, #error-message, #success-message, #loading {
+                display: none !important;
+            }
+            
+            #preview-section {
+                display: block !important;
+                width: 100%;
+                overflow: visible;
+            }
+            
+            #preview-content {
+                width: 100%;
+                overflow: visible;
+                font-size: 7pt;
+            }
+            
+            table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+                page-break-inside: auto;
+                font-size: 7pt !important;
+                margin: 0;
+            }
+            
+            th, td {
+                padding: 2px 1px !important;
+                border: 0.5pt solid #000 !important;
+                font-size: 7pt !important;
+                line-height: 1.1 !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+            
+            th {
+                background-color: #f0f0f0 !important;
+                font-weight: bold !important;
+            }
+            
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            
+            thead {
+                display: table-header-group;
+            }
+            
+            tfoot {
+                display: table-footer-group;
+            }
+        }
+        
+        /* レスポンシブテーブル対応 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .responsive-table {
+            width: 100%;
+            min-width: 800px;
+            border-collapse: collapse;
+            word-wrap: break-word;
+            table-layout: fixed;
+        }
+        
+        .responsive-table th,
+        .responsive-table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+        }
+        
+        /* 小画面対応 */
+        @media screen and (max-width: 768px) {
+            .responsive-table {
+                font-size: 8px;
+            }
+            
+            .responsive-table th,
+            .responsive-table td {
+                padding: 2px 1px;
+                font-size: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="navigation-buttons">
+            <a href="/">トップページ</a>
+            <a href="/admin">管理者ページ</a>
+        </div>
+        <h1>月間集計レポート</h1>
+        
+        <div id="error-message" class="error"></div>
+        <div id="success-message" class="success"></div>
+        <div id="loading" class="loading"><span class="loading-text">処理中...</span></div>
+        
+        <div class="form-section">
+            <div class="form-group">
+                <label for="section-select">セクション</label>
+                <select id="section-select">
+                    <option value="">▼ セクションを選択</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="employee-id">従業員</label>
+                <select id="employee-id">
+                    <option value="">▼ 従業員を選択してください</option>
+                </select>
+                <div class="help-text">従業員を選択してください</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="search-month">検索月</label>
+                <input type="text" id="search-month" placeholder="YYYY/MM形式（例: 2025/12）" pattern="\d{4}/\d{2}">
+                <div class="help-text">前月16日〜当月15日の期間で集計されます</div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn" onclick="generateReport()">Excel生成・ダウンロード</button>
+                <button class="btn btn-secondary" onclick="previewReport()">プレビュー</button>
+            </div>
+        </div>
+        
+        <div id="preview-section" style="display: none;">
+            <h2 style="margin-top: 30px; margin-bottom: 20px;">プレビュー</h2>
+            <div id="preview-content" style="width: 100%; margin: 0; padding: 0; box-sizing: border-box; font-size: 14px; overflow-x: auto; background: white;"></div>
+        </div>
+        
+        <a href="/" class="back-link">← トップページに戻る</a>
+    </div>
+    
+    <script>
+        // 名前空間を使用してグローバル変数の衝突を回避
+        AttendanceSystem.Report = AttendanceSystem.Report || {};
+        AttendanceSystem.Report.allEmployees = [];
+        
+        // 後方互換性のため
+        let allEmployees = AttendanceSystem.Report.allEmployees;
+        
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadEmployees();
+            
+            // 検索月のデフォルト値を設定（現在の日付から月度を計算）
+            function calculateCurrentPayrollMonth() {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = today.getMonth() + 1;
+                const day = today.getDate();
+                
+                if (day >= 16) {
+                    return month === 12 ? `${year + 1}/01` : `${year}/${String(month + 1).padStart(2, '0')}`;
+                } else {
+                    return `${year}/${String(month).padStart(2, '0')}`;
+                }
+            }
+            
+            document.getElementById('search-month').value = calculateCurrentPayrollMonth();
+            
+            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('section-select');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+        
+        // 従業員情報を読み込む
+        async function loadEmployees() {
+            try {
+                const response = await AttendanceSystem.API.Employees.getAll();
+                
+                if (response.success) {
+                    allEmployees = response.data;
+                    
+                    // セクション一覧を設定
+                    const sectionSelect = document.getElementById('section-select');
+                    const sections = [...new Set(response.data.map(emp => emp.section || '設備'))].sort();
+                    sectionSelect.innerHTML = '<option value="">▼ セクションを選択</option>';
+                    sections.forEach(section => {
+                        const option = document.createElement('option');
+                        option.value = section;
+                        option.textContent = section;
+                        sectionSelect.appendChild(option);
+                    });
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                } else {
+                    showError(response.message || '従業員リストの取得に失敗しました');
+                }
+            } catch (error) {
+                showError('従業員リストの取得中にエラーが発生しました');
+                console.error(error);
+            }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            const selectedSection = sectionSelect.value;
+            
+            employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+            
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            filteredEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.employee_num;
+                option.textContent = `${employee.employee_num} - ${employee.name}`;
+                employeeSelect.appendChild(option);
+            });
+        }
+        
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+        
+        // 成功表示
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // Excel生成・ダウンロード
+        async function generateReport() {
+            const employeeId = document.getElementById('employee-id').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            if (!employeeId) {
+                showError('従業員を選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            // バリデーション
+            if (!/^\d{4}\/\d{2}$/.test(searchMonth)) {
+                showError('検索月はYYYY/MM形式で入力してください（例: 2025/12）');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/monthly-report/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        search_month: searchMonth
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok && data.status === 'success') {
+                    showSuccess('レポートを生成しました。ダウンロードを開始します...');
+                    
+                    // ダウンロード
+                    window.location.href = data.download_url;
+                } else {
+                    showError(data.message || 'レポートの生成に失敗しました');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                const errorMessage = error && error.message ? error.message : 'サーバーとの通信エラーが発生しました';
+                showError('サーバーとの通信エラーが発生しました: ' + errorMessage);
+                console.error('レポート生成エラー:', error);
+            }
+        }
+        
+        // プレビュー表示
+        async function previewReport() {
+            const employeeId = document.getElementById('employee-id').value.trim();
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            if (!employeeId) {
+                showError('従業員を選択してください');
+                return;
+            }
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            if (!/^\d{4}\/\d{2}$/.test(searchMonth)) {
+                showError('検索月はYYYY/MM形式で入力してください（例: 2025/12）');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/monthly-report/preview?employee_id=${employeeId}&search_month=${searchMonth}`);
+                const data = await response.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (response.ok && data.status === 'success') {
+                    if (data.data) {
+                        displayPreview(data.data);
+                    } else {
+                        showError('データが取得できませんでした');
+                        console.error('レスポンスデータ:', data);
+                    }
+                } else {
+                    showError(data.message || 'プレビューの取得に失敗しました');
+                    console.error('APIエラー:', data);
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                const errorMessage = error && error.message ? error.message : 'サーバーとの通信エラーが発生しました';
+                showError('サーバーとの通信エラーが発生しました: ' + errorMessage);
+                console.error('プレビュー取得エラー:', error);
+            }
+        }
+        
+        // プレビュー表示
+        function displayPreview(data) {
+            if (!data) {
+                showError('データの取得に失敗しました');
+                return;
+            }
+            
+            const previewSection = document.getElementById('preview-section');
+            const previewContent = document.getElementById('preview-content');
+            
+               // データの存在確認
+               if (!data.search_month || !data.employee_info || !data.daily_data) {
+                   showError('データの形式が正しくありません');
+                   return;
+               }
+            
+            let html = `
+                <div class="preview-header" style="background: white; padding: 10px; border: 1px solid #333; margin-bottom: 10px; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <div style="font-weight: bold; font-size: 21px; color: #333;">${data.search_month}月度 勤務実績表</div>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: #333;">
+                            <span><strong>社員番号:</strong> ${data.employee_info.employee_num || '-'}</span>
+                            <span><strong>社員名:</strong> ${data.employee_info.name || '-'}</span>
+                            <span><strong>勤務先名:</strong> ${data.employee_info.workplace || '-'}</span>
+                            <span><strong>期間:</strong> ${data.start_date || '-'} 〜 ${data.end_date || '-'}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="width: 100%; margin: 0; padding: 0; box-sizing: border-box; overflow-x: auto; background: white;">
+                <table style="width: 1000px; border-collapse: collapse; margin: 10px 0; font-size: 14px; table-layout: fixed; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif; background: white;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 80px; font-size: 14px; line-height: 1.2; text-align: center;">日付</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 80px; font-size: 14px; line-height: 1.2; text-align: center;">区分</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 100px; font-size: 14px; line-height: 1.1; text-align: center;">開始<br>出勤</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 100px; font-size: 14px; line-height: 1.1; text-align: center;">終了<br>退勤</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 180px; font-size: 14px; line-height: 1.1; text-align: center;">エラー・警告</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 120px; font-size: 14px; line-height: 1.1; text-align: center;">確認状況</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 200px; font-size: 14px; line-height: 1.1; text-align: center;">時間外</th>
+                            <th style="padding: 5px 3px; border: 1px solid #333; width: 140px; font-size: 14px; line-height: 1.1; text-align: center;">休暇願</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            const dailyData = data.daily_data || {};
+            const sortedDates = Object.keys(dailyData).sort();
+            
+            let totalOvertime = 0;
+            let totalStandard = 0;
+            let totalErrorCount = 0;
+            let totalCheckedCount = 0;
+            
+            if (sortedDates.length === 0) {
+                html += `
+                    <tr>
+                        <td colspan="8" style="padding: 20px; text-align: center; color: #666;">
+                            データがありません
+                        </td>
+                    </tr>
+                `;
+            } else {
+                for (const dateStr of sortedDates) {
+                    const dayData = dailyData[dateStr];
+                    if (!dayData) continue;
+                    
+                    let workDate;
+                    try {
+                        workDate = new Date(dateStr + 'T00:00:00');
+                    } catch (e) {
+                        workDate = new Date();
+                    }
+                    
+                    const overtime = dayData.overtime || { outer: 0, inner: 0, night: 0, applications: [] };
+                    const overtimeHours = (overtime.outer || 0) + (overtime.inner || 0);
+                    const hasOvertime = overtimeHours > 0 || (overtime.night || 0) > 0;
+                    const overtimeApplications = overtime.applications || [];
+                    
+                    // 時間外時間の表示文字列を生成（内残業・外残業・深夜時間の詳細を個別に表示）
+                    let overtimeDisplay = '-';
+                    if (hasOvertime) {
+                        if (overtimeApplications.length > 0) {
+                            // 各時間外申告の詳細を表示（開始時間・終了時間と内残業・外残業・深夜時間を個別に）
+                            const appParts = overtimeApplications.map(app => {
+                                const timeStr = `${app.start_time || '-'}～${app.end_time || '-'}`;
+                                const typeParts = [];
+                                if (app.inner > 0) {
+                                    typeParts.push(`内${app.inner.toFixed(1)}h`);
+                                }
+                                if (app.outer > 0) {
+                                    typeParts.push(`外${app.outer.toFixed(1)}h`);
+                                }
+                                if (app.night > 0) {
+                                    typeParts.push(`深夜${app.night.toFixed(1)}h`);
+                                }
+                                // 開始時間・終了時間と内残業・外残業・深夜時間を個別に表示
+                                let displayStr = timeStr;
+                                if (typeParts.length > 0) {
+                                    displayStr += '<br>' + typeParts.join(' ');
+                                }
+                                return displayStr;
+                            });
+                            overtimeDisplay = appParts.join('<br><br>'); // 複数の申告がある場合は改行で区切る
+                        } else {
+                            // applicationsが空の場合でも、内残業・外残業・深夜時間を個別に表示
+                            const parts = [];
+                            if (overtime.inner > 0) {
+                                parts.push(`内${overtime.inner.toFixed(1)}h`);
+                            }
+                            if (overtime.outer > 0) {
+                                parts.push(`外${overtime.outer.toFixed(1)}h`);
+                            }
+                            if (overtime.night > 0) {
+                                parts.push(`深夜${overtime.night.toFixed(1)}h`);
+                            }
+                            overtimeDisplay = parts.length > 0 ? parts.join('<br>') : `${overtimeHours.toFixed(1)}h`;
+                        }
+                    }
+                    
+                    // 打刻データから出勤時間・退勤時間を取得（検索画面と同じロジック）
+                    const clock_times = dayData.clock_times || [];
+                    let work_type = dayData.work_type || '';
+                    // 「通常」を「日勤」に変換
+                    work_type = work_type.replace('通常', '日勤');
+                    const work_type_str = String(work_type || '');
+                    
+                    let clock_start = null;
+                    let clock_end = null;
+                    let startTime = '-';
+                    let endTime = '-';
+                    
+                    // 「明」勤務の場合は、前日の24勤・夜勤の終了時間（スケジュール）と打刻の中で一番遅い時間を退勤時刻として表示
+                    if (work_type_str.includes('明')) {
+                        // スケジュールの終了時間（前日の24勤・夜勤から移動されたもの）を表示
+                        endTime = dayData.end_time || '-';
+                        
+                        // 打刻の中で一番遅い時間を退勤時刻として表示
+                        if (clock_times.length > 0) {
+                            // 時刻を比較して一番遅い時間を取得
+                            const sortedTimes = clock_times.map(time => {
+                                const parts = time.split(':');
+                                return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
+                            }).sort((a, b) => b - a);
+                            const latestTimeIndex = clock_times.findIndex(time => {
+                                const parts = time.split(':');
+                                return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0) === sortedTimes[0];
+                            });
+                            clock_end = clock_times[latestTimeIndex];
+                        }
+                        // 「明」勤務は開始時間・出勤時間を表示しない
+                        startTime = '-';
+                        clock_start = null;
+                    } else if (work_type_str && (work_type_str.includes('24勤A') || work_type_str.includes('24勤B') || work_type_str.includes('夜勤'))) {
+                        // 24勤・夜勤の場合は、開始時間と出勤時間のみ表示、終了時間は翌日の「明」に移動済み
+                        clock_start = clock_times[0] || null;
+                        startTime = dayData.start_time || '-';
+                        // 終了時間は表示しない（翌日の「明」に移動済み）
+                        endTime = '-';
+                        clock_end = null;
+                    } else {
+                        // 通常の場合は、最初の打刻が出勤、最後の打刻が退勤
+                        clock_start = clock_times[0] || null;
+                        clock_end = clock_times.length > 1 ? clock_times[clock_times.length - 1] : null;
+                        startTime = dayData.start_time || '-';
+                        endTime = dayData.end_time || '-';
+                    }
+                    
+                    // 開始時間と出勤時間を表示
+                    const clockStartStr = clock_start ? (clock_start.length >= 5 ? clock_start.substring(0, 5) : clock_start) : '-';
+                    
+                    // 終了時間と退勤時間を表示
+                    const clockEndStr = clock_end ? (clock_end.length >= 5 ? clock_end.substring(0, 5) : clock_end) : '-';
+                    
+                    // 休暇願情報を取得
+                    const leaveRequest = dayData.leave_request || null;
+                    let leaveDisplay = '-';
+                    if (leaveRequest) {
+                        const leaveType = leaveRequest.leave_type || '';
+                        const leaveSubtype = leaveRequest.leave_subtype || '';
+                        if (leaveSubtype) {
+                            leaveDisplay = `${leaveType} ${leaveSubtype}`;
+                        } else {
+                            leaveDisplay = leaveType || '-';
+                        }
+                    }
+                    
+                    // エラー・警告情報を取得（簡潔な表示）
+                    const alerts = dayData.alerts || [];
+                    let alertsDisplay = '-';
+                    if (alerts.length > 0) {
+                        const alertTexts = alerts.map(alert => {
+                            const icon = alert.type === 'error' ? '[エラー]' : alert.type === 'warning' ? '[警告]' : '[情報]';
+                            let simpleMessage = alert.message;
+                            
+                            // detailsから差異の分数を抽出して簡潔に表示
+                            if (alert.details) {
+                                const diffMatch = alert.details.match(/差異:\s*([+-]?\d+)分/);
+                                if (diffMatch) {
+                                    const diffMinutes = diffMatch[1];
+                                    if (alert.details.includes('退勤時刻') || alert.message.includes('退勤')) {
+                                        simpleMessage = `退勤差異 ${diffMinutes > 0 ? '+' : ''}${diffMinutes}分`;
+                                    } else if (alert.details.includes('出勤時刻') || alert.message.includes('出勤')) {
+                                        simpleMessage = `出勤差異 ${diffMinutes > 0 ? '+' : ''}${diffMinutes}分`;
+                                    } else {
+                                        simpleMessage = `${alert.message} ${diffMinutes > 0 ? '+' : ''}${diffMinutes}分`;
+                                    }
+                                }
+                            }
+                            
+                            return `${icon}${simpleMessage}`;
+                        });
+                        alertsDisplay = alertTexts.join('<br>');
+                        totalErrorCount += alerts.filter(a => a.type === 'error').length;
+                    }
+                    
+                    // 確認状況を取得
+                    const checkStatuses = dayData.check_statuses || {};
+                    let checkStatusDisplay = '-';
+                    if (alerts.length > 0) {
+                        const errorAlerts = alerts.filter(a => a.type === 'error');
+                        const checkStatusParts = [];
+                        
+                        // 打刻なしエラーの確認状況
+                        const missingPunchErrors = errorAlerts.filter(a => a.message.includes('打刻なし') || a.message.includes('打刻もれ'));
+                        if (missingPunchErrors.length > 0) {
+                            if (checkStatuses.missing_punch || checkStatuses.punch_leak) {
+                                checkStatusParts.push('[確認済]打刻もれ');
+                                totalCheckedCount += 1;
+                            } else {
+                                checkStatusParts.push('未確認');
+                            }
+                        }
+                        
+                        // 時刻差異エラーの確認状況
+                        const timeDiffErrors = errorAlerts.filter(a => a.message.includes('時刻差異') || a.message.includes('時間外'));
+                        if (timeDiffErrors.length > 0) {
+                            if (checkStatuses.time_difference) {
+                                checkStatusParts.push('[確認済]時刻差異');
+                                totalCheckedCount += 1;
+                            } else {
+                                checkStatusParts.push('未確認');
+                            }
+                        }
+                        
+                        if (checkStatusParts.length > 0) {
+                            checkStatusDisplay = checkStatusParts.join('<br>');
+                        }
+                    }
+                    
+                    // 基準時間を計算（簡易版）
+                    let standardHours = 0;
+                    if (work_type && !work_type.includes('明') && !work_type.includes('法') && !work_type.includes('有')) {
+                        if (work_type.includes('24勤A')) {
+                            standardHours = 3;
+                        } else if (work_type.includes('24勤B')) {
+                            standardHours = 5;
+                        } else if (work_type.includes('夜勤')) {
+                            standardHours = 8;
+                        } else if (work_type.includes('日勤')) {
+                            standardHours = 8;
+                        }
+                    }
+                    totalStandard += standardHours;
+                    totalOvertime += overtimeHours;
+                    
+                    html += `
+                        <tr>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">${workDate.getMonth() + 1}/${workDate.getDate()}</td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">${work_type || '-'}</td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; line-height: 1.3;">
+                                ${startTime}<br>
+                                <span style="color: #666; font-size: 14px;">${clockStartStr}</span>
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; line-height: 1.3;">
+                                ${endTime}<br>
+                                <span style="color: #666; font-size: 14px;">${clockEndStr}</span>
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; font-size: 14px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
+                                ${alertsDisplay}
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; font-size: 14px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
+                                ${checkStatusDisplay}
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; ${hasOvertime ? 'color: #333; font-weight: 400;' : ''}; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
+                                ${overtimeDisplay}
+                            </td>
+                            <td style="padding: 4px 3px; border: 1px solid #333; text-align: center; font-size: 14px; word-wrap: break-word; overflow-wrap: break-word;">${leaveDisplay}</td>
+                        </tr>
+                    `;
+                }
+                
+                // サマリー行を追加
+                html += `
+                        <tr style="background: #f8f9fa; font-weight: bold;">
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">計</td>
+                            <td style="padding: 6px 3px; border: 1px solid #333;"></td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                ${Math.floor(totalStandard)}:${String(Math.floor((totalStandard % 1) * 60)).padStart(2, '0')}
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333;"></td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                ${totalErrorCount}件
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                ${totalCheckedCount}件
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333; text-align: center; font-size: 14px;">
+                                ${Math.floor(totalOvertime)}:${String(Math.floor((totalOvertime % 1) * 60)).padStart(2, '0')}
+                            </td>
+                            <td style="padding: 6px 3px; border: 1px solid #333;"></td>
+                        </tr>
+                `;
+            }
+            
+            html += `
+                    </tbody>
+                </table>
+                </div>
+            `;
+            
+            previewContent.innerHTML = html;
+            previewSection.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
+

@@ -520,13 +520,20 @@ def get_attendance_for_schedule(cursor, employee_id, work_date):
         
         attendance_rows = cursor.fetchall()
         
-        # 打刻データを整形
+        # 打刻データを整形（同じ時刻の打刻は最初の1つだけを残す）
         attendance_records = []
+        seen_times = set()
         for att_row in attendance_rows:
             # timestampから時刻のみを抽出（統一関数を使用）
             timestamp_str = att_row[2]
             time_only = extract_time_from_timestamp(timestamp_str)
             
+            # 同じ時刻の打刻が既にある場合はスキップ
+            if time_only in seen_times:
+                logger.debug(f"同じ時刻の打刻をスキップ: {time_only} (id={att_row[0]})")
+                continue
+            
+            seen_times.add(time_only)
             attendance_records.append({
                 'attendance_id': att_row[0],
                 'idm': att_row[1],

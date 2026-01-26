@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>係員別月度勤怠チェック</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .container {
+            max-width: 1400px;
+        }
+        
+        .search-form {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        /* トースト通知アニメーション */
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        .btn-search {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+            margin-right: var(--spacing-sm);
+        }
+        
+        .btn-search:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        
+        .btn-clear {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        
+        .btn-clear:hover {
+            background: var(--bg-hover);
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-primary);
+            table-layout: fixed;
+        }
+        
+        .results-table thead {
+            background: var(--bg-secondary);
+        }
+        
+        .results-table th {
+            padding: var(--spacing-sm) var(--spacing-sm);
+            text-align: left;
+            font-weight: 400;
+            font-size: var(--font-size-sm);
+        }
+        
+        /* 列幅の最適化 */
+        .results-table th:nth-child(1) { width: 80px; }  /* 従業員ID */
+        .results-table th:nth-child(2) { width: 100px; } /* 従業員名 */
+        .results-table th:nth-child(3) { width: 90px; }  /* 勤務日 */
+        .results-table th:nth-child(4) { width: 90px; }  /* 勤務タイプ */
+        .results-table th:nth-child(5) { width: 70px; }  /* 開始時刻 */
+        .results-table th:nth-child(6) { width: 70px; }  /* 終了時刻 */
+        .results-table th:nth-child(7) { width: 120px; } /* 打刻時間 */
+        .results-table th:nth-child(8) { width: 150px; } /* エラー */
+        .results-table th:nth-child(9) { width: 120px; } /* 確認状況 */
+        .results-table th:nth-child(10) { width: 80px; } /* 時間外 */
+        .results-table th:nth-child(11) { width: 80px; } /* 休暇 */
+        
+        .results-table td {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-bottom: var(--border-width) solid var(--border-color);
+            font-size: var(--font-size-sm);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .results-table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+        
+        .idm-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 400;
+            color: var(--accent-color);
+        }
+        
+        .work-type {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-sm);
+            font-weight: 400;
+            color: var(--text-primary);
+            white-space: nowrap;
+            min-width: 60px;
+            text-align: center;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        
+        .work-type.shift-24 {
+            background: var(--bg-secondary);
+            border-color: var(--border-color);
+        }
+        
+        .work-type.day-shift {
+            background: var(--bg-secondary);
+        }
+        
+        .work-type.night-shift {
+            background: var(--bg-secondary);
+        }
+        
+        .work-type.office {
+            background: var(--bg-secondary);
+        }
+        
+        .work-type.off-day {
+            background: var(--bg-secondary);
+        }
+        
+        .work-type.holiday {
+            background: var(--bg-secondary);
+        }
+        
+        .work-type.paid-leave {
+            background: var(--bg-secondary);
+        }
+        
+        /* チェック機構のスタイル */
+        .check-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+        
+        .check-item input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+        
+        .check-item label {
+            font-size: var(--font-size-sm);
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .check-status {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            margin-top: var(--spacing-xs);
+        }
+        
+        .check-status.completed {
+            color: var(--text-primary);
+            font-weight: 400;
+        }
+        
+        .alert-item {
+            display: block;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            margin: var(--spacing-xs) 0;
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-sm);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+            border-left: 2px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        
+        .alert-item.error {
+            border-left-color: var(--border-color);
+        }
+        
+        .alert-item.warning {
+            border-left-color: var(--border-color);
+        }
+        
+        .alert-item.info {
+            border-left-color: var(--border-color);
+        }
+        
+        /* 打刻時間表示のスタイル */
+        .attendance-times {
+            font-family: 'Courier New', monospace;
+            font-size: var(--font-size-sm);
+        }
+        
+        .attendance-time {
+            display: inline-block;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-xs) var(--spacing-xs);
+            border-radius: var(--border-radius);
+            margin: 1px;
+            font-weight: 400;
+            cursor: help;
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .attendance-time.valid-clock-in {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-weight: 400;
+            border-color: var(--accent-color);
+        }
+        
+        .attendance-time.valid-clock-out {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-weight: 400;
+            border-color: var(--accent-color);
+        }
+        
+        .no-attendance {
+            color: var(--text-secondary);
+            font-style: normal;
+        }
+        
+        .alert-icon {
+            margin-right: var(--spacing-xs);
+            font-weight: 400;
+        }
+        
+        .loading, .no-results {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: var(--spacing-xl);
+            font-size: var(--font-size-lg);
+        }
+        
+        .error {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .results-section {
+            margin-top: var(--spacing-lg);
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .results-count {
+            font-size: var(--font-size-lg);
+            font-weight: 400;
+            color: var(--text-primary);
+        }
+        
+        .btn-export {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: var(--border-width) solid var(--accent-color);
+            cursor: pointer;
+            font-weight: 400;
+        }
+        
+        .btn-export:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>� 係員別月度勤怠チェック</h1>
+        <a href="/admin" class="back-link">← 管理者メニューに戻る</a>
+        
+        <div class="search-form">
+            <form id="search-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="section-select">セクション（絞り込み）</label>
+                        <select id="section-select" name="section">
+                            <option value="">すべてのセクション</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="employee-id">確認対象係員 ⭐必須</label>
+                        <select id="employee-id" name="employee_id" required>
+                            <option value="">▼ 係員を選択してください</option>
+                        </select>
+                        <small id="employee-hint" style="color: #666; font-size: 0.8em; display: none;">
+                            係員データを読み込み中...
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="search-month">対象月度 ⭐必須</label>
+                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/12" value="" pattern="[0-9]{4}/[0-9]{1,2}" required>
+                        <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
+                            yyyy/mm形式（前月16日〜当月15日の勤怠）
+                        </small>
+                    </div>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-search">🔍 月度勤怠チェック実行</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 入力クリア</button>
+                </div>
+            </form>
+        </div>
+        
+        <div id="error-message" style="display: none;" class="error"></div>
+        
+        <div class="results-section" id="results-section" style="display: none;">
+            <div class="results-header">
+                <div class="results-count" id="results-count">月度勤怠チェック結果: 0 件</div>
+                <button class="btn-export" onclick="exportCSV()">📄 CSV出力</button>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>係員ID</th>
+                            <th>係員名</th>
+                            <th>勤務日 📅↑</th>
+                            <th>勤務タイプ</th>
+                            <th>開始時刻</th>
+                            <th>終了時刻</th>
+                            <th>実際の打刻時間 🕐</th>
+                            <th>エラー・警告</th>
+                            <th>確認状況</th>
+                            <th>時間外申告</th>
+                            <th>休暇願</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            係員の月度勤怠データを確認中...
+        </div>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            指定された係員・月度の勤怠データが見つかりませんでした。
+        </div>
+    </div>
+    
+    <!-- 共通ライブラリを読み込み -->
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/employee-list.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/attendance-check.js') }}"></script>
+    
+    <script>
+        // 名前空間を使用してグローバル変数の衝突を回避
+        AttendanceSystem.Check = AttendanceSystem.Check || {};
+        
+        // このページ固有のデータを名前空間に保存
+        AttendanceSystem.Check.searchResults = [];
+        // 後方互換性のため
+        let searchResults = AttendanceSystem.Check.searchResults;
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 従業員情報を動的に読み込み
+            await loadEmployees();
+            
+        // 現在の日付から適切な月度を計算して設定
+        function calculateCurrentPayrollMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1; // 0ベースなので+1
+            const day = today.getDate();
+            
+            // 16日以降なら翌月度、15日以前なら当月度
+            if (day >= 16) {
+                // 翌月度
+                if (month === 12) {
+                    return `${year + 1}/1`;
+                } else {
+                    return `${year}/${month + 1}`;
+                }
+            } else {
+                // 当月度
+                return `${year}/${month}`;
+            }
+        }
+        
+        document.getElementById('search-month').value = calculateCurrentPayrollMonth();            // セクション変更時に従業員リストを更新
+            const sectionSelect = document.getElementById('section-select');
+            if (sectionSelect) {
+                sectionSelect.addEventListener('change', updateEmployeeList);
+            }
+        });
+        
+        // 従業員情報を動的に読み込む（統一APIサービス使用）
+        async function loadEmployees() {
+            const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            const employeeHint = document.getElementById('employee-hint');
+            
+            try {
+                console.log('[loadEmployees] 統一APIサービスで従業員データを読み込み中...');
+                
+                // 統一APIサービスを使用
+                const employeesResponse = await AttendanceSystem.API.Employees.getAll();
+                
+                if (employeesResponse.success) {
+                    // 全従業員データを保存
+                    allEmployees = employeesResponse.data;
+                    console.log(`[loadEmployees] ${employeesResponse.data.length}名の従業員を読み込みました`);
+                    
+                    // セクション一覧を統一APIサービスから取得
+                    const sectionsResponse = await AttendanceSystem.API.Employees.getSections();
+                    
+                    if (sectionsResponse.success) {
+                        sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                        sectionsResponse.data.forEach(section => {
+                            const option = document.createElement('option');
+                            option.value = section;
+                            option.textContent = section;
+                            sectionSelect.appendChild(option);
+                        });
+                    } else {
+                        console.warn('[loadEmployees] セクション一覧取得に失敗:', sectionsResponse.message);
+                    }
+                    
+                    // 従業員リストを更新
+                    updateEmployeeList();
+                    
+                    // ヒント表示を有効化
+                    employeeHint.style.display = 'block';
+                    employeeHint.textContent = `${employeesResponse.data.length}名の従業員が読み込まれました`;
+                    employeeHint.style.color = '#28a745';
+                } else {
+                    console.error('[loadEmployees] APIエラー:', employeesResponse.message);
+                    throw new Error(employeesResponse.message);
+                }
+            } catch (error) {
+                console.error('[loadEmployees] エラー詳細:', error);
+                employeeSelect.innerHTML = '<option value="">[エラー] 従業員データ読み込み失敗</option>';
+                employeeHint.style.display = 'block';
+                employeeHint.textContent = `従業員データの読み込みに失敗しました: ${error.message}`;
+                employeeHint.style.color = '#e74c3c';
+            }
+        }
+        
+        // セクションで絞り込んだ従業員リストを更新
+        function updateEmployeeList() {
+            const employeeSelect = document.getElementById('employee-id');
+            const sectionSelect = document.getElementById('section-select');
+            const selectedSection = sectionSelect.value;
+            
+            // 既存のオプションをクリア
+            employeeSelect.innerHTML = '<option value="">▼ 従業員を選択してください</option>';
+            
+            // セクションでフィルタリング
+            const filteredEmployees = selectedSection 
+                ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
+                : allEmployees;
+            
+            // 従業員データでオプションを構築
+            filteredEmployees.forEach(employee => {
+                const option = document.createElement('option');
+                option.value = employee.employee_num;
+                
+                // 表示名を構築（24勤シフトがある場合は明示）
+                let displayName = `${employee.employee_num} - ${employee.name}`;
+                if (employee.has_24hour_shifts) {
+                    displayName += ' (24勤あり)';
+                }
+                if (employee.total_schedules > 0) {
+                    displayName += ` [${employee.total_schedules}件]`;
+                }
+                
+                option.textContent = displayName;
+                
+                employeeSelect.appendChild(option);
+            });
+        }
+        
+        // フォーム送信
+        document.getElementById('search-form').addEventListener('submit', performSearch);
+        
+        // performSearch と displayResults は attendance-check.js から使用
+        
+        // 重複関数を削除しました - attendance-common.js の関数を使用
+        
+        // 行データから完全なデータを取得するヘルパー関数
+        function getFullDataFromRow(row) {
+            try {
+                return JSON.parse(row.dataset.fullData);
+            } catch (e) {
+                console.warn('行データの解析に失敗:', e);
+                return null;
+            }
+        }
+        
+        // 全ての行データを取得するヘルパー関数
+        function getAllRowData() {
+            const rows = document.querySelectorAll('#results-body tr');
+            return Array.from(rows).map(row => getFullDataFromRow(row)).filter(data => data !== null);
+        }
+        
+        // formatAttendanceTimes, getValidClockTimes は attendance-common.js から使用
+        
+        // 日時フォーマット（下位互換用）
+        function formatDateTime(datetime) {
+            if (!datetime) return '';
+            const dt = new Date(datetime);
+            return dt.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // formatAlerts は attendance-common.js から使用
+        
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        // フォームクリア
+        function clearForm() {
+            document.getElementById('search-form').reset();
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // 時間外申告データをグローバル変数に保存（日付をキーとして）
+        const overtimeDataMap = {};
+        
+        // 時間外申告データを月単位で取得
+        async function fetchOvertimeDataForMonth(employeeId, results) {
+            try {
+                const response = await fetch(`/api/overtime?employee_num=${employeeId}&limit=1000`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    result.data.forEach(overtime => {
+                        // 時間外申告データをマップに保存
+                        overtimeDataMap[overtime.work_date] = overtime;
+                        
+                        const cell = document.getElementById(`overtime-${overtime.work_date}`);
+                        if (cell) {
+                            const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
+                            const hours = (totalMin / 60).toFixed(1);
+                            cell.innerHTML = `${overtime.start_time}-${overtime.end_time}<br><small>(${hours}h)</small>`;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('[時間外データ取得エラー]', error);
+            }
+        }
+        
+        // 指定日付に時間外申告があるかチェック
+        function hasOvertimeForDate(workDate) {
+            return overtimeDataMap.hasOwnProperty(workDate);
+        }
+        
+        // 休暇願データを月単位で取得
+        async function fetchLeaveDataForMonth(employeeId, results) {
+            try {
+                const response = await fetch(`/api/leave?employee_num=${employeeId}&limit=1000`);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    result.data.forEach(leave => {
+                        // 休暇期間の各日付をチェック
+                        const startDate = new Date(leave.leave_date_from);
+                        const endDate = new Date(leave.leave_date_to);
+                        
+                        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                            const dateStr = d.toISOString().split('T')[0];
+                            const cell = document.getElementById(`leave-${dateStr}`);
+                            if (cell) {
+                                let detail = leave.leave_type;
+                                if (leave.leave_subtype) {
+                                    detail = leave.leave_subtype.substring(0, 20);
+                                }
+                                cell.innerHTML = `${detail}`;
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('[休暇願データ取得エラー]', error);
+            }
+        }
+        
+        // generateCheckStatusHTML は attendance-common.js から使用
+        
+        // updateCheckStatus と loadCheckStatuses は attendance-check.js から使用
+        
+        // CSV出力
+        function exportCSV() {
+            if (searchResults.length === 0) {
+                alert('出力するデータがありません');
+                return;
+            }
+            
+            let csv = '従業員ID,従業員名,勤務日,勤務タイプ,開始時刻,終了時刻,実際の打刻時間,エラー・警告\n';
+            searchResults.forEach(item => {
+                const attendanceTimes = (item.attendance_records || []).map(record => record.time_only).join(' ');
+                
+                // 退勤時刻の処理（24勤は翌日明に表示、明は前日24勤の退勤時刻を表示）
+                let endTimeForCSV = '';
+                if (item.work_type === '明' && item.night_shift_end_time) {
+                    // 明の行で、前日24勤の退勤時刻がある場合
+                    endTimeForCSV = `${item.night_shift_end_time} (${item.night_shift_work_type}退勤)`;
+                } else if (item.work_type && item.work_type.includes('24勤')) {
+                    // 24勤の場合は退勤時刻を表示しない
+                    endTimeForCSV = '翌日明に表示';
+                } else {
+                    // 通常勤務
+                    endTimeForCSV = item.end_time || '';
+                }
+                
+                // アラート情報をCSVに追加
+                const alertsText = (item.alerts || []).map(alert => {
+                    return alert.details ? `${alert.message}: ${alert.details}` : alert.message;
+                }).join('; ').replace(/"/g, '""');
+                
+                csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${item.work_type || ''}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}","${alertsText}"\n`;
+            });
+            
+            // BOM（Byte Order Mark）を追加してExcelで文字化けを防ぐ
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `schedule_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>

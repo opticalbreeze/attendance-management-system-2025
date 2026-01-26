@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打刻システム - トップページ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+        
+        .recent-activity {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg);
+            margin-top: var(--spacing-xl);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .activity-list {
+            list-style: none;
+        }
+        
+        .activity-item {
+            background: var(--bg-primary);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-xs);
+            border: var(--border-width) solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .activity-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .activity-employee {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+        
+        .activity-employee-num {
+            font-weight: 400;
+            color: var(--text-primary);
+        }
+        
+        .activity-employee-name {
+            font-weight: 400;
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+        }
+        
+        .activity-time {
+            color: var(--text-secondary);
+            font-size: var(--font-size-sm);
+            white-space: nowrap;
+        }
+        
+        .loading {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: var(--spacing-lg);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="text-align: right; margin-bottom: var(--spacing-md);">
+            <span id="auth-status"></span>
+            <a href="/login" id="login-link" class="btn">ログイン</a>
+            <a href="/logout" id="logout-link" class="btn" style="display: none;">ログアウト</a>
+        </div>
+        
+        <h1>打刻システム</h1>
+        
+        <div class="buttons">
+            <a href="/search" class="btn btn-primary">打刻データを検索</a>
+            <a href="/check" class="btn btn-primary">勤怠チェック</a>
+            <a href="/overtime" class="btn btn-primary">時間外作業申告</a>
+            <a href="/overtime/check" class="btn btn-primary">時間外確認（個人）</a>
+            <a href="/leave" class="btn btn-primary">休暇願申請</a>
+            <a href="/leave/check" class="btn btn-primary">休暇願確認（個人）</a>
+        </div>
+        
+        <div class="buttons" id="admin-menu" style="display: none;">
+            <a href="/admin" class="btn btn-danger" style="background-color: #dc3545; border-color: #dc3545; color: white;">管理者メニュー</a>
+        </div>
+        
+        <div class="recent-activity">
+            <h2>最新の打刻履歴</h2>
+            <ul class="activity-list" id="recent-activity">
+                <li class="loading">読み込み中...<br><small style="font-size: 0.8em; color: #999;">Loading...</small></li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // 認証状態を確認
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.logged_in) {
+                    document.getElementById('login-link').style.display = 'none';
+                    document.getElementById('logout-link').style.display = 'inline-block';
+                    document.getElementById('auth-status').textContent = 'ログイン中';
+                    // 管理者メニューを表示
+                    document.getElementById('admin-menu').style.display = 'flex';
+                } else {
+                    document.getElementById('login-link').style.display = 'inline-block';
+                    document.getElementById('logout-link').style.display = 'none';
+                    document.getElementById('auth-status').textContent = '';
+                    // 管理者メニューを非表示
+                    document.getElementById('admin-menu').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('認証状態確認エラー:', error);
+            }
+        }
+        
+        // ページ読み込み時に認証状態を確認
+        checkAuthStatus();
+        
+        // 日時をフォーマット
+        function formatDateTime(datetime) {
+            if (!datetime) return '';
+            const dt = new Date(datetime);
+            return dt.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // 最新の打刻履歴のみを取得（統計情報は不要）
+        async function loadRecentActivity() {
+            try {
+                const response = await fetch('/api/stats', {
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    const stats = data;
+                    const activityList = document.getElementById('recent-activity');
+                    if (!activityList) {
+                        console.warn('Recent activity list element not found');
+                        return;
+                    }
+                    
+                    if (stats.latest && Array.isArray(stats.latest) && stats.latest.length > 0) {
+                        activityList.innerHTML = '';
+                        stats.latest.forEach((item, index) => {
+                            try {
+                                const li = document.createElement('li');
+                                li.className = 'activity-item';
+                                
+                                // 従業員番号と従業員名を表示（取得できない場合はIDMを表示）
+                                const employeeNum = item.employee_num || item.idm || 'N/A';
+                                const employeeName = item.employee_name || '';
+                                
+                                li.innerHTML = `
+                                    <div class="activity-employee">
+                                        <span class="activity-employee-num">${employeeNum}</span>
+                                        ${employeeName ? `<span class="activity-employee-name">${employeeName}</span>` : ''}
+                                    </div>
+                                    <span class="activity-time">${formatDateTime(item.timestamp)}</span>
+                                `;
+                                activityList.appendChild(li);
+                            } catch (itemError) {
+                                console.warn(`Failed to process activity item ${index}:`, itemError);
+                            }
+                        });
+                    } else {
+                        activityList.innerHTML = '<li class="loading">まだ打刻データがありません</li>';
+                    }
+                } else if (data.status === 'error') {
+                    showError(data.message || 'サーバーエラーが発生しました');
+                }
+            } catch (error) {
+                console.error('最新の打刻履歴の取得エラー:', error);
+                const activityList = document.getElementById('recent-activity');
+                if (activityList) {
+                    activityList.innerHTML = `<li class="alert alert-error">エラー: ${error.message}</li>`;
+                }
+            }
+        }
+        
+        // エラー表示関数
+        function showError(message) {
+            const activityList = document.getElementById('recent-activity');
+            if (activityList) {
+                activityList.innerHTML = `<li class="alert alert-error">${message}</li>`;
+            }
+        }
+        
+        // ページ読み込み時に最新の打刻履歴を取得
+        loadRecentActivity();
+        
+        // 30秒ごとに自動更新
+        setInterval(loadRecentActivity, 30000);
+    </script>
+</body>
+</html>
+

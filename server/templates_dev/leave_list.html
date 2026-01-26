@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>休暇願一覧（管理用） - 打刻システム</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <style>
+        .container {
+            max-width: 1200px;
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .search-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .search-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        label {
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input, select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+        }
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+        .btn-success {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border-color: var(--accent-color);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
+        }
+        .btn-success:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+        .btn-danger {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
+        }
+        .btn-danger:hover { background: var(--bg-hover); }
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+            border-color: #17a2b8;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-sm);
+        }
+        .btn-info:hover { background: #138496; border-color: #117a8b; }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+        .summary-card {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+            text-align: center;
+        }
+        .summary-number { font-size: 2em; font-weight: bold; margin-bottom: 5px; }
+        .summary-label { font-size: 0.9em; opacity: 0.9; }
+        .table-container { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        thead { background: #f8f9fa; }
+        th {
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+            white-space: nowrap;
+        }
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        tbody tr:hover { background: #f8f9fa; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .action-buttons { display: flex; gap: 5px; }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .no-data { text-align: center; padding: 40px; color: #999; font-size: 16px; }
+        .help-text { font-size: 12px; color: #6c757d; margin-top: 5px; }
+        .time-info { font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← トップページに戻る</a>
+        
+        <h1>📋 休暇願一覧（管理用）</h1>
+        <p class="subtitle">月度別の休暇申請を確認・承認できます</p>
+
+        <div id="alert" class="alert"></div>
+
+        <!-- 検索フォーム -->
+        <div class="search-section">
+            <div class="search-form">
+                <div class="form-group">
+                    <label for="searchMonth">月度（給与計算期間）</label>
+                    <input type="month" id="searchMonth" required>
+                    <div class="help-text">前月16日〜当月15日の期間</div>
+                </div>
+                <div class="form-group">
+                    <label for="statusFilter">ステータス</label>
+                    <select id="statusFilter">
+                        <option value="">すべて</option>
+                        <option value="pending">承認待ち</option>
+                        <option value="approved">承認済み</option>
+                        <option value="rejected">却下</option>
+                    </select>
+                    <div class="help-text">&nbsp;</div>
+                </div>
+                <button class="btn-primary" onclick="searchLeaveRequests()">🔍 検索</button>
+            </div>
+        </div>
+
+        <!-- 集計サマリー -->
+        <div id="summarySection" style="display: none;">
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <div class="summary-number" id="totalCount">0</div>
+                    <div class="summary-label">申請件数</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" id="totalDays">0</div>
+                    <div class="summary-label">合計日数</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" id="pendingCount">0</div>
+                    <div class="summary-label">承認待ち</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number" id="approvedCount">0</div>
+                    <div class="summary-label">承認済み</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 一覧テーブル -->
+        <div class="table-container">
+            <table id="leaveTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>従業員</th>
+                        <th>休暇種類</th>
+                        <th>休暇期間</th>
+                        <th>日数</th>
+                        <th>詳細</th>
+                        <th>ステータス</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="leaveTableBody">
+                    <tr>
+                        <td colspan="8" class="loading">月度を選択して検索してください</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 給与計算期間を考慮した月度を計算
+        function calculateCurrentPayrollMonth() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth() + 1;
+            const day = today.getDate();
+            
+            if (day >= 16) {
+                return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
+            } else {
+                return `${year}-${String(month).padStart(2, '0')}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 給与計算期間を考慮した月度を初期値として設定
+            document.getElementById('searchMonth').value = calculateCurrentPayrollMonth();
+        });
+
+        async function searchLeaveRequests() {
+            const searchMonth = document.getElementById('searchMonth').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            if (!searchMonth) {
+                showAlert('error', '月度を選択してください');
+                return;
+            }
+
+            const tbody = document.getElementById('leaveTableBody');
+            tbody.innerHTML = '<tr><td colspan="8" class="loading">読み込み中...</td></tr>';
+
+            try {
+                const [year, month] = searchMonth.split('-').map(Number);
+                const startDate = new Date(year, month - 2, 16).toISOString().split('T')[0];
+                const endDate = new Date(year, month - 1, 15).toISOString().split('T')[0];
+
+                let url = `/api/leave?limit=1000`;
+                if (statusFilter) {
+                    url += `&status=${statusFilter}`;
+                }
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    const filteredData = result.data.filter(item => {
+                        return item.leave_date_from >= startDate && item.leave_date_from <= endDate;
+                    });
+
+                    displayLeaveRequests(filteredData);
+                    updateSummary(filteredData);
+                } else {
+                    showAlert('error', result.message || 'データの取得に失敗しました');
+                    tbody.innerHTML = '<tr><td colspan="8" class="no-data">データが見つかりませんでした</td></tr>';
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                tbody.innerHTML = '<tr><td colspan="8" class="no-data">エラーが発生しました</td></tr>';
+                console.error(error);
+            }
+        }
+
+        function displayLeaveRequests(data) {
+            const tbody = document.getElementById('leaveTableBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="no-data">該当する申請がありません</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                
+                const statusClass = 
+                    item.status === 'approved' ? 'status-approved' :
+                    item.status === 'rejected' ? 'status-rejected' : 'status-pending';
+                
+                const statusText =
+                    item.status === 'approved' ? '承認済み' :
+                    item.status === 'rejected' ? '却下' : '承認待ち';
+
+                const days = calculateDays(item.leave_date_from, item.leave_date_to);
+
+                let detail = '';
+                if (item.leave_subtype) {
+                    detail = item.leave_subtype;
+                } else if (item.substitute_work_date) {
+                    detail = `出勤日: ${item.substitute_work_date}`;
+                } else if (item.other_reason) {
+                    detail = item.other_reason;
+                }
+
+                // 操作ボタン
+                let actionButtons = '';
+                if (item.status === 'pending') {
+                    actionButtons = `
+                        <div class="action-buttons">
+                            <button class="btn-success" onclick="approveLeave(${item.id})">承認</button>
+                            <button class="btn-danger" onclick="rejectLeave(${item.id})">却下</button>
+                            <button class="btn-info" onclick="reprintPdf(${item.id})" title="PDF再出力">PDF再出力</button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = `
+                        <div class="action-buttons">
+                            <span class="time-info">${item.approved_by || '-'}</span>
+                            <button class="btn-info" onclick="reprintPdf(${item.id})" title="PDF再出力">PDF再出力</button>
+                        </div>
+                    `;
+                }
+
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>
+                        <strong>${item.employee_name}</strong><br>
+                        <span class="time-info">${item.employee_num}</span>
+                    </td>
+                    <td>${item.leave_type}</td>
+                    <td>
+                        ${item.leave_date_from}<br>～ ${item.leave_date_to}
+                    </td>
+                    <td>${days}日</td>
+                    <td class="time-info">${detail || '-'}</td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${actionButtons}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function calculateDays(from, to) {
+            const start = new Date(from);
+            const end = new Date(to);
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return diffDays;
+        }
+
+        function updateSummary(data) {
+            const summarySection = document.getElementById('summarySection');
+            summarySection.style.display = 'block';
+
+            const totalCount = data.length;
+            const pendingCount = data.filter(item => item.status === 'pending').length;
+            const approvedCount = data.filter(item => item.status === 'approved').length;
+
+            const totalDays = data.reduce((sum, item) => {
+                return sum + calculateDays(item.leave_date_from, item.leave_date_to);
+            }, 0);
+
+            document.getElementById('totalCount').textContent = `${totalCount}件`;
+            document.getElementById('totalDays').textContent = `${totalDays}日`;
+            document.getElementById('pendingCount').textContent = `${pendingCount}件`;
+            document.getElementById('approvedCount').textContent = `${approvedCount}件`;
+        }
+
+        async function approveLeave(leaveId) {
+            if (!confirm('この休暇願を承認しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/leave/${leaveId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        approved_by: 'admin'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', '承認しました');
+                    searchLeaveRequests();
+                } else {
+                    showAlert('error', result.message || '承認に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        async function rejectLeave(leaveId) {
+            if (!confirm('この休暇願を却下しますか？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/leave/${leaveId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rejected_by: 'admin'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', '却下しました');
+                    searchLeaveRequests();
+                } else {
+                    showAlert('error', result.message || '却下に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        async function reprintPdf(leaveId) {
+            try {
+                showAlert('info', 'PDF再出力中です...');
+
+                const response = await fetch(`/api/leave/${leaveId}/reprint_pdf`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showAlert('success', `PDF再出力完了: ${result.filename}`);
+                    console.log('PDF保存パス:', result.path);
+                } else {
+                    showAlert('error', result.message || 'PDF再出力に失敗しました');
+                }
+            } catch (error) {
+                showAlert('error', 'サーバーエラーが発生しました');
+                console.error(error);
+            }
+        }
+
+        function showAlert(type, message) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
+
