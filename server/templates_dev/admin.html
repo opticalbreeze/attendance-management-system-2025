@@ -169,6 +169,58 @@
         .navigation-links a:hover {
             background: var(--bg-hover);
         }
+        
+        /* 隠し機能用スタイル */
+        .hidden-feature {
+            display: none;
+        }
+        
+        .hidden-feature.visible {
+            display: block;
+        }
+        
+        .employee-exclusion-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--bg-primary);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-md);
+            border: var(--border-width) solid var(--border-color);
+        }
+        
+        .employee-exclusion-item {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-sm) 0;
+            border-bottom: var(--border-width) solid var(--border-color);
+        }
+        
+        .employee-exclusion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .employee-exclusion-item label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .employee-exclusion-item input[type="checkbox"] {
+            margin-right: var(--spacing-sm);
+        }
+        
+        .exclusion-search {
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .exclusion-search input {
+            width: 100%;
+            padding: var(--spacing-sm);
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
     </style>
 </head>
 <body>
@@ -289,6 +341,32 @@
                 <li>ログ管理・監査機能</li>
                 <li>自動メール通知設定</li>
             </ul>
+        </div>
+        
+        <!-- 隠し機能: 通知除外設定 -->
+        <div class="admin-section hidden-feature" id="notificationExclusionSection">
+            <h2>🔒 通知除外設定（隠し機能）</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9em;">
+                チェックを入れた従業員には、お知らせ通知が送信されません。
+            </p>
+            
+            <div class="exclusion-search">
+                <input type="text" id="employeeSearch" placeholder="従業員名で検索..." oninput="filterEmployees()">
+            </div>
+            
+            <div class="employee-exclusion-list" id="employeeExclusionList">
+                <p>読み込み中...</p>
+            </div>
+            
+            <div style="margin-top: var(--spacing-md);">
+                <button onclick="saveExclusions()" class="btn btn-primary">設定を保存</button>
+                <button onclick="selectAllExclusions()" class="btn btn-secondary">すべて選択</button>
+                <button onclick="deselectAllExclusions()" class="btn btn-secondary">すべて解除</button>
+            </div>
+            
+            <div id="exclusionResult" class="result" style="display: none; margin-top: var(--spacing-md);">
+                <div id="exclusionResultMessage"></div>
+            </div>
         </div>
     </div>
 
@@ -629,7 +707,172 @@
         // ページ読み込み時に統計情報を取得
         document.addEventListener('DOMContentLoaded', function() {
             loadDatabaseStats();
+            
+            // URLパラメータで隠し機能を表示
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('hidden') === 'true') {
+                document.getElementById('notificationExclusionSection').classList.add('visible');
+                loadEmployeesForExclusion();
+                loadExclusions();
+            }
         });
+        
+        // ========================================================================
+        // 通知除外設定機能（隠し機能）
+        // ========================================================================
+        let allEmployeesForExclusion = [];
+        let excludedEmployeeIds = new Set();
+        
+        async function loadEmployeesForExclusion() {
+            try {
+                const response = await fetch('/api/employees');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    allEmployeesForExclusion = data.data || [];
+                    renderEmployeeExclusionList();
+                } else {
+                    document.getElementById('employeeExclusionList').innerHTML = 
+                        '<p style="color: red;">従業員データの取得に失敗しました</p>';
+                }
+            } catch (error) {
+                console.error('従業員データ取得エラー:', error);
+                document.getElementById('employeeExclusionList').innerHTML = 
+                    '<p style="color: red;">ネットワークエラーが発生しました</p>';
+            }
+        }
+        
+        async function loadExclusions() {
+            try {
+                const response = await fetch('/api/notifications/exclusions');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    excludedEmployeeIds = new Set(data.excluded_employee_ids || []);
+                    renderEmployeeExclusionList();
+                }
+            } catch (error) {
+                console.error('除外リスト取得エラー:', error);
+            }
+        }
+        
+        function renderEmployeeExclusionList() {
+            const listDiv = document.getElementById('employeeExclusionList');
+            const searchTerm = document.getElementById('employeeSearch').value.toLowerCase();
+            
+            // 検索フィルター適用
+            const filteredEmployees = allEmployeesForExclusion.filter(emp => {
+                if (!searchTerm) return true;
+                const name = (emp.name || '').toLowerCase();
+                const employeeNum = (emp.employee_num || '').toLowerCase();
+                return name.includes(searchTerm) || employeeNum.includes(searchTerm);
+            });
+            
+            if (filteredEmployees.length === 0) {
+                listDiv.innerHTML = '<p>該当する従業員が見つかりません</p>';
+                return;
+            }
+            
+            let html = '';
+            filteredEmployees.forEach(emp => {
+                const employeeId = emp.employee_num || emp.employee_id;
+                const isExcluded = excludedEmployeeIds.has(String(employeeId));
+                const name = emp.name || '名前不明';
+                const section = emp.section || '未設定';
+                
+                html += `
+                    <div class="employee-exclusion-item">
+                        <label>
+                            <input type="checkbox" 
+                                   data-employee-id="${employeeId}" 
+                                   ${isExcluded ? 'checked' : ''}
+                                   onchange="toggleExclusion('${employeeId}', this.checked)">
+                            <span>${name} (${employeeId}) - ${section}</span>
+                        </label>
+                    </div>
+                `;
+            });
+            
+            listDiv.innerHTML = html;
+        }
+        
+        function filterEmployees() {
+            renderEmployeeExclusionList();
+        }
+        
+        function toggleExclusion(employeeId, isExcluded) {
+            if (isExcluded) {
+                excludedEmployeeIds.add(String(employeeId));
+            } else {
+                excludedEmployeeIds.delete(String(employeeId));
+            }
+        }
+        
+        function selectAllExclusions() {
+            // 確認ダイアログを表示
+            if (!confirm('本当に全従業員を除外リストに追加しますか？\n（全員のお知らせが来なくなります）')) {
+                return;
+            }
+            allEmployeesForExclusion.forEach(emp => {
+                const employeeId = emp.employee_num || emp.employee_id;
+                excludedEmployeeIds.add(String(employeeId));
+            });
+            renderEmployeeExclusionList();
+        }
+        
+        function deselectAllExclusions() {
+            if (!confirm('本当に全従業員の除外を解除しますか？')) {
+                return;
+            }
+            excludedEmployeeIds.clear();
+            renderEmployeeExclusionList();
+            // 自動的に保存
+            saveExclusions();
+        }
+        
+        async function saveExclusions() {
+            try {
+                const excludedList = Array.from(excludedEmployeeIds);
+                console.log('保存する除外リスト:', excludedList);
+                
+                const response = await fetch('/api/notifications/exclusions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        excluded_employee_ids: excludedList
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('保存レスポンス:', data);
+                
+                const resultDiv = document.getElementById('exclusionResult');
+                const messageDiv = document.getElementById('exclusionResultMessage');
+                
+                if (data.status === 'success') {
+                    resultDiv.className = 'result alert alert-success';
+                    messageDiv.textContent = data.message || `設定を保存しました（${excludedList.length}件の従業員を除外）`;
+                    resultDiv.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        resultDiv.style.display = 'none';
+                    }, 5000);
+                } else {
+                    resultDiv.className = 'result alert alert-error';
+                    messageDiv.textContent = data.message || '保存に失敗しました';
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('保存エラー:', error);
+                const resultDiv = document.getElementById('exclusionResult');
+                const messageDiv = document.getElementById('exclusionResultMessage');
+                resultDiv.className = 'result alert alert-error';
+                messageDiv.textContent = 'ネットワークエラーが発生しました';
+                resultDiv.style.display = 'block';
+            }
+        }
     </script>
 </body>
 </html>
