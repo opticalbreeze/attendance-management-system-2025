@@ -500,7 +500,8 @@
                         full_data: data
                     });
 
-                    document.getElementById('loading').style.display = 'none';
+                    // 検索中表示は displayResults の最後まで維持する
+                    // document.getElementById('loading').style.display = 'none';
 
                     if (data.status === 'success') {
                         AttendanceSystem.Search.searchResults = data.results;
@@ -515,19 +516,25 @@
                         debugLog('📊 検索結果サンプル（最初の3件）:', data.results.slice(0, 3));
 
                         await displayResults(data.results, data.search_params);
+                        
+                        // 結果表示完了後に検索中表示を非表示にする
+                        document.getElementById('loading').style.display = 'none';
 
                     } else {
+                        // エラー時は検索中表示を非表示にする
+                        document.getElementById('loading').style.display = 'none';
                         debugError('❌ APIエラー:', data.message || '不明なエラー');
                         showError(data.message || '検索エラーが発生しました');
                     }
                 } catch (error) {
+                    // エラー時は検索中表示を非表示にする
+                    document.getElementById('loading').style.display = 'none';
                     debugError('❌ APIリクエストエラー:', error);
                     debugError('エラー詳細:', {
                         message: error.message,
                         stack: error.stack,
                         name: error.name
                     });
-                    document.getElementById('loading').style.display = 'none';
                     showError('サーバーとの通信エラーが発生しました: ' + error.message);
                 }
             } catch (error) {
@@ -544,6 +551,7 @@
             
             if (results.length === 0) {
                 debugLog('検索結果が0件');
+                document.getElementById('loading').style.display = 'none';
                 document.getElementById('no-results').style.display = 'block';
                 return;
             }
@@ -632,6 +640,9 @@
             
             // 打刻申告データを復元
             restorePunchReportData(results);
+            
+            // 結果表示完了後に検索中表示を非表示にする
+            document.getElementById('loading').style.display = 'none';
             debugLog('displayResults() 完了');
         }
         

@@ -197,9 +197,21 @@ def calculate_actual_clock_times(result: AttendanceCheckResult, cursor) -> None:
                 result.actual_clock_out = result.attendance_records[-1]['time']
 
 def check_holiday_punch_errors(result: AttendanceCheckResult) -> None:
-    """休日打刻エラーをチェック"""
+    """休日打刻エラーをチェック（当日以降はスキップ）"""
     if not result.schedule:
         return
+    
+    # 当日以降の日付はスキップ（まだ打刻する時間があるため）
+    try:
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
+        today = date.today()
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため休日打刻エラーをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+    except (ValueError, TypeError) as e:
+        logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
+        # 日付の解析に失敗した場合は続行（既存の動作を維持）
     
     work_type = result.schedule['work_type']
     if work_type and ('有' in work_type or '所' in work_type or '法' in work_type):
@@ -238,13 +250,13 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
     if not result.schedule:
         return
     
-    # 未来の日付（明日以降）は打刻がないのが正常なので、エラーを出さない
+    # 当日以降の日付は打刻がないのが正常なので、エラーを出さない
     try:
         from datetime import date
         check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
         today = date.today()
-        if check_date_obj > today:
-            logger.info(f"  未来の日付のため打刻なしエラーをスキップ: 日付={result.check_date}, 今日={today}")
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため打刻なしエラーをスキップ: 日付={result.check_date}, 今日={today}")
             return
     except (ValueError, TypeError) as e:
         logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
@@ -345,9 +357,21 @@ def check_missing_punch_errors(result: AttendanceCheckResult) -> None:
                 logger.info(f"  打刻漏れチェック条件不一致: punch_count={punch_count}, is_24hour_or_night={is_24hour_or_night_shift(work_type)}, is_off_day={is_off_day_shift(work_type)}, has_start={bool(result.schedule.get('start_time'))}, has_end={bool(result.schedule.get('end_time'))}")
 
 def check_holiday_work_errors(result: AttendanceCheckResult) -> None:
-    """休日出勤エラーをチェック"""
+    """休日出勤エラーをチェック（当日以降はスキップ）"""
     if not result.schedule:
         return
+    
+    # 当日以降の日付はスキップ（まだ打刻する時間があるため）
+    try:
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
+        today = date.today()
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため休日出勤エラーをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+    except (ValueError, TypeError) as e:
+        logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
+        # 日付の解析に失敗した場合は続行（既存の動作を維持）
     
     work_type = result.schedule['work_type']
     if work_type and ('休出' in work_type or '休日出勤' in work_type):
@@ -357,7 +381,19 @@ def check_holiday_work_errors(result: AttendanceCheckResult) -> None:
                       f'勤務タイプ: {work_type}、スケジュール: {result.schedule["start_time"]} - {result.schedule["end_time"]}')
 
 def check_leave_request_conflicts(result: AttendanceCheckResult) -> None:
-    """休暇申請との競合をチェック"""
+    """休暇申請との競合をチェック（当日以降はスキップ）"""
+    # 当日以降の日付はスキップ（まだ打刻する時間があるため）
+    try:
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
+        today = date.today()
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため休暇申請競合チェックをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+    except (ValueError, TypeError) as e:
+        logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
+        # 日付の解析に失敗した場合は続行（既存の動作を維持）
+    
     try:
         from leave_request import get_leave_requests
         approved_leaves = get_leave_requests(
@@ -494,7 +530,19 @@ def _check_overtime_overlap(schedule_end_minutes: int, actual_end_minutes: int, 
     return False
 
 def check_time_difference_errors(result: AttendanceCheckResult, late_adjust: int, early_adjust: int) -> None:
-    """出退勤時刻差異をチェック"""
+    """出退勤時刻差異をチェック（当日以降はスキップ）"""
+    # 当日以降の日付はスキップ（まだ打刻する時間があるため）
+    try:
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
+        today = date.today()
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため時刻差異エラーをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+    except (ValueError, TypeError) as e:
+        logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
+        # 日付の解析に失敗した場合は続行（既存の動作を維持）
+    
     if not (result.schedule and result.attendance_records):
         return
     
@@ -751,11 +799,23 @@ def _check_overtime_coverage(schedule_end: str, actual_end: str, overtime_apps: 
 
 def _check_prev_day_24hour_punch_leak(cursor, result: AttendanceCheckResult, prev_date: str) -> None:
     """
-    前日の24勤で出勤・退勤両方の打刻漏れがあった場合、明勤務の日にも「打刻漏れ」を表示
+    前日の24勤で出勤打刻漏れがあった場合、明勤務の日にも「打刻漏れ」を表示
     検証レポート課題11への対応
+    
+    注意: 24勤の退勤打刻は翌日（「明」勤務の日）に記録されるため、
+    退勤打刻漏れのチェックはcheck_off_day_shift_attendance関数で既に行われている。
+    この関数では前日の出勤打刻漏れのみをチェックする。
     """
     try:
-        # 前日の24勤の打刻状況をチェック
+        # 当日以降の日付はスキップ（まだ打刻する時間があるため）
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
+        today = date.today()
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため前日24勤打刻漏れチェックをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+        
+        # 前日の24勤のスケジュールをチェック
         cursor.execute("""
             SELECT employee_id, work_date, work_type FROM attend_schedule 
             WHERE employee_id = ? AND work_date = ? AND work_type LIKE '%24%'
@@ -763,19 +823,22 @@ def _check_prev_day_24hour_punch_leak(cursor, result: AttendanceCheckResult, pre
         
         prev_schedule = cursor.fetchone()
         if not prev_schedule:
+            logger.debug(f"[前日24勤打刻漏れチェック] 前日の24勤スケジュールが見つかりません: prev_date={prev_date}")
             return
             
-        # 前日の24勤の打刻データを取得
+        # 前日の24勤の打刻データを取得（出勤打刻は前日の日付で記録される）
         cursor.execute("""
             SELECT idm FROM employee_master WHERE employee_num = ?
         """, (result.employee_id,))
         
         idm_result = cursor.fetchone()
         if not idm_result:
+            logger.warning(f"[前日24勤打刻漏れチェック] 従業員IDが見つかりません: employee_id={result.employee_id}")
             return
             
         idm = idm_result[0]
         
+        # 前日の24勤の出勤打刻をチェック（前日の日付で記録される）
         cursor.execute("""
             SELECT timestamp FROM attendance 
             WHERE idm = ? AND date(timestamp) = ?
@@ -784,18 +847,58 @@ def _check_prev_day_24hour_punch_leak(cursor, result: AttendanceCheckResult, pre
         
         prev_day_punches = cursor.fetchall()
         
-        # 前日の24勤で打刻が全くない場合、明勤務の日に「打刻漏れ」を追加
-        if not prev_day_punches:
-            _add_alert(result, AttendanceConstants.ALERT_ERROR,
-                      '打刻漏れ',
-                      f'前日({prev_date})の24勤で出勤・退勤ともに打刻漏れ')
-            logger.info(f"[明勤務] 前日24勤の打刻漏れを検出: {prev_date}")
+        # 「明」勤務の日の打刻もチェック（24勤の退勤打刻は翌日の日付で記録される）
+        cursor.execute("""
+            SELECT timestamp FROM attendance 
+            WHERE idm = ? AND date(timestamp) = ?
+            ORDER BY timestamp ASC
+        """, (idm, result.check_date))
+        
+        current_day_punches = cursor.fetchall()
+        
+        # 前日の24勤で出勤打刻がなく、かつ「明」勤務の日にも打刻がない場合、
+        # 前日の24勤で出勤・退勤ともに打刻漏れと判断
+        # ただし、check_off_day_shift_attendance関数で既に「退勤打刻漏れ」エラーが追加されている場合は重複を避ける
+        if not prev_day_punches and not current_day_punches:
+            # 既に「退勤打刻漏れ」エラーが追加されている場合はスキップ（重複を防ぐ）
+            if not _has_punch_leak_alert(result):
+                _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                          '打刻漏れ',
+                          f'前日({prev_date})の24勤で出勤・退勤ともに打刻漏れ')
+                logger.info(f"[明勤務] 前日24勤の打刻漏れを検出: prev_date={prev_date}, 前日打刻={len(prev_day_punches)}件, 当日打刻={len(current_day_punches)}件")
+            else:
+                logger.debug(f"[明勤務] 既に打刻漏れエラーが存在するため、前日24勤打刻漏れエラーの追加をスキップ")
+        elif not prev_day_punches and current_day_punches:
+            # 前日の出勤打刻がないが、当日（「明」勤務の日）に打刻がある場合
+            # これは前日の24勤の出勤打刻漏れのみを意味する
+            # ただし、check_off_day_shift_attendance関数で既に「退勤打刻漏れ」エラーが追加されている場合は重複を避ける
+            if not _has_punch_leak_alert(result):
+                _add_alert(result, AttendanceConstants.ALERT_ERROR,
+                          '打刻漏れ',
+                          f'前日({prev_date})の24勤で出勤打刻漏れ（退勤打刻は存在）')
+                logger.info(f"[明勤務] 前日24勤の出勤打刻漏れを検出: prev_date={prev_date}, 前日打刻={len(prev_day_punches)}件, 当日打刻={len(current_day_punches)}件")
+            else:
+                logger.debug(f"[明勤務] 既に打刻漏れエラーが存在するため、前日24勤出勤打刻漏れエラーの追加をスキップ")
+        else:
+            logger.debug(f"[明勤務] 前日24勤の打刻は存在: prev_date={prev_date}, 前日打刻={len(prev_day_punches)}件, 当日打刻={len(current_day_punches)}件")
             
     except Exception as e:
-        logger.warning(f"前日24勤打刻漏れチェックエラー: {e}")
+        logger.warning(f"前日24勤打刻漏れチェックエラー: {e}", exc_info=True)
 
 def check_off_day_shift_attendance(cursor, result: AttendanceCheckResult, prev_date: str) -> None:
-    """明勤務の前日24勤・夜勤チェック"""
+    """明勤務の前日24勤・夜勤チェック（当日以降はスキップ）"""
+    # 当日以降の日付はスキップ（まだ打刻する時間があるため）
+    try:
+        from datetime import date
+        check_date_obj = datetime.strptime(result.check_date, AttendanceConstants.DATE_FORMAT).date()
+        today = date.today()
+        if check_date_obj >= today:
+            logger.info(f"  当日以降のため「明」勤務チェックをスキップ: 日付={result.check_date}, 今日={today}")
+            return
+    except (ValueError, TypeError) as e:
+        logger.warning(f"  日付比較エラー: {e}, check_date={result.check_date}")
+        # 日付の解析に失敗した場合は続行（既存の動作を維持）
+    
     work_type = result.schedule['work_type'] if result.schedule else None
     logger.info(f"[「明」勤務チェック開始] 日付={result.check_date}, 勤務タイプ={work_type}, prev_date={prev_date}")
     

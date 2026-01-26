@@ -111,14 +111,19 @@ async function performSearch(event) {
             search_month: searchMonth
         });
 
-        document.getElementById('loading').style.display = 'none';
+        // 検索中表示は displayResults の最後まで維持する
+        // document.getElementById('loading').style.display = 'none';
 
         if (searchResponse.success && searchResponse.data.status === 'success') {
             // 名前空間とグローバル変数の両方に保存
             AttendanceSystem.Check.searchResults = searchResponse.data.results;
             searchResults = searchResponse.data.results;
             await displayResults(searchResponse.data.results, searchResponse.data.search_params);
+            
+            // 結果表示完了後に検索中表示を非表示にする
+            document.getElementById('loading').style.display = 'none';
         } else {
+            document.getElementById('loading').style.display = 'none';
             const errorMsg = searchResponse.message || searchResponse.data?.message || '検索エラーが発生しました';
             if (typeof showError !== 'undefined') {
                 showError(errorMsg);
@@ -141,6 +146,7 @@ async function performSearch(event) {
 // 検索結果を表示
 async function displayResults(results, searchParams) {
     if (results.length === 0) {
+        document.getElementById('loading').style.display = 'none';
         document.getElementById('no-results').style.display = 'block';
         return;
     }
@@ -206,6 +212,9 @@ async function displayResults(results, searchParams) {
     
     document.getElementById('results-count').textContent = `検索結果: ${results.length} 件${rangeInfo}`;
     document.getElementById('results-section').style.display = 'block';
+    
+    // 結果表示完了後に検索中表示を非表示にする
+    document.getElementById('loading').style.display = 'none';
 }
 
 // generateCheckStatusHTML は attendance-common.js から使用
