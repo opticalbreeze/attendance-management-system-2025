@@ -6,6 +6,8 @@
     <title>時間外作業申告 - 打刻システム</title>
     <!-- html2pdf.js ライブラリ（ローカルファイル） -->
     <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
+    <!-- 共通ライブラリ（AttendanceSystem初期化） -->
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
     <!-- 統合APIサービス -->
     <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
@@ -31,6 +33,10 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: var(--spacing-md);
+        }
+        
+        .actual-work-time-input {
+            margin-top: var(--spacing-md);
         }
         
         .button-group {
@@ -453,6 +459,10 @@
 
         // 全従業員データを保持
         // 名前空間を使用してグローバル変数の衝突を回避
+        // AttendanceSystemが存在しない場合は初期化
+        if (typeof AttendanceSystem === 'undefined') {
+            window.AttendanceSystem = window.AttendanceSystem || {};
+        }
         AttendanceSystem.Overtime = AttendanceSystem.Overtime || {};
         AttendanceSystem.Overtime.allEmployees = [];
         
@@ -462,15 +472,17 @@
         // 従業員リスト取得
         async function loadEmployees() {
             try {
-                const response = await AttendanceSystem.API.Employees.getAll();
+                const response = await fetch('/api/employees');
+                const result = await response.json();
 
-                if (response.success) {
-                    allEmployees = response.data;
-                    employees = response.data;
+                if (result.status === 'success' && result.data) {
+                    // 全従業員データを保存
+                    allEmployees = result.data;
+                    employees = result.data;
                     
                     // セクション一覧を取得・設定
                     const sectionSelect = document.getElementById('sectionSelect');
-                    const sections = [...new Set(response.data.map(emp => emp.section || '設備'))].sort();
+                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
                     sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
                     sections.forEach(section => {
                         const option = document.createElement('option');
@@ -482,11 +494,11 @@
                     // 従業員リストを更新
                     updateEmployeeList();
                 } else {
-                    showAlert('error', response.message || '従業員リストの取得に失敗しました');
+                    throw new Error(result.message || '従業員データの読み込みに失敗');
                 }
             } catch (error) {
                 console.error('従業員リスト取得エラー:', error);
-                showAlert('error', '従業員リストの取得中にエラーが発生しました');
+                showAlert('error', error.message || '従業員リストの取得に失敗しました');
             }
         }
         
@@ -540,6 +552,15 @@
                             <input type="time" id="endTime${i}" step="60">
                         </div>
                     </div>
+                    <div class="form-group break-time-input">
+                        <label for="breakStart${i}">休憩開始時刻</label>
+                        <input type="time" id="breakStart${i}" step="60">
+                    </div>
+                    <div class="form-group break-time-input">
+                        <label for="breakEnd${i}">休憩終了時刻</label>
+                        <input type="time" id="breakEnd${i}" step="60">
+                        <small style="color: var(--text-secondary); font-size: 0.9em;">例: 12:00-13:00（1時間の休憩）※未入力の場合は休憩時間0として計算されます</small>
+                    </div>
                     <div class="form-group">
                         <label for="description${i}">作業内容</label>
                         <textarea id="description${i}" placeholder="例: 緊急対応作業、イベント準備など"></textarea>
@@ -581,13 +602,43 @@
             for (let i = 1; i <= 4; i++) {
                 const startTime = document.getElementById(`startTime${i}`).value;
                 const endTime = document.getElementById(`endTime${i}`).value;
+                const breakStart = document.getElementById(`breakStart${i}`).value;
+                const breakEnd = document.getElementById(`breakEnd${i}`).value;
                 const description = document.getElementById(`description${i}`).value;
 
                 // 開始時刻と終了時刻が両方入力されている場合のみ追加
                 if (startTime && endTime) {
+                    // 開始時刻と終了時刻の差を計算（分）
+                    const start = new Date(`2000-01-01T${startTime}:00`);
+                    const end = new Date(`2000-01-01T${endTime}:00`);
+                    // 終了時刻が開始時刻より前の場合は翌日として扱う
+                    if (end < start) {
+                        end.setDate(end.getDate() + 1);
+                    }
+                    const totalMinutes = Math.floor((end - start) / 60000);
+                    
+                    // 休憩時間を計算（分）
+                    let breakMinutes = 0;
+                    if (breakStart && breakEnd) {
+                        const breakStartTime = new Date(`2000-01-01T${breakStart}:00`);
+                        const breakEndTime = new Date(`2000-01-01T${breakEnd}:00`);
+                        // 休憩終了時刻が休憩開始時刻より前の場合は翌日として扱う
+                        if (breakEndTime < breakStartTime) {
+                            breakEndTime.setDate(breakEndTime.getDate() + 1);
+                        }
+                        breakMinutes = Math.floor((breakEndTime - breakStartTime) / 60000);
+                    }
+                    
+                    // 実働時間 = 総時間 - 休憩時間
+                    const actualWorkMinutes = Math.max(0, totalMinutes - breakMinutes);
+                    
                     overtimeEntries.push({
                         start_time: startTime,
                         end_time: endTime,
+                        break_start: breakStart || '',
+                        break_end: breakEnd || '',
+                        break_minutes: breakMinutes,
+                        actual_work_minutes: actualWorkMinutes,
                         description: description || ''
                     });
                 }
@@ -651,12 +702,32 @@
                 item.className = 'overtime-item';
                 
                 const duration = calculateDuration(entry.start_time, entry.end_time);
+                // 実働時間を時間:分形式に変換
+                const actualWorkHours = Math.floor((entry.actual_work_minutes || 0) / 60);
+                const actualWorkMins = (entry.actual_work_minutes || 0) % 60;
+                const actualWorkTimeStr = `${actualWorkHours}:${String(actualWorkMins).padStart(2, '0')}`;
+                
+                // 休憩時間を表示
+                let breakTimeDisplay = '-';
+                if (entry.break_start && entry.break_end) {
+                    const breakHours = Math.floor((entry.break_minutes || 0) / 60);
+                    const breakMins = (entry.break_minutes || 0) % 60;
+                    breakTimeDisplay = `${entry.break_start} - ${entry.break_end} （${breakHours}時間${breakMins}分）`;
+                }
                 
                 item.innerHTML = `
                     <h4>作業 ${index + 1}</h4>
                     <div class="info-row">
                         <div class="info-label">時間</div>
                         <div class="info-value">${entry.start_time} - ${entry.end_time} （${duration}）</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">休憩時間</div>
+                        <div class="info-value">${breakTimeDisplay}</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">実働時間</div>
+                        <div class="info-value">${actualWorkTimeStr}（${actualWorkHours}時間${actualWorkMins}分）</div>
                     </div>
                     <div class="info-row">
                         <div class="info-label">作業内容</div>

@@ -169,7 +169,8 @@ def get_monthly_attendance_data(employee_id, search_month):
                     end_time, 
                     inner_overtime_minutes,
                     outer_overtime_minutes, 
-                    night_overtime_minutes, 
+                    night_overtime_minutes,
+                    actual_work_minutes,
                     COALESCE(description, '') as description
                 FROM overtime_applications
                 WHERE employee_num = ?
@@ -263,16 +264,18 @@ def get_monthly_attendance_data(employee_id, search_month):
                 inner_minutes_db = row[3] or 0  # データベースから読み込んだ値（分）
                 outer_minutes_db = row[4] or 0
                 night_minutes_db = row[5] or 0
+                actual_work_minutes_db = row[6] or 0  # 実働時間（分）
                 inner_minutes = inner_minutes_db / 60  # 分→時間
                 outer_minutes = outer_minutes_db / 60
                 night_minutes = night_minutes_db / 60
-                # 作業内容を取得（row[6]が存在する場合）
+                actual_work_minutes = actual_work_minutes_db / 60  # 実働時間（時間）
+                # 作業内容を取得（row[7]が存在する場合）
                 description = ''
-                if len(row) > 6:
-                    description = row[6] or ''
+                if len(row) > 7:
+                    description = row[7] or ''
                 
                 # デバッグ出力：データベースから読み込んだ値
-                logger.info(f"[時間外申告データ読み込み] 日付={date_str}, 時間={start_time}-{end_time}, DB値: inner={inner_minutes_db}分({inner_minutes:.2f}h), outer={outer_minutes_db}分({outer_minutes:.2f}h), night={night_minutes_db}分({night_minutes:.2f}h)")
+                logger.info(f"[時間外申告データ読み込み] 日付={date_str}, 時間={start_time}-{end_time}, DB値: inner={inner_minutes_db}分({inner_minutes:.2f}h), outer={outer_minutes_db}分({outer_minutes:.2f}h), night={night_minutes_db}分({night_minutes:.2f}h), 実働時間={actual_work_minutes_db}分({actual_work_minutes:.2f}h)")
                 
                 # 時間外申告の詳細をリストに追加
                 app_data = {
@@ -286,9 +289,9 @@ def get_monthly_attendance_data(employee_id, search_month):
                 daily_data[date_str]['overtime']['applications'].append(app_data)
                 
                 # 複数の時間外申告がある場合は合計する
-                daily_data[date_str]['overtime']['outer'] += outer_minutes
-                daily_data[date_str]['overtime']['inner'] += inner_minutes
-                daily_data[date_str]['overtime']['night'] += night_minutes
+                daily_data[date_str]['overtime']['outer'] += outer_minutes_db
+                daily_data[date_str]['overtime']['inner'] += inner_minutes_db
+                daily_data[date_str]['overtime']['night'] += night_minutes_db
             
             # 休暇願データを設定
             for row in leave_rows:
@@ -448,6 +451,7 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         total_overtime_outer = 0.0  # 外残業の合計（時間）
         total_overtime_inner = 0.0  # 内残業の合計（時間）
         total_overtime_night = 0.0  # 深夜残業の合計（時間）
+        total_actual_work = 0.0  # 実働時間の合計（時間）
         
         for date_str in sorted(daily_data.keys()):
             day_data = daily_data[date_str]
@@ -569,13 +573,13 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             
             # 時間外（内残業・外残業を区別）
             overtime = day_data.get('overtime', {})
-            outer_time = overtime.get('outer', 0)
-            inner_time = overtime.get('inner', 0)
-            night_time = overtime.get('night', 0)
+            outer_time = overtime.get('outer', 0) / 60  # 分→時間
+            inner_time = overtime.get('inner', 0) / 60
+            night_time = overtime.get('night', 0) / 60
             
             # デバッグ出力：各日の時間外データ
             if outer_time > 0 or inner_time > 0 or night_time > 0:
-                logger.info(f"[時間外集計デバッグ] 日付={date_str}, outer={outer_time}, inner={inner_time}, night={night_time}, 合計={outer_time + inner_time + night_time}")
+                logger.info(f"[時間外集計デバッグ] 日付={date_str}, outer={outer_time:.2f}h, inner={inner_time:.2f}h, night={night_time:.2f}h, 合計={outer_time + inner_time + night_time:.2f}h")
             
             # 集計用：時間外の合計（データ行の表示で使用している値と同じ値をそのまま使用）
             total_overtime_outer += outer_time
@@ -584,7 +588,7 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             
             # デバッグ出力：累積合計
             if outer_time > 0 or inner_time > 0 or night_time > 0:
-                logger.info(f"[時間外集計デバッグ] 累積合計: outer={total_overtime_outer}, inner={total_overtime_inner}, night={total_overtime_night}, 総合計={total_overtime_outer + total_overtime_inner + total_overtime_night}")
+                logger.info(f"[時間外集計デバッグ] 累積合計: outer={total_overtime_outer:.2f}h, inner={total_overtime_inner:.2f}h, night={total_overtime_night:.2f}h, 総合計={total_overtime_outer + total_overtime_inner + total_overtime_night:.2f}h")
             
             # 時間外（内残業+外残業の合計値のみ表示）
             total_overtime = outer_time + inner_time
@@ -678,7 +682,7 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
         # データ行の表示で使用している値と同じ値をそのまま合計しているため、単純に足し算する
         total_overtime_hours = total_overtime_outer + total_overtime_inner + total_overtime_night
         # デバッグ出力：最終集計結果
-        logger.info(f"[時間外集計デバッグ] 最終集計: outer={total_overtime_outer}, inner={total_overtime_inner}, night={total_overtime_night}, 総合計={total_overtime_hours}, 表示値={total_overtime_hours:.2f}")
+        logger.info(f"[時間外集計デバッグ] 最終集計: outer={total_overtime_outer:.2f}h, inner={total_overtime_inner:.2f}h, night={total_overtime_night:.2f}h, 総合計={total_overtime_hours:.2f}h, 表示値={total_overtime_hours:.2f}h")
         
         # 集計行の時間外表示（内残業+外残業の合計値のみ）
         total_overtime_summary = total_overtime_outer + total_overtime_inner
@@ -731,6 +735,23 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             cell.alignment = center_alignment
             cell.border = thin_border
         
+        # 作業内容のヘッダー（G列からJ列までをマージ）
+        ws.merge_cells(f'G{row}:J{row}')
+        cell_work_desc = ws.cell(row=row, column=7, value='作業内容')
+        cell_work_desc.font = Font(name='游ゴシック', size=10, bold=True)
+        cell_work_desc.alignment = center_alignment
+        cell_work_desc.border = thin_border
+        
+        # マージされたセルの罫線を設定
+        for col_idx in [7, 8, 9, 10]:
+            cell = ws.cell(row=row, column=col_idx)
+            if col_idx == 7:
+                cell.border = Border(left=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            elif col_idx == 10:
+                cell.border = Border(right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+            else:
+                cell.border = Border(top=Side(style='thin'), bottom=Side(style='thin'))
+        
         # 時間外申告データを取得して表示
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -773,6 +794,8 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
                     # 深夜時間は赤文字で表示
                     night_cell = ws.cell(row=row, column=6, value=f"{(overtime_row[5] or 0) / 60:.2f}h" if overtime_row[5] else '-')
                     night_cell.font = Font(name='游ゴシック', size=10, color='FF0000')  # 赤文字
+                    night_cell.alignment = center_alignment
+                    night_cell.border = thin_border
                     
                     # G列からJ列までをマージして作業内容を表示（縮小して表示）
                     ws.merge_cells(f'G{row}:J{row}')
