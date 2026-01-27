@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>月間集計レポート</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
+    <!-- 共通ライブラリ（AttendanceSystem初期化） -->
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
     <!-- 統合APIサービス -->
     <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
     <style>
@@ -340,6 +342,7 @@
             <div class="button-group">
                 <button class="btn" onclick="generateReport()">Excel生成・ダウンロード</button>
                 <button class="btn btn-secondary" onclick="previewReport()">プレビュー</button>
+                <button class="btn btn-secondary" onclick="downloadAllEmployeesExcel()">全員一括Excelダウンロード</button>
             </div>
         </div>
         
@@ -353,6 +356,10 @@
     
     <script>
         // 名前空間を使用してグローバル変数の衝突を回避
+        // AttendanceSystemが存在しない場合は初期化
+        if (typeof AttendanceSystem === 'undefined') {
+            window.AttendanceSystem = window.AttendanceSystem || {};
+        }
         AttendanceSystem.Report = AttendanceSystem.Report || {};
         AttendanceSystem.Report.allEmployees = [];
         
@@ -391,7 +398,7 @@
             try {
                 const response = await AttendanceSystem.API.Employees.getAll();
                 
-                if (response.success) {
+                if (response.success && response.data) {
                     allEmployees = response.data;
                     
                     // セクション一覧を設定
@@ -408,10 +415,10 @@
                     // 従業員リストを更新
                     updateEmployeeList();
                 } else {
-                    showError(response.message || '従業員リストの取得に失敗しました');
+                    throw new Error(response.message || '従業員データの読み込みに失敗');
                 }
             } catch (error) {
-                showError('従業員リストの取得中にエラーが発生しました');
+                showError(error.message || '従業員リストの取得中にエラーが発生しました');
                 console.error(error);
             }
         }
@@ -880,6 +887,83 @@
             
             previewContent.innerHTML = html;
             previewSection.style.display = 'block';
+        }
+        
+        // 全員一括Excelダウンロード
+        async function downloadAllEmployeesExcel() {
+            const searchMonth = document.getElementById('search-month').value.trim();
+            
+            if (!searchMonth) {
+                showError('検索月を入力してください（YYYY/MM形式）');
+                return;
+            }
+            
+            if (!/^\d{4}\/\d{2}$/.test(searchMonth)) {
+                showError('検索月はYYYY/MM形式で入力してください（例: 2025/12）');
+                return;
+            }
+            
+            if (!confirm(`全員分のExcelファイルをダウンロードしますか？\n検索月: ${searchMonth}\n\n※各従業員が1つのシートとして作成されます。`)) {
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+            
+            try {
+                const url = `/api/monthly-report/download-all-excel?search_month=${encodeURIComponent(searchMonth)}`;
+                
+                // タイムアウトを延長（10分 = 600秒）
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 600000); // 10分
+                
+                // 進捗表示を追加
+                const progressDiv = document.createElement('div');
+                progressDiv.id = 'download-excel-progress';
+                progressDiv.style.cssText = 'margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px; display: block;';
+                progressDiv.innerHTML = '<p style="margin: 0;">Excel生成中... しばらくお待ちください（最大10分程度かかる場合があります）</p>';
+                document.getElementById('loading').appendChild(progressDiv);
+                
+                const response = await fetch(url, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    // Excelファイルとしてダウンロード
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `全員分_勤務実績表_${searchMonth.replace('/', '_')}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl);
+                    
+                    const progressDiv = document.getElementById('download-excel-progress');
+                    if (progressDiv) progressDiv.remove();
+                    showSuccess('全員分のExcelファイルをダウンロードしました');
+                } else {
+                    const data = await response.json().catch(() => ({ message: 'ダウンロードに失敗しました' }));
+                    const progressDiv = document.getElementById('download-excel-progress');
+                    if (progressDiv) progressDiv.remove();
+                    showError(data.message || 'ダウンロードに失敗しました');
+                }
+            } catch (error) {
+                const progressDiv = document.getElementById('download-excel-progress');
+                if (progressDiv) progressDiv.remove();
+                
+                if (error.name === 'AbortError') {
+                    showError('タイムアウトしました。従業員数が多い場合は処理に時間がかかります。しばらく待ってから再度お試しください。');
+                } else {
+                    showError('サーバーとの通信エラーが発生しました: ' + (error.message || ''));
+                }
+                console.error('ダウンロードエラー:', error);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
         }
     </script>
 </body>
