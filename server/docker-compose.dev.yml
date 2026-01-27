@@ -30,6 +30,12 @@ services:
         source: ./pdf_generator.py
         target: /app/pdf_generator.py
       - type: bind
+        source: ./pdf_utils.py
+        target: /app/pdf_utils.py
+      - type: bind
+        source: ./config.py
+        target: /app/config.py
+      - type: bind
         source: ./database.py
         target: /app/database.py
       - type: bind
@@ -38,6 +44,9 @@ services:
       - type: bind
         source: ./api_overtime.py
         target: /app/api_overtime.py
+      - type: bind
+        source: ./overtime.py
+        target: /app/overtime.py
       - type: bind
         source: ./api_leave.py
         target: /app/api_leave.py
@@ -62,6 +71,9 @@ services:
       - type: bind
         source: ./api_check_status.py
         target: /app/api_check_status.py
+      - type: bind
+        source: ./logger_config.py
+        target: /app/logger_config.py
       - type: bind
         source: ./api_notifications.py
         target: /app/api_notifications.py

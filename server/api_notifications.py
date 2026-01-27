@@ -35,12 +35,16 @@ def load_notification_data() -> List[Dict[str, Any]]:
     
     for file_path in file_paths:
         try:
-            if os.path.exists(file_path):
+            # ファイルが存在し、かつディレクトリでないことを確認
+            if os.path.exists(file_path) and os.path.isfile(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     notifications = data.get('notifications', [])
                     logger.info(f"通知データ読み込み成功: {file_path} ({len(notifications)}件)")
                     return notifications
+            elif os.path.exists(file_path) and os.path.isdir(file_path):
+                logger.warning(f"通知データパスがディレクトリです（スキップ）: {file_path}")
+                continue
         except Exception as e:
             logger.warning(f"通知データ読み込み試行失敗 ({file_path}): {e}")
             continue
@@ -81,12 +85,16 @@ def load_notification_exclusions() -> set:
     
     for file_path in file_paths:
         try:
-            if os.path.exists(file_path):
+            # ファイルが存在し、かつディレクトリでないことを確認
+            if os.path.exists(file_path) and os.path.isfile(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     excluded_set = set(data.get('excluded_employee_ids', []))
                     logger.debug(f"除外リスト読み込み成功: {file_path} ({len(excluded_set)}件)")
                     return excluded_set
+            elif os.path.exists(file_path) and os.path.isdir(file_path):
+                logger.warning(f"除外リストパスがディレクトリです（スキップ）: {file_path}")
+                continue
         except Exception as e:
             logger.warning(f"除外リスト読み込み試行失敗 ({file_path}): {e}")
             continue
@@ -101,6 +109,11 @@ def save_notification_exclusions(excluded_set: set):
     
     for file_path in file_paths:
         try:
+            # パスがディレクトリの場合はスキップ
+            if os.path.exists(file_path) and os.path.isdir(file_path):
+                logger.warning(f"除外リスト保存パスがディレクトリです（スキップ）: {file_path}")
+                continue
+            
             # ディレクトリが存在するか確認
             dir_path = os.path.dirname(file_path)
             if not os.path.exists(dir_path):

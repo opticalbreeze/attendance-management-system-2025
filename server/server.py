@@ -157,7 +157,8 @@ def register_auth_routes(app):
                 session['admin_logged_in'] = True
                 session['admin_user_id'] = 'admin'  # 管理者IDをセッションに保存
                 session['admin_username'] = '管理者'  # 管理者名をセッションに保存
-                session.permanent = True
+                # セッションを永続化しない（ブラウザを閉じたらログアウト）
+                session.permanent = False
                 
                 # データベースアクセス権限の設定
                 if db_access:

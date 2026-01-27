@@ -33,6 +33,7 @@ COPY api_overtime.py .
 COPY api_leave.py .
 COPY api_monthly_report.py .
 COPY api_check_status.py .
+COPY api_notifications.py .
 COPY auth.py .
 COPY monthly_report.py .
 COPY pdf_generator.py .
@@ -42,6 +43,7 @@ COPY time_utils.py .
 COPY validation_utils.py .
 COPY api_utils.py .
 COPY pdf_utils.py .
+COPY constants.py .
 COPY admin.py .
 COPY work_type_constants.py .
 COPY attendance_check_service.py .

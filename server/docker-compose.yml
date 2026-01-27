@@ -58,14 +58,45 @@ services:
       - type: bind
         source: ./api_check_status.py
         target: /app/api_check_status.py
+      - type: bind
+        source: ./api_notifications.py
+        target: /app/api_notifications.py
+      - type: bind
+        source: ./auth.py
+        target: /app/auth.py
+      - type: bind
+        source: ./config.py
+        target: /app/config.py
+      - type: bind
+        source: ./constants.py
+        target: /app/constants.py
+      - type: bind
+        source: ./logger_config.py
+        target: /app/logger_config.py
+      - type: bind
+        source: ./pdf_utils.py
+        target: /app/pdf_utils.py
+      # notification_data.jsonのマウント
+      - type: bind
+        source: ../notification_data.json
+        target: /app/notification_data.json
+      # acknowledged_notifications.jsonのマウント
+      - type: bind
+        source: ../acknowledged_notifications.json
+        target: /app/acknowledged_notifications.json
+      # notification_exclusions.jsonのマウント
+      - type: bind
+        source: ../notification_exclusions.json
+        target: /app/notification_exclusions.json
       # バックアップディレクトリをホストにマウント
       - type: bind
         source: ../../backup
         target: /backup
       # Dドライブバックアップディレクトリをマウント（Dドライブが存在する場合）
-      - type: bind
-        source: D:/AttendanceBackup_Mirror
-        target: /app/D_drive_backup
+      # 一時的にコメントアウト - マウントパスの問題を解決
+      # - type: bind
+      #   source: D:/AttendanceBackup_Mirror
+      #   target: /app/D_drive_backup
       # auto_save.pyのマウント
       - type: bind
         source: ./auto_save.py
