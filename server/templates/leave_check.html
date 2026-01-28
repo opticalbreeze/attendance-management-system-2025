@@ -252,6 +252,8 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
     <script>
         let employees = [];
 
@@ -277,20 +279,30 @@
         });
 
         // 全従業員データを保持
-        let allEmployees = [];
+        // 名前空間を使用してグローバル変数の衝突を回避
+        // AttendanceSystemが存在しない場合は初期化
+        if (typeof AttendanceSystem === 'undefined') {
+            window.AttendanceSystem = window.AttendanceSystem || {};
+        }
+        AttendanceSystem.LeaveCheck = AttendanceSystem.LeaveCheck || {};
+        AttendanceSystem.LeaveCheck.allEmployees = [];
+        
+        // 後方互換性のため
+        let allEmployees = AttendanceSystem.LeaveCheck.allEmployees;
         
         async function loadEmployees() {
             try {
                 const response = await fetch('/api/employees');
-                const data = await response.json();
+                const result = await response.json();
 
-                if (data.status === 'success') {
-                    allEmployees = data.data;
-                    employees = data.data;
+                if (result.status === 'success' && result.data) {
+                    // 全従業員データを保存
+                    allEmployees = result.data;
+                    employees = result.data;
                     
                     // セクション一覧を取得・設定
                     const sectionSelect = document.getElementById('sectionSelect');
-                    const sections = [...new Set(data.data.map(emp => emp.section || '設備'))].sort();
+                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
                     sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
                     sections.forEach(section => {
                         const option = document.createElement('option');
@@ -301,10 +313,12 @@
                     
                     // 従業員リストを更新
                     updateEmployeeList();
+                } else {
+                    throw new Error(result.message || '従業員データの読み込みに失敗');
                 }
             } catch (error) {
-                showAlert('error', '従業員リストの取得に失敗しました');
-                console.error(error);
+                console.error('従業員リスト取得エラー:', error);
+                showAlert('error', error.message || '従業員リストの取得に失敗しました');
             }
         }
         

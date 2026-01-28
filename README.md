@@ -30,7 +30,10 @@
 - ✅ スケジュールと実績の差異チェック
 - ✅ 休日打刻アラート
 - ✅ 未打刻アラート
+- ✅ 打刻漏れアラート
+- ✅ 時刻差異アラート（出勤・退勤時刻の差異検出）
 - ✅ 時間外申告との照合
+- ✅ チェック状況の管理（確認済みマーク）
 
 ---
 
@@ -44,34 +47,47 @@ work_attend_server/
 │   ├── api_overtime.py             # 時間外申告API
 │   ├── api_leave.py                # 休暇申請API
 │   ├── api_monthly_report.py       # 月間集計レポートAPI
+│   ├── api_check_status.py          # 打刻チェック状況API
 │   ├── database.py                 # データベース操作（コアロジック）
+│   ├── attendance_check_service.py # 勤怠チェックロジック
 │   ├── overtime.py                 # 時間外申告管理
 │   ├── leave_request.py            # 休暇申請管理
 │   ├── monthly_report.py           # 月間集計レポート生成
 │   ├── auth.py                     # 認証・認可
+│   ├── admin.py                    # 管理者機能
 │   ├── utils.py                    # ユーティリティ関数
 │   ├── config.py                   # 設定管理
-│   ├── work_type_constants.py      # 勤務タイプ定数・判定関数
-│   ├── pdf_generator.py            # PDF生成
-│   ├── templates/                  # HTMLテンプレート
-│   │   ├── index.html             # トップページ
-│   │   ├── search.html            # 打刻検索
-│   │   ├── check.html             # 勤怠チェック
-│   │   ├── overtime.html          # 時間外申告
-│   │   ├── overtime_list.html     # 時間外一覧
-│   │   ├── leave.html             # 休暇申請
-│   │   ├── leave_list.html        # 休暇一覧
-│   │   ├── monthly_report.html    # 月間集計レポート
-│   │   └── admin.html             # 管理者メニュー
-│   ├── docker-compose.yml         # Docker設定
-│   ├── Dockerfile                 # Dockerイメージ
-│   ├── requirements_server.txt    # Python依存パッケージ
-│   └── SECURITY_SETUP.md          # セキュリティ設定ガイド
+│   ├── constants.py                # 定数定義
+│   ├── templates/                  # HTMLテンプレート（本番環境）
+│   ├── templates_dev/              # HTMLテンプレート（開発環境）
+│   ├── static/                     # 静的ファイル（本番環境）
+│   ├── static_dev/                  # 静的ファイル（開発環境）
+│   ├── docker-compose.yml          # Docker設定（本番環境）
+│   ├── docker-compose.dev.yml       # Docker設定（開発環境）
+│   ├── Dockerfile                  # Dockerイメージ
+│   ├── requirements_server.txt     # Python依存パッケージ
+│   ├── README_DEV.md               # 開発者向けREADME
+│   ├── DEVELOPMENT.md               # 開発ガイド
+│   ├── ENVIRONMENT_SEPARATION.md    # 環境分離ガイド
+│   └── SECURITY_SETUP.md           # セキュリティ設定ガイド
+├── card-reder-for-win/             # クライアントアプリケーション
+│   ├── win_client.py               # ICカードリーダー連携クライアント
+│   └── docs/                       # クライアントドキュメント
+├── docs/                           # システムドキュメント
+│   ├── SYSTEM_ARCHITECTURE.md      # システムアーキテクチャ
+│   ├── API_REFERENCE.md            # APIリファレンス
+│   └── DATABASE_SCHEMA.md         # データベーススキーマ
+├── archive/                        # アーカイブ
+│   ├── verification/               # 検証ファイル
+│   └── old_backups/                # 古いバックアップ
 ├── data/                           # データベース（Dockerの外）
-│   └── attendance.db              # SQLiteデータベース
-├── NETWORK_SETUP.md               # ネットワーク設定ガイド
-├── TROUBLESHOOTING.md             # トラブルシューティング
-└── README.md                       # このファイル
+│   └── attendance.db               # SQLiteデータベース
+├── README.md                       # このファイル
+├── QUICK_REFERENCE.md              # クイックリファレンス
+├── TROUBLESHOOTING.md              # トラブルシューティング
+├── DOCKER_GUIDE.md                 # Dockerガイド
+├── NETWORK_SETUP.md                # ネットワーク設定ガイド
+└── DATABASE_RECOVERY_GUIDE.md      # データベース復旧ガイド
 ```
 
 ### コード構造の設計原則
@@ -397,12 +413,26 @@ ls -la ../data/attendance.db
 
 ## 📚 関連ドキュメント
 
-| ドキュメント | 内容 |
-|-------------|------|
-| [DOCKER_GUIDE.md](./DOCKER_GUIDE.md) | Docker環境構築の詳細ガイド |
-| [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) | よく使うコマンドとURL一覧 |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 問題解決ガイド |
-| [server/SECURITY_SETUP.md](./server/SECURITY_SETUP.md) | セキュリティ設定ガイド |
+### 基本ドキュメント
+- [クイックリファレンス](QUICK_REFERENCE.md) - よく使う機能のクイックリファレンス
+- [トラブルシューティング](TROUBLESHOOTING.md) - よくある問題と解決方法
+- [Dockerガイド](DOCKER_GUIDE.md) - Docker環境の構築・運用
+- [ネットワーク設定](NETWORK_SETUP.md) - ネットワーク設定ガイド
+- [データベース復旧ガイド](DATABASE_RECOVERY_GUIDE.md) - データベース復旧手順
+
+### システム仕様
+- [システムアーキテクチャ](docs/SYSTEM_ARCHITECTURE.md) - システム全体の構成と設計
+- [APIリファレンス](docs/API_REFERENCE.md) - APIエンドポイント一覧
+- [データベーススキーマ](docs/DATABASE_SCHEMA.md) - データベーステーブル仕様
+
+### 開発者向け
+- [開発者向けREADME](server/README_DEV.md) - 開発環境のセットアップ
+- [開発ガイド](server/DEVELOPMENT.md) - 開発の進め方
+- [環境分離ガイド](server/ENVIRONMENT_SEPARATION.md) - 開発/本番環境の分離
+- [セキュリティ設定](server/SECURITY_SETUP.md) - セキュリティ設定ガイド
+
+### アーカイブ
+- [アーカイブ説明](archive/README.md) - アーカイブファイルの説明
 
 ---
 

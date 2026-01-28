@@ -31,48 +31,69 @@ if os.environ.get('DEBUG', '').lower() in ('true', '1', 'yes'):
     logger.debug(f"Database path: {DB_FILE}")
     logger.debug(f"File exists: {os.path.exists(DB_FILE)}")
 
+# データベース初期化の実行フラグ（複数回呼ばれないようにする）
+_database_initialized = False
+
 def init_database():
     """
     データベースを初期化
     すべてのテーブルを一元管理して作成
     """
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        
-        # 打刻テーブルの作成
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS attendance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                idm TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                terminal_id TEXT NOT NULL,
-                received_at TEXT NOT NULL
-            )
-        """)
-        
-        # インデックスの作成（パフォーマンス向上）
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_idm ON attendance(idm)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON attendance(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_terminal_id ON attendance(terminal_id)")
-        
-        # employee_masterテーブルのマイグレーション（sectionカラム追加）
-        migrate_employee_master_table(cursor)
-        
-        # 遅刻早退申告テーブルの作成
-        init_late_early_requests_tables(cursor)
-        
-        # 休暇願テーブルの作成
-        init_leave_request_table_internal(cursor)
-        
-        # 時間外申告テーブルの作成
-        init_overtime_table_internal(cursor)
-        
-        # 打刻チェック状況テーブルの作成
-        init_attendance_check_status_table(cursor)
-        
-        # コンテキストマネージャーが自動的にコミット・クローズする
+    global _database_initialized
     
-    logger.info("データベース初期化完了（全テーブル統合管理）")
+    # 既に初期化済みの場合はスキップ（無限ループ防止）
+    if _database_initialized:
+        logger.debug("データベースは既に初期化済みです")
+        return
+    
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 打刻テーブルの作成
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS attendance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    idm TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    terminal_id TEXT NOT NULL,
+                    received_at TEXT NOT NULL
+                )
+            """)
+            
+            # インデックスの作成（パフォーマンス向上）
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_idm ON attendance(idm)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON attendance(timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_terminal_id ON attendance(terminal_id)")
+            
+            # employee_masterテーブルのマイグレーション（sectionカラム追加）
+            migrate_employee_master_table(cursor)
+            
+            # 遅刻早退申告テーブルの作成
+            init_late_early_requests_tables(cursor)
+            
+            # 休暇願テーブルの作成
+            init_leave_request_table_internal(cursor)
+            
+            # 時間外申告テーブルの作成
+            init_overtime_table_internal(cursor)
+            
+            # 時間外申告テーブルのマイグレーション（actual_work_minutesカラム追加）
+            migrate_overtime_table(cursor)
+            
+            # 打刻チェック状況テーブルの作成
+            init_attendance_check_status_table(cursor)
+            
+            # コンテキストマネージャーが自動的にコミット・クローズする
+        
+        # 初期化完了フラグを設定
+        _database_initialized = True
+        logger.info("データベース初期化完了（全テーブル統合管理）")
+    except Exception as e:
+        logger.error(f"データベース初期化エラー: {e}", exc_info=True)
+        # エラーが発生してもフラグを設定して、無限ループを防ぐ
+        _database_initialized = True
+        raise
 
 def migrate_employee_master_table(cursor):
     """
@@ -248,6 +269,7 @@ def init_overtime_table_internal(cursor):
                 inner_overtime_minutes INTEGER DEFAULT 0,
                 outer_overtime_minutes INTEGER DEFAULT 0,
                 night_overtime_minutes INTEGER DEFAULT 0,
+                actual_work_minutes INTEGER DEFAULT 0,
                 approved_by TEXT,
                 approved_at TEXT,
                 created_at TEXT NOT NULL,
@@ -264,6 +286,60 @@ def init_overtime_table_internal(cursor):
         
     except sqlite3.Error as e:
         logger.error(f"時間外申告テーブルの初期化エラー: {e}")
+
+def migrate_overtime_table(cursor):
+    """
+    overtime_applicationsテーブルにactual_work_minutesカラムを追加するマイグレーション
+    既存データに対して0を設定
+    """
+    try:
+        # テーブルが存在するか確認
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='overtime_applications'
+        """)
+        table_exists = cursor.fetchone()
+        
+        if not table_exists:
+            logger.debug("overtime_applicationsテーブルが存在しないため、マイグレーションをスキップします")
+            return
+        
+        # カラムが存在するか確認
+        cursor.execute("PRAGMA table_info(overtime_applications)")
+        columns_info = cursor.fetchall()
+        columns = [col[1] for col in columns_info]
+        
+        # actual_work_minutesカラムが存在しない場合は追加
+        if 'actual_work_minutes' not in columns:
+            try:
+                cursor.execute("""
+                    ALTER TABLE overtime_applications 
+                    ADD COLUMN actual_work_minutes INTEGER DEFAULT 0
+                """)
+                
+                # 既存データに対して0を設定（既にDEFAULT 0が設定されているが念のため）
+                cursor.execute("""
+                    UPDATE overtime_applications 
+                    SET actual_work_minutes = 0
+                    WHERE actual_work_minutes IS NULL
+                """)
+                
+                updated_count = cursor.rowcount
+                logger.info(f"overtime_applicationsテーブルにactual_work_minutesカラムを追加しました（既存{updated_count}件のデータを0に設定）")
+            except sqlite3.OperationalError as e:
+                # カラムが既に存在する場合など
+                if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+                    logger.debug("actual_work_minutesカラムは既に存在します")
+                else:
+                    raise
+        else:
+            logger.debug("overtime_applicationsテーブルのactual_work_minutesカラムを確認しました")
+    except sqlite3.Error as e:
+        logger.error(f"overtime_applicationsテーブルのマイグレーションエラー: {e}", exc_info=True)
+        # エラーが発生してもサーバー起動を続行できるように、例外を再発生させない
+    except Exception as e:
+        logger.error(f"overtime_applicationsテーブルのマイグレーション予期しないエラー: {e}", exc_info=True)
+        # エラーが発生してもサーバー起動を続行できるように、例外を再発生させない
 
 def insert_attendance(idm, timestamp, terminal_id):
     """打刻データを挿入"""

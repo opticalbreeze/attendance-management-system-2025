@@ -428,6 +428,10 @@
 
         // 全従業員データを保持
         // 名前空間を使用してグローバル変数の衝突を回避
+        // AttendanceSystemが存在しない場合は初期化
+        if (typeof AttendanceSystem === 'undefined') {
+            window.AttendanceSystem = window.AttendanceSystem || {};
+        }
         AttendanceSystem.OvertimeCheck = AttendanceSystem.OvertimeCheck || {};
         AttendanceSystem.OvertimeCheck.allEmployees = [];
         

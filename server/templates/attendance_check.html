@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>打刻チェック確認（管理者専用）</title>
+    <title>係員別月度勤怠チェック</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
         .container {
@@ -308,40 +308,40 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔍 打刻チェック確認（管理者専用）</h1>
+        <h1>� 係員別月度勤怠チェック</h1>
         <a href="/admin" class="back-link">← 管理者メニューに戻る</a>
         
         <div class="search-form">
             <form id="search-form">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="section-select">セクション（任意）</label>
+                        <label for="section-select">セクション（絞り込み）</label>
                         <select id="section-select" name="section">
                             <option value="">すべてのセクション</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label for="employee-id">従業員（必須）</label>
+                        <label for="employee-id">確認対象係員 ⭐必須</label>
                         <select id="employee-id" name="employee_id" required>
-                            <option value="">▼ 従業員を選択してください</option>
+                            <option value="">▼ 係員を選択してください</option>
                         </select>
                         <small id="employee-hint" style="color: #666; font-size: 0.8em; display: none;">
-                            従業員データを読み込み中...
+                            係員データを読み込み中...
                         </small>
                     </div>
                     
                     <div class="form-group">
-                        <label for="search-month">検索月（必須）</label>
+                        <label for="search-month">対象月度 ⭐必須</label>
                         <input type="text" id="search-month" name="search_month" placeholder="例: 2025/12" value="" pattern="[0-9]{4}/[0-9]{1,2}" required>
                         <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
-                            yyyy/mm形式で入力（前月16日〜当月15日を検索）
+                            yyyy/mm形式（前月16日〜当月15日の勤怠）
                         </small>
                     </div>
                 </div>
                 <div>
-                    <button type="submit" class="btn btn-search">🔍 検索</button>
-                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
+                    <button type="submit" class="btn btn-search">🔍 月度勤怠チェック実行</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 入力クリア</button>
                 </div>
             </form>
         </div>
@@ -350,16 +350,16 @@
         
         <div class="results-section" id="results-section" style="display: none;">
             <div class="results-header">
-                <div class="results-count" id="results-count">検索結果: 0 件</div>
-                <button class="btn-export" onclick="exportCSV()">CSV出力</button>
+                <div class="results-count" id="results-count">月度勤怠チェック結果: 0 件</div>
+                <button class="btn-export" onclick="exportCSV()">📄 CSV出力</button>
             </div>
             
             <div style="overflow-x: auto;">
                 <table class="results-table">
                     <thead>
                         <tr>
-                            <th>従業員ID</th>
-                            <th>従業員名</th>
+                            <th>係員ID</th>
+                            <th>係員名</th>
                             <th>勤務日 📅↑</th>
                             <th>勤務タイプ</th>
                             <th>開始時刻</th>
@@ -378,23 +378,28 @@
         </div>
         
         <div id="loading" class="loading" style="display: none;">
-            検索中...
+            係員の月度勤怠データを確認中...
         </div>
         
         <div id="no-results" class="no-results" style="display: none;">
-            検索条件に一致するデータが見つかりませんでした。
+            指定された係員・月度の勤怠データが見つかりませんでした。
         </div>
     </div>
     
     <!-- 共通ライブラリを読み込み -->
     <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/employee-list.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/attendance-check.js') }}"></script>
     
     <script>
-        let searchResults = [];
+        // 名前空間を使用してグローバル変数の衝突を回避
+        AttendanceSystem.Check = AttendanceSystem.Check || {};
         
-        // ページ読み込み時の初期化処理
-        // 全従業員データを保持
-        let allEmployees = [];
+        // このページ固有のデータを名前空間に保存
+        AttendanceSystem.Check.searchResults = [];
+        // 後方互換性のため
+        let searchResults = AttendanceSystem.Check.searchResults;
         
         document.addEventListener('DOMContentLoaded', async function() {
             // 従業員情報を動的に読み込み
@@ -428,59 +433,48 @@
             }
         });
         
-        // 従業員情報を動的に読み込む
+        // 従業員情報を動的に読み込む（統一APIサービス使用）
         async function loadEmployees() {
             const employeeSelect = document.getElementById('employee-id');
             const sectionSelect = document.getElementById('section-select');
             const employeeHint = document.getElementById('employee-hint');
             
             try {
-                const response = await fetch('/api/employees');
+                console.log('[loadEmployees] 統一APIサービスで従業員データを読み込み中...');
                 
-                // HTTPステータスコードをチェック
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('[loadEmployees] HTTPエラー:', response.status, errorText);
-                    throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
-                }
+                // 統一APIサービスを使用
+                const employeesResponse = await AttendanceSystem.API.Employees.getAll();
                 
-                // Content-Typeをチェック
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const errorText = await response.text();
-                    console.error('[loadEmployees] JSONでないレスポンス:', contentType, errorText.substring(0, 200));
-                    throw new Error('サーバーからJSON以外のレスポンスが返されました（認証エラーの可能性があります）');
-                }
-                
-                const result = await response.json();
-                console.log('[loadEmployees] APIレスポンス:', result);
-                
-                if (result.status === 'success' && result.data) {
+                if (employeesResponse.success) {
                     // 全従業員データを保存
-                    allEmployees = result.data;
-                    console.log(`[loadEmployees] ${result.data.length}名の従業員を読み込みました`);
+                    allEmployees = employeesResponse.data;
+                    console.log(`[loadEmployees] ${employeesResponse.data.length}名の従業員を読み込みました`);
                     
-                    // セクション一覧を取得・設定
-                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
-                    sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
-                    sections.forEach(section => {
-                        const option = document.createElement('option');
-                        option.value = section;
-                        option.textContent = section;
-                        sectionSelect.appendChild(option);
-                    });
+                    // セクション一覧を統一APIサービスから取得
+                    const sectionsResponse = await AttendanceSystem.API.Employees.getSections();
+                    
+                    if (sectionsResponse.success) {
+                        sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                        sectionsResponse.data.forEach(section => {
+                            const option = document.createElement('option');
+                            option.value = section;
+                            option.textContent = section;
+                            sectionSelect.appendChild(option);
+                        });
+                    } else {
+                        console.warn('[loadEmployees] セクション一覧取得に失敗:', sectionsResponse.message);
+                    }
                     
                     // 従業員リストを更新
                     updateEmployeeList();
                     
                     // ヒント表示を有効化
                     employeeHint.style.display = 'block';
-                    employeeHint.textContent = `${result.data.length}名の従業員が読み込まれました`;
+                    employeeHint.textContent = `${employeesResponse.data.length}名の従業員が読み込まれました`;
                     employeeHint.style.color = '#28a745';
                 } else {
-                    const errorMsg = result.message || '従業員データの読み込みに失敗';
-                    console.error('[loadEmployees] APIエラー:', errorMsg, result);
-                    throw new Error(errorMsg);
+                    console.error('[loadEmployees] APIエラー:', employeesResponse.message);
+                    throw new Error(employeesResponse.message);
                 }
             } catch (error) {
                 console.error('[loadEmployees] エラー詳細:', error);
@@ -526,227 +520,11 @@
         }
         
         // フォーム送信
-        document.getElementById('search-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            await performSearch();
-        });
+        document.getElementById('search-form').addEventListener('submit', performSearch);
         
-        // 検索実行
-        async function performSearch() {
-            const employeeId = document.getElementById('employee-id').value.trim();
-            const searchMonth = document.getElementById('search-month').value.trim();
-            
-            // バリデーション
-            if (!employeeId) {
-                showError('従業員IDを入力してください');
-                return;
-            }
-            
-            if (!searchMonth) {
-                showError('検索月を入力してください（yyyy/mm形式）');
-                return;
-            }
-            
-            // 検索月の形式チェック
-            const monthPattern = /^[0-9]{4}\/[0-9]{1,2}$/;
-            if (!monthPattern.test(searchMonth)) {
-                showError('検索月はyyyy/mm形式で入力してください（例: 2025/10）');
-                return;
-            }
-            
-            // UIリセット
-            document.getElementById('results-section').style.display = 'none';
-            document.getElementById('no-results').style.display = 'none';
-            document.getElementById('error-message').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
-            
-            // クエリパラメータ構築
-            const params = new URLSearchParams();
-            params.append('employee_id', employeeId);
-            params.append('search_month', searchMonth);
-            
-            const searchUrl = `/api/search?${params}`;
-
-            try {
-                const response = await fetch(searchUrl);
-                const data = await response.json();
-
-                document.getElementById('loading').style.display = 'none';
-
-                if (data.status === 'success') {
-                    searchResults = data.results;
-                    await displayResults(data.results, data.search_params);
-                } else {
-                    showError(data.message || '検索エラーが発生しました');
-                }
-            } catch (error) {
-                document.getElementById('loading').style.display = 'none';
-                showError('サーバーとの通信エラーが発生しました');
-            }
-        }
+        // performSearch と displayResults は attendance-check.js から使用
         
-        // 検索結果を表示
-        async function displayResults(results, searchParams) {
-
-
-            if (results.length === 0) {
-                document.getElementById('no-results').style.display = 'block';
-                return;
-            }
-
-            // 日付順でソート（古い順）
-            results.sort((a, b) => {
-                const dateA = new Date(a.work_date);
-                const dateB = new Date(b.work_date);
-                return dateA - dateB;
-            });
-
-            // 24勤の退勤時刻を翌日の明に移動するための前処理
-            results = processNightShiftEndTimes(results);
-            const tbody = document.getElementById('results-body');
-            tbody.innerHTML = '';
-            
-            results.forEach(item => {
-                const tr = document.createElement('tr');
-                // 打刻時間を整形（有効な打刻に色を付けるため、全結果とitemを渡す）
-                // 「通常」を「日勤」に変換
-                if (item.work_type) {
-                    item.work_type = item.work_type.replace('通常', '日勤');
-                }
-                const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || [], item.work_type, item.work_date, results, item);
-                
-                // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
-                // アラート情報を表示
-                const alerts = item.alerts || [];
-                const alertsHtml = formatAlerts(alerts);
-                
-                // 確認状況を生成
-                const checkStatusHtml = generateCheckStatusHTML(item, alerts);
-                
-                tr.innerHTML = `
-                    <td class="idm-cell">${item.employee_id}</td>
-                    <td><strong>${item.employee_name || ''}</strong></td>
-                    <td>${formatDate(item.work_date)}</td>
-                    <td><span class="work-type ${getWorkTypeClass(item.work_type)}">${item.work_type || ''}</span></td>
-                    <td>${formatTime(item.start_time)}</td>
-                    <td>${formatEndTime(item)}</td>
-                    <td class="attendance-times">${attendanceTimesHtml}</td>
-                    <td id="alerts-${item.work_date}" style="font-size: 0.85em;">${alertsHtml}</td>
-                    <td id="check-status-${item.employee_id}-${item.work_date}" style="font-size: 0.85em;">${checkStatusHtml}</td>
-                    <td id="overtime-${item.work_date}" style="font-size: 0.85em; color: #667eea;">-</td>
-                    <td id="leave-${item.work_date}" style="font-size: 0.85em; color: #28a745;">-</td>
-                `;
-                // 全データを行要素に保存（後で使用可能）
-                tr.dataset.fullData = JSON.stringify(item);
-                tbody.appendChild(tr);
-            });
-            
-            // 時間外・休暇願データを非同期で取得
-            const employeeId = searchParams.employee_id;
-            fetchOvertimeDataForMonth(employeeId, results);
-            fetchLeaveDataForMonth(employeeId, results);
-            
-            // チェック状況を読み込む
-            await loadCheckStatuses(results);
-            
-            // 検索範囲の情報を表示
-            let rangeInfo = '';
-            if (searchParams && searchParams.date_range) {
-                rangeInfo = ` (${searchParams.date_range.start_date} 〜 ${searchParams.date_range.end_date})`;
-            }
-            
-            document.getElementById('results-count').textContent = `検索結果: ${results.length} 件${rangeInfo}`;
-            document.getElementById('results-section').style.display = 'block';
-        }
-        
-        // 日付フォーマット
-        function formatDate(dateStr) {
-            if (!dateStr) return '';
-            const dt = new Date(dateStr);
-            return dt.toLocaleDateString('ja-JP', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            });
-        }
-        
-        // 時刻フォーマット
-        function formatTime(timeStr) {
-            if (!timeStr) return '';
-            // ISO時刻文字列の場合
-            if (timeStr.includes('T') || timeStr.includes(' ')) {
-                const dt = new Date(timeStr);
-                return dt.toLocaleTimeString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-            // HH:MM形式の場合はそのまま返す
-            return timeStr;
-        }
-
-        // 24勤の退勤時刻を翌日の明に移動する処理
-        function processNightShiftEndTimes(results) {
-            const processedResults = [...results];
-            
-            for (let i = 0; i < processedResults.length; i++) {
-                const currentItem = processedResults[i];
-                
-                // 24勤の場合
-                if (currentItem.work_type && currentItem.work_type.includes('24勤')) {
-                    // 翌日の明を探す
-                    const currentDate = new Date(currentItem.work_date);
-                    const nextDay = new Date(currentDate);
-                    nextDay.setDate(currentDate.getDate() + 1);
-                    const nextDateStr = nextDay.toISOString().split('T')[0];
-                    
-                    const nextDayOffItem = processedResults.find(item => 
-                        item.work_date === nextDateStr && item.work_type === '明'
-                    );
-                    
-                    if (nextDayOffItem && currentItem.end_time) {
-                        // 24勤の退勤時刻を翌日の明に移動
-                        nextDayOffItem.night_shift_end_time = currentItem.end_time;
-                        nextDayOffItem.night_shift_work_type = currentItem.work_type;
-                        
-                        // 24勤の退勤時刻をクリア
-                        currentItem.end_time = null;
-                    }
-                }
-            }
-            
-            return processedResults;
-        }
-
-        // 退勤時刻表示（24勤の場合は翌日明に表示）
-        function formatEndTime(item) {
-            // 明の行で、前日24勤の退勤時刻がある場合
-            if (item.work_type === '明' && item.night_shift_end_time) {
-                const timeStr = formatTime(item.night_shift_end_time);
-                return `${timeStr} <span style="color: #3498db; font-size: 0.8em;">(${item.night_shift_work_type}退勤)</span>`;
-            }
-            
-            // 24勤の場合は退勤時刻を表示しない（翌日明に移動済み）
-            if (item.work_type && item.work_type.includes('24勤')) {
-                return '<span style="color: #999; font-style: italic;">翌日明に表示</span>';
-            }
-            
-            // 通常勤務の場合はそのまま
-            return formatTime(item.end_time);
-        }
-        
-        // 勤務タイプに応じたCSSクラスを返す
-        function getWorkTypeClass(workType) {
-            if (!workType) return '';
-            if (workType.includes('24勤')) return 'shift-24';
-            if (workType.includes('日勤')) return 'day-shift';
-            if (workType.includes('夜勤')) return 'night-shift';
-            if (workType.includes('所')) return 'office';
-            if (workType.includes('明')) return 'off-day';
-            if (workType.includes('法')) return 'holiday';
-            if (workType.includes('有')) return 'paid-leave';
-            return '';
-        }
+        // 重複関数を削除しました - attendance-common.js の関数を使用
         
         // 行データから完全なデータを取得するヘルパー関数
         function getFullDataFromRow(row) {
@@ -861,190 +639,7 @@
         
         // generateCheckStatusHTML は attendance-common.js から使用
         
-        // 確認ステータスを更新する関数
-        async function updateCheckStatus(checkbox) {
-            const employeeNum = checkbox.dataset.employee;
-            const workDate = checkbox.dataset.date;
-            const checkType = checkbox.dataset.type;
-            const isChecked = checkbox.checked;
-            
-            const requestBody = {
-                employee_num: employeeNum,
-                work_date: workDate,
-                check_type: checkType,
-                is_checked: isChecked
-            };
-            
-            try {
-                const response = await fetch('/api/attendance-check-status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                // ステータスコードをチェック
-                if (!response.ok) {
-                    // エラーレスポンスの詳細を取得して表示
-                    let errorMessage = 'ステータス更新に失敗しました（HTTP ' + response.status + '）';
-                    try {
-                        const errorData = await response.json();
-                        if (errorData.message) {
-                            errorMessage = errorData.message;
-                        }
-                    } catch (e) {
-                        // レスポンス解析失敗は無視
-                    }
-                    showError(errorMessage);
-                    checkbox.checked = !isChecked;
-                    return;
-                }
-                
-                // Content-TypeをチェックしてJSONかどうかを確認
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    // JSONでない場合は認証エラーの可能性がある
-                    showError('認証エラーが発生しました。再度ログインしてください。');
-                    checkbox.checked = !isChecked;
-                    return;
-                }
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    let statusId;
-                    if (checkType === 'missing_punch') {
-                        statusId = `missing-status-${employeeNum}-${workDate}`;
-                    } else if (checkType === 'punch_leak') {
-                        statusId = `punchleak-status-${employeeNum}-${workDate}`;
-                    } else {
-                        statusId = `timediff-status-${employeeNum}-${workDate}`;
-                    }
-                    const statusElement = document.getElementById(statusId);
-                    
-                    if (statusElement) {
-                        if (isChecked) {
-                            // 時間外申告の有無を確認
-                            const hasOvertime = hasOvertimeForDate(workDate);
-                            const overtimeText = hasOvertime ? '時間外有り' : '時間外無';
-                            
-                            if (checkType === 'missing_punch') {
-                                statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
-                            } else if (checkType === 'punch_leak') {
-                                statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
-                            } else {
-                                statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
-                            }
-                            statusElement.classList.add('completed');
-                        } else {
-                            statusElement.textContent = '未確認';
-                            statusElement.classList.remove('completed');
-                        }
-                    }
-                } else {
-                    console.error('[updateCheckStatus] データベースへの保存失敗:', result);
-                    showError('ステータス更新に失敗しました: ' + (result.message || '不明なエラー'));
-                    checkbox.checked = !isChecked;
-                }
-            } catch (error) {
-                // JSONパースエラーの場合
-                if (error instanceof SyntaxError) {
-                    showError('認証エラーが発生しました。再度ログインしてください。');
-                } else {
-                    console.error('ステータス更新エラー:', error);
-                    showError('ステータス更新中にエラーが発生しました');
-                }
-                checkbox.checked = !isChecked;
-            }
-        }
-        
-        // 確認ステータスを読み込む関数
-        async function loadCheckStatuses(results) {
-            console.log('[ブラウザ] ===== loadCheckStatuses開始 =====');
-            console.log('[ブラウザ] 結果件数:', results.length);
-            if (!results || results.length === 0) {
-                console.warn('[ブラウザ] 結果が空です');
-                return;
-            }
-            
-            for (const item of results) {
-                if (!item || !item.employee_id || !item.work_date) {
-                    console.warn('[ブラウザ] 無効なアイテム:', item);
-                    continue;
-                }
-                
-                console.log(`[ブラウザ] アイテム処理開始: employee_id=${item.employee_id}, work_date=${item.work_date}`);
-                
-                for (const checkType of ['missing_punch', 'time_difference', 'punch_leak']) {
-                    try {
-                        const employeeNum = item.employee_num || item.employee_id;
-                        const url = `/api/attendance-check-status?employee_num=${employeeNum}&work_date=${item.work_date}&check_type=${checkType}`;
-                        
-                        const response = await fetch(url);
-                        
-                        if (!response.ok) {
-                            continue;
-                        }
-                        
-                        const contentType = response.headers.get('content-type');
-                        if (!contentType || !contentType.includes('application/json')) {
-                            continue;
-                        }
-                        
-                        const result = await response.json();
-                        
-                        // チェック済みデータがある場合のみデバッグ出力
-                        if (result.success && result.data && result.data.is_checked) {
-                            console.log(`[ブラウザ] [確認済] チェック済みデータ発見: employee=${item.employee_id}, date=${item.work_date}, check_type=${checkType}, is_checked=${result.data.is_checked}`);
-                            let checkboxId, statusId;
-                            if (checkType === 'missing_punch') {
-                                checkboxId = `missing-${item.employee_id}-${item.work_date}`;
-                                statusId = `missing-status-${item.employee_id}-${item.work_date}`;
-                            } else if (checkType === 'punch_leak') {
-                                checkboxId = `punchleak-${item.employee_id}-${item.work_date}`;
-                                statusId = `punchleak-status-${item.employee_id}-${item.work_date}`;
-                            } else {
-                                checkboxId = `timediff-${item.employee_id}-${item.work_date}`;
-                                statusId = `timediff-status-${item.employee_id}-${item.work_date}`;
-                            }
-                            
-                            console.log(`[ブラウザ] DOM要素検索開始: checkboxId=${checkboxId}, statusId=${statusId}`);
-                            const checkbox = document.getElementById(checkboxId);
-                            const statusElement = document.getElementById(statusId);
-                            console.log(`[ブラウザ] DOM要素検索結果: checkbox=${checkbox ? '存在' : 'なし'}, statusElement=${statusElement ? '存在' : 'なし'}`);
-                            
-                            if (checkbox && statusElement) {
-                                console.log(`[ブラウザ] [確認済] チェックボックスにチェックを設定: checkboxId=${checkboxId}, 現在のchecked=${checkbox.checked}`);
-                                checkbox.checked = true;
-                                console.log(`[ブラウザ] チェック後: checked=${checkbox.checked}`);
-                                
-                                // 時間外申告の有無を確認
-                                const hasOvertime = hasOvertimeForDate(item.work_date);
-                                
-                                if (checkType === 'missing_punch') {
-                                    statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
-                                } else if (checkType === 'punch_leak') {
-                                    statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
-                                } else {
-                                    statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
-                                }
-                                statusElement.classList.add('completed');
-                                console.log(`[ブラウザ] [確認済] ステータス表示更新完了: statusId=${statusId}, textContent=${statusElement.textContent}`);
-                            } else {
-                                console.warn(`[ブラウザ] ✗ 要素が見つかりません: checkboxId=${checkboxId}, statusId=${statusId}, employee_id=${item.employee_id}, date=${item.work_date}`);
-                            }
-                        } else {
-                            console.log(`[ブラウザ] チェック済みデータなし: success=${result.success}, data=`, result.data, `is_checked=`, result.data ? result.data.is_checked : 'N/A');
-                        }
-                    } catch (error) {
-                        // すべてのエラーを無視して続行
-                        // 認証エラーなどでHTMLが返される場合があるため、エラーをログに出力しない
-                        continue;
-                    }
-                }
-            }
-        }
+        // updateCheckStatus と loadCheckStatuses は attendance-check.js から使用
         
         // CSV出力
         function exportCSV() {

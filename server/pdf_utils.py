@@ -7,14 +7,58 @@ PDF生成とファイル管理の専門モジュール
 
 import os
 import re
-from datetime import datetime
+from datetime import datetime, date
 from config import Config
 from constants import AttendanceConstants
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
 
-def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, employee_name='', additional_css=''):
+def calculate_payroll_month_from_date(date_str):
+    """
+    日付から給与計算月度を計算（前月16日〜当月15日が1つの月度）
+    
+    Args:
+        date_str: 日付文字列（YYYY-MM-DD形式）
+    
+    Returns:
+        str: 月度文字列（YYYY_MM形式、例: 2026_02）
+    """
+    try:
+        date_obj = datetime.strptime(date_str, AttendanceConstants.DATE_FORMAT).date()
+        year = date_obj.year
+        month = date_obj.month
+        day = date_obj.day
+        
+        # 給与計算期間のルール：前月16日〜当月15日が1つの月度
+        # 16日以降なら翌月度、15日以前なら当月度
+        if day >= Config.PAYROLL_START_DAY:  # 16日以降
+            # 翌月度
+            if month == 12:
+                payroll_year = year + 1
+                payroll_month = 1
+            else:
+                payroll_year = year
+                payroll_month = month + 1
+        else:  # 15日以前
+            # 当月度
+            payroll_year = year
+            payroll_month = month
+        
+        return f'{payroll_year}_{payroll_month:02d}'
+    except (ValueError, TypeError) as e:
+        # 日付の解析に失敗した場合は現在の年月を使用
+        now = datetime.now()
+        logger.warning(f"日付の解析に失敗したため、現在の年月を使用: {date_str}, エラー: {e}")
+        if now.day >= Config.PAYROLL_START_DAY:
+            if now.month == 12:
+                return f'{now.year + 1}_01'
+            else:
+                return f'{now.year}_{now.month + 1:02d}'
+        else:
+            return f'{now.year}_{now.month:02d}'
+
+def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, employee_name='', additional_css='', document_id=None):
     """
     HTMLコンテンツからPDFを生成して保存（共通関数）
     
@@ -25,22 +69,17 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
         date_str: 日付文字列（YYYY-MM-DD形式）
         employee_name: 従業員名（オプション）
         additional_css: 追加のCSS（オプション）
+        document_id: 書類ID（オプション、ファイル名に含める）
     
     Returns:
         dict: {'success': bool, 'filename': str, 'path': str, 'message': str}
     """
     try:
-        # reportsフォルダを基準とした保存先に変更（PDFフォルダは使用しない）
-        reports_base_dir = os.path.join(os.path.dirname(Config.DATABASE_PATH), 'reports')
+        # PDFフォルダを基準とした保存先に変更
+        pdf_base_dir = os.path.join(os.path.dirname(Config.DATABASE_PATH), 'PDF')
         
-        # reportsフォルダが存在しない場合は作成
-        os.makedirs(reports_base_dir, exist_ok=True)
-        
-        # reportsフォルダを基準とした保存先に変更（PDFフォルダは使用しない）
-        reports_base_dir = os.path.join(os.path.dirname(Config.DATABASE_PATH), 'reports')
-        
-        # reportsフォルダが存在しない場合は作成
-        os.makedirs(reports_base_dir, exist_ok=True)
+        # PDFフォルダが存在しない場合は作成
+        os.makedirs(pdf_base_dir, exist_ok=True)
         
         # ファイル名に使用できない文字を除去（Windowsのファイル名に使用できない文字）
         safe_employee_name = ''
@@ -49,53 +88,49 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             safe_employee_name = re.sub(r'[<>:"/\\|?*]', '', employee_name)
             safe_employee_name = safe_employee_name.strip()
         
-        # 月度を取得（YYYYMM形式）
-        try:
-            date_obj = datetime.strptime(date_str, AttendanceConstants.DATE_FORMAT)
-            month_str = date_obj.strftime(AttendanceConstants.DATE_FORMAT_YM)  # YYYYMM形式
-        except (ValueError, TypeError):
-            # 日付の解析に失敗した場合は現在の年月を使用
-            month_str = datetime.now().strftime(AttendanceConstants.DATE_FORMAT_YM)
-            logger.warning(f"日付の解析に失敗したため、現在の年月を使用: {date_str}")
+        # 給与計算期間を考慮した月度を取得（YYYY_MM形式）
+        # 前月16日〜当月15日が1つの月度
+        month_str = calculate_payroll_month_from_date(date_str)
+        logger.info(f"日付 {date_str} の給与計算月度: {month_str}")
         
-        # 申請種別に応じたサブフォルダ名を設定
-        document_type = ''
-        if filename_prefix == '時間外':
-            document_type = 'overtime_applications'  # 時間外申告
-        elif filename_prefix == '休暇願':
-            document_type = 'leave_requests'  # 休暇申請
-        else:
-            document_type = 'other_documents'  # その他の書類
+        # 月度フォルダを作成（存在しない場合）
+        year_month_folder = os.path.join(pdf_base_dir, month_str)
+        os.makedirs(year_month_folder, exist_ok=True)
         
-        # フォルダ構造: reports/{年月}/{申請種別}/{従業員名}
-        # 例: reports/202412/overtime_applications/井上誠二/
-        year_month_folder = os.path.join(reports_base_dir, month_str)
-        document_type_folder = os.path.join(year_month_folder, document_type)
-        
+        # 従業員ごとのフォルダを作成（名前_年月形式）
         if safe_employee_name:
-            final_folder = os.path.join(document_type_folder, safe_employee_name)
+            employee_folder_name = f'{safe_employee_name}_{month_str}'
         else:
-            final_folder = os.path.join(document_type_folder, f'employee_{employee_num}')
+            employee_folder_name = f'employee_{employee_num}_{month_str}'
         
-        # フォルダを作成（存在しない場合）
+        final_folder = os.path.join(year_month_folder, employee_folder_name)
         os.makedirs(final_folder, exist_ok=True)
-        logger.debug(f"PDF保存先: {final_folder}")
+        logger.info(f"PDF保存先フォルダ: {final_folder}")
+        logger.info(f"PDFベースディレクトリ: {pdf_base_dir}")
+        logger.info(f"月度フォルダ: {year_month_folder}")
+        logger.info(f"従業員フォルダ名: {employee_folder_name}")
         
-        # フォルダを作成（存在しない場合）
-        os.makedirs(final_folder, exist_ok=True)
-        logger.debug(f"PDF保存先: {final_folder}")
-        
-        # ファイル名を生成（日付_申請種別_名前_時刻.pdf形式）
-        now = datetime.now()
-        timestamp_str = now.strftime(AttendanceConstants.TIME_FORMAT_HMS)  # 時刻のみ（HHMMSS形式）
+        # ファイル名を生成（名前_日付_書類の種別_ID.pdf形式）
         date_str_clean = date_str.replace('-', '')  # YYYYMMDD形式
         
-        # ファイル名: 日付_申請種別_従業員名_時刻.pdf
-        # 例: 20241215_時間外_井上誠二_143025.pdf, 20241220_休暇願_松浦真司_091530.pdf
-        if safe_employee_name:
-            filename = f'{date_str_clean}_{filename_prefix}_{safe_employee_name}_{timestamp_str}.pdf'
+        # 書類の種別を設定
+        document_type = filename_prefix  # '時間外' または '休暇願'
+        
+        # ファイル名: 名前_日付_書類の種別_ID.pdf
+        # 例: 田中宏和_20260215_時間外_123.pdf, 田中宏和_20260220_休暇願_456.pdf
+        if document_id:
+            if safe_employee_name:
+                filename = f'{safe_employee_name}_{date_str_clean}_{document_type}_{document_id}.pdf'
+            else:
+                filename = f'従業員{employee_num}_{date_str_clean}_{document_type}_{document_id}.pdf'
         else:
-            filename = f'{date_str_clean}_{filename_prefix}_従業員{employee_num}_{timestamp_str}.pdf'
+            # IDがない場合は時刻を使用（後方互換性のため）
+            now = datetime.now()
+            timestamp_str = now.strftime(AttendanceConstants.TIME_FORMAT_HMS)
+            if safe_employee_name:
+                filename = f'{safe_employee_name}_{date_str_clean}_{document_type}_{timestamp_str}.pdf'
+            else:
+                filename = f'従業員{employee_num}_{date_str_clean}_{document_type}_{timestamp_str}.pdf'
         
         pdf_path = os.path.join(final_folder, filename)
         
@@ -124,8 +159,9 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
             css = CSS(string=base_css + additional_css, font_config=font_config)
             
             HTML(string=html_content).write_pdf(pdf_path, stylesheets=[css], font_config=font_config)
-            logger.info(f"PDF保存成功: {filename} -> {final_folder}")
-            logger.debug(f"PDF保存パス: {pdf_path}")
+            logger.info(f"PDF保存成功: {filename}")
+            logger.info(f"PDF保存先フォルダ: {final_folder}")
+            logger.info(f"PDF保存フルパス: {pdf_path}")
             return {
                 'success': True,
                 'filename': filename,
@@ -149,6 +185,8 @@ def save_pdf_from_html(html_content, filename_prefix, employee_num, date_str, em
         
     except Exception as e:
         logger.error(f"PDF保存エラー: {e}", exc_info=True)
+        logger.error(f"PDF保存試行時のパラメータ: employee_num={employee_num}, date_str={date_str}, employee_name={employee_name}, filename_prefix={filename_prefix}")
+        logger.error(f"PDFベースディレクトリ: {pdf_base_dir if 'pdf_base_dir' in locals() else 'N/A'}")
         return {
             'success': False,
             'filename': None,

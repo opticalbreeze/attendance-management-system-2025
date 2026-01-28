@@ -38,6 +38,16 @@ def create_app():
     app.config['SESSION_COOKIE_HTTPONLY'] = Config.SESSION_COOKIE_HTTPONLY
     app.config['SESSION_COOKIE_SAMESITE'] = Config.SESSION_COOKIE_SAMESITE
     
+    # 静的ファイルのキャッシュ制御（ブラウザキャッシュ対策）
+    @app.after_request
+    def set_static_cache_headers(response):
+        """静的ファイルにキャッシュ制御ヘッダーを追加"""
+        if request.endpoint == 'static' or request.path.startswith('/static/'):
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+    
     # 認証機能を初期化
     init_auth(app)
     
@@ -229,6 +239,9 @@ def print_startup_info():
     logger.info("  - 休暇願申告:     GET  /leave")
     logger.info("  - 休暇願一覧:     GET  /leave/list")
     logger.info("  - 休暇願確認:     GET  /leave/check")
+    logger.info("  - 月間レポート:   GET  /monthly-report")
+    logger.info("  - 管理者ページ:   GET  /admin")
+    logger.info("  - 打刻チェック確認: GET  /attendance-check")
     logger.info("")
     logger.info("[API エンドポイント]")
     logger.info("  - ヘルスチェック: GET  /api/health")
@@ -242,6 +255,10 @@ def print_startup_info():
     logger.info("  - 時間外承認:     POST /api/overtime/<id>/approve")
     logger.info("  - 時間外却下:     POST /api/overtime/<id>/reject")
     logger.info("  - 月次集計:       GET  /api/overtime/monthly_summary")
+    logger.info("  - 通知取得:       GET  /api/notifications")
+    logger.info("  - 通知確認:       POST /api/notifications/acknowledge")
+    logger.info("  - 通知除外リスト: GET  /api/notifications/exclusions")
+    logger.info("  - 通知除外設定:   POST /api/notifications/exclusions")
     logger.info("  - CSV アップロード: POST /api/admin/csv/upload")
     logger.info("  - DB統計情報:     GET  /api/admin/database/stats")
     logger.info("=" * 79)

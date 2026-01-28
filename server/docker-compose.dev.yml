@@ -101,6 +101,14 @@ services:
       - type: bind
         source: ../notification_data.json
         target: /app/notification_data.json
+      # acknowledged_notifications.jsonのマウント
+      - type: bind
+        source: ../acknowledged_notifications.json
+        target: /app/acknowledged_notifications.json
+      # notification_exclusions.jsonのマウント（開発用にも追加）
+      - type: bind
+        source: ../notification_exclusions.json
+        target: /app/notification_exclusions.json
     environment:
       - TZ=Asia/Tokyo
       # サーバー設定（開発用）

@@ -3,11 +3,11 @@
  * セクションによるフィルタリングと従業員選択を提供
  */
 
-// グローバル変数: 全従業員データ
+// グローバル変数を名前空間に移動（後方互換性のため残す）
 let allEmployees = [];
 
 /**
- * 従業員リストをAPIから読み込む
+ * 従業員リストをAPIから読み込む（統一APIサービス使用）
  * @param {string} employeeSelectId - 従業員選択要素のID
  * @param {string} sectionSelectId - セクション選択要素のID
  * @param {string} defaultOptionText - デフォルトオプションのテキスト
@@ -23,22 +23,27 @@ async function loadEmployees(employeeSelectId, sectionSelectId, defaultOptionTex
     }
     
     try {
-        const response = await fetch('/api/employees');
-        const result = await response.json();
+        // 統一APIサービスを使用
+        const employeesResponse = await AttendanceSystem.API.Employees.getAll();
         
-        if (result.status === 'success' && result.data) {
-            // 全従業員データを保存
-            allEmployees = result.data;
+        if (employeesResponse.success) {
+            // 後方互換性のため全従業員データをグローバル変数にも保存
+            allEmployees = employeesResponse.data;
             
-            // セクション一覧を取得・設定
-            const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
-            sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
-            sections.forEach(section => {
-                const option = document.createElement('option');
-                option.value = section;
-                option.textContent = section;
-                sectionSelect.appendChild(option);
-            });
+            // セクション一覧を統一APIサービスから取得
+            const sectionsResponse = await AttendanceSystem.API.Employees.getSections();
+            
+            if (sectionsResponse.success) {
+                sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
+                sectionsResponse.data.forEach(section => {
+                    const option = document.createElement('option');
+                    option.value = section;
+                    option.textContent = section;
+                    sectionSelect.appendChild(option);
+                });
+            } else {
+                console.warn('[employee-list] セクション一覧取得に失敗:', sectionsResponse.message);
+            }
             
             // 従業員リストを更新
             updateEmployeeList(employeeSelectId, sectionSelectId, defaultOptionText);
@@ -48,7 +53,7 @@ async function loadEmployees(employeeSelectId, sectionSelectId, defaultOptionTex
                 onSuccess(allEmployees);
             }
         } else {
-            throw new Error(result.message || '従業員データの読み込みに失敗');
+            throw new Error(employeesResponse.message);
         }
     } catch (error) {
         console.error('[employee-list] Employee loading error:', error);
@@ -73,12 +78,24 @@ function updateEmployeeList(employeeSelectId, sectionSelectId, defaultOptionText
     
     const selectedSection = sectionSelect.value;
     
+    // URLパラメータから従業員IDを取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlEmployeeId = urlParams.get('employee_id');
+    
+    // 現在選択されている値を保存（URLパラメータがない場合のため）
+    const currentSelectedValue = urlEmployeeId ? null : (employeeSelect.value || null);
+    
     employeeSelect.innerHTML = `<option value="">▼ ${defaultOptionText}</option>`;
+    
+    // 名前空間データを優先、フォールバックでグローバル変数を使用
+    const employees = AttendanceSystem.Data.employees.length > 0 
+        ? AttendanceSystem.Data.employees 
+        : allEmployees;
     
     // セクションでフィルタリング
     const filteredEmployees = selectedSection 
-        ? allEmployees.filter(emp => (emp.section || '設備') === selectedSection)
-        : allEmployees;
+        ? employees.filter(emp => (emp.section || '設備') === selectedSection)
+        : employees;
     
     // 従業員名でソート
     filteredEmployees.sort((a, b) => {
@@ -94,8 +111,21 @@ function updateEmployeeList(employeeSelectId, sectionSelectId, defaultOptionText
         option.textContent = `${emp.employee_num} - ${emp.name || '名前なし'}`;
         option.dataset.employeeName = emp.name || '';
         option.dataset.section = emp.section || '設備';
+        
+        // URLパラメータで指定された従業員IDを優先して選択
+        if (urlEmployeeId && emp.employee_num === urlEmployeeId) {
+            option.selected = true;
+        }
+        
         employeeSelect.appendChild(option);
     });
+    
+    // 選択値を設定（URLパラメータを最優先、なければ現在の選択を維持）
+    if (urlEmployeeId) {
+        employeeSelect.value = urlEmployeeId;
+    } else if (currentSelectedValue && currentSelectedValue !== '') {
+        employeeSelect.value = currentSelectedValue;
+    }
 }
 
 /**

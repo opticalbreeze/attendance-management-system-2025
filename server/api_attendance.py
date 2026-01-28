@@ -74,26 +74,43 @@ def register_attendance_api_routes(app):
     def search_schedule_api():
         """勤怠スケジュール検索API"""
         try:
+            logger.info(f"[API] /api/search リクエスト受信")
+            logger.info(f"[API] リクエストパラメータ: {dict(request.args)}")
+            
             employee_id = request.args.get('employee_id', '').strip()
             search_month = request.args.get('search_month', '').strip()
             limit = safe_int(request.args.get('limit', str(Config.DEFAULT_SEARCH_LIMIT)), Config.DEFAULT_SEARCH_LIMIT)
             
+            logger.info(f"[API] パラメータ解析後: employee_id='{employee_id}', search_month='{search_month}', limit={limit}")
+            
             valid, employee_id_or_error = validate_employee_id(employee_id)
             if not valid:
+                logger.warning(f"[API] 従業員IDバリデーション失敗: {employee_id_or_error}")
                 return jsonify(format_response('error', message=employee_id_or_error)), 400
             employee_id = employee_id_or_error
+            logger.info(f"[API] 従業員IDバリデーション成功: {employee_id}")
             
             valid, search_month_or_error = validate_search_month(search_month)
             if not valid:
+                logger.warning(f"[API] 検索月バリデーション失敗: {search_month_or_error}")
                 return jsonify(format_response('error', message=search_month_or_error)), 400
             search_month = search_month_or_error
+            logger.info(f"[API] 検索月バリデーション成功: {search_month}")
             
             try:
                 start_date, end_date = calculate_date_range(search_month)
+                logger.info(f"[API] 日付範囲計算: {start_date} 〜 {end_date}")
             except ValueError as e:
+                logger.error(f"[API] 日付範囲計算エラー: {e}")
                 return jsonify(format_response('error', message=str(e))), 400
             
-            results = search_schedule(employee_id, start_date, end_date, limit)
+            logger.info(f"[API] スケジュール検索開始: employee_id={employee_id}, start_date={start_date}, end_date={end_date}")
+            try:
+                results = search_schedule(employee_id, start_date, end_date, limit)
+                logger.info(f"[API] スケジュール検索完了: {len(results)}件")
+            except Exception as db_error:
+                logger.error(f"[API] スケジュール検索エラー: {type(db_error).__name__}: {db_error}", exc_info=True)
+                raise
             
             # 各日付に対してアラート情報と実際の打刻時刻を取得
             total_alerts_count = 0
@@ -124,21 +141,29 @@ def register_attendance_api_routes(app):
                     item['actual_clock_out'] = None
             
             if total_alerts_count > 0:
-                logger.info(f"検索結果: {len(results)}件中、合計{total_alerts_count}件のアラートを検出")
+                logger.info(f"[API] 検索結果: {len(results)}件中、合計{total_alerts_count}件のアラートを検出")
             else:
-                logger.debug(f"検索結果: {len(results)}件中、アラートなし")
+                logger.info(f"[API] 検索結果: {len(results)}件中、アラートなし")
             
-            return jsonify(format_response(
+            response_data = format_response(
                 'success',
                 count=len(results),
                 results=results,
                 search_params={'employee_id': employee_id, 'search_month': search_month,
                              'date_range': {'start_date': start_date, 'end_date': end_date}}
-            ))
+            )
+            logger.info(f"[API] レスポンス準備完了: status={response_data.get('status')}, count={len(results)}")
+            logger.debug(f"[API] レスポンスデータサンプル（最初の1件）: {results[0] if results else 'なし'}")
+            
+            return jsonify(response_data)
             
         except Exception as e:
-            logger.error(f"検索エラー: {e}", exc_info=True)
-            return jsonify(format_response('error', message=f'検索エラー: {str(e)}')), 500
+            error_type = type(e).__name__
+            error_message = str(e)
+            logger.error(f"[API] /api/search エラー発生: {error_type}: {error_message}", exc_info=True)
+            logger.error(f"[API] エラー発生時のパラメータ: employee_id={request.args.get('employee_id', '')}, search_month={request.args.get('search_month', '')}")
+            logger.error(f"[API] エラートレースバック:", exc_info=True)
+            return jsonify(format_response('error', message=f'検索エラー: {error_message}')), 500
 
     @app.route('/api/stats', methods=['GET'])
     def get_stats_api():
@@ -169,9 +194,8 @@ def register_attendance_api_routes(app):
             return jsonify(format_response('error', message=f'エラー: {str(e)}')), 500
 
     @app.route('/api/employees', methods=['GET'])
-    @login_required
     def get_employees_api():
-        """従業員一覧取得API"""
+        """従業員一覧取得API（認証不要）"""
         try:
             employees = get_employees()
             

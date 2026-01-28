@@ -67,7 +67,7 @@ def verify_db_password(password):
 
 def login_required(f):
     """
-    ログインが必要なページを保護するデコレータ（開発モード：無効化）
+    ログインが必要なページを保護するデコレータ
     
     使用例:
         @app.route('/admin')
@@ -77,7 +77,11 @@ def login_required(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 開発モード：認証をバイパス
+        # セッションにログイン情報があるかチェック
+        if not session.get('admin_logged_in', False):
+            # ログインしていない場合はログインページにリダイレクト
+            # 元のURLを保存して、ログイン後に戻れるようにする
+            return redirect(f'/login?next={request.url}')
         return f(*args, **kwargs)
     return decorated_function
 
@@ -119,5 +123,6 @@ def set_db_access_granted(granted=True):
         granted: 権限を付与するかどうか
     """
     session['db_access_granted'] = granted
-    session.permanent = True
+    # セッションを永続化しない（ブラウザを閉じたらログアウト）
+    session.permanent = False
 

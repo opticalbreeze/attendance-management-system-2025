@@ -242,8 +242,18 @@
         </div>
         
         <div id="loading" class="loading" style="display: none;">
-            検索中...
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <div class="spinner" style="width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <span style="font-size: 1.1em; color: #007bff; font-weight: bold;">検索中...</span>
+            </div>
         </div>
+        
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
         
         <div id="no-results" class="no-results" style="display: none;">
             検索条件に一致するデータが見つかりませんでした。
@@ -621,11 +631,17 @@
             // 時間外・休暇願データを非同期で取得
             const employeeId = searchParams.employee_id;
             debugLog('時間外・休暇願データの取得開始:', employeeId);
-            fetchOvertimeDataForMonth(employeeId, results).then(() => {
+            fetchOvertimeDataForMonth(employeeId, results).then(async () => {
                 // 時間外データ取得後に、時間差異アラートがある行のアラートを再描画
                 refreshTimeDiffAlerts(results);
                 // 時間差異確認状態を復元
                 restoreTimeDiffConfirmations(results);
+                // 出勤時刻の差異を判定（時間外開始時刻と出勤打刻時刻を比較）
+                await autoCheckClockInTimeDifference(results);
+                // 退勤時刻の差異を判定（時間外終了時刻と退勤打刻時刻を比較）
+                await autoCheckClockOutTimeDifference(results);
+                // 判定結果を表示するため、アラートを再描画
+                refreshTimeDiffAlerts(results);
             });
             fetchLeaveDataForMonth(employeeId, results);
             
@@ -693,9 +709,15 @@
                         // 確認状態をitemに追加（formatAlertsWithOvertimeCheckで使用）
                         if (response.success && response.data && response.data.is_checked) {
                             const notes = response.data.notes || '';
-                            item._timeDiffChecked = notes.includes('時間外なし');
+                            item._timeDiffChecked = true;
+                            item._timeDiffNotes = notes;
+                            // 「時間外なし」の場合もtrueとして扱う（後方互換性のため）
+                            if (notes.includes('時間外なし')) {
+                                item._timeDiffChecked = true;
+                            }
                         } else {
                             item._timeDiffChecked = false;
+                            item._timeDiffNotes = '';
                         }
                         
                         const alertsCell = document.getElementById(`alerts-${item.work_date}`);
@@ -829,6 +851,10 @@
             document.getElementById('error-message').style.display = 'none';
         }
         
+        // 時間外申告データをグローバル変数に保存（日付をキーとして）
+        // 注意: attendance-check.jsで既に宣言されているため、ここでは宣言しない
+        // const overtimeDataMap = {}; // attendance-check.jsで既に宣言済み
+        
         // 時間外申告データを月単位で取得
         async function fetchOvertimeDataForMonth(employeeId, results) {
             debugLog('fetchOvertimeDataForMonth() 開始:', employeeId);
@@ -839,6 +865,9 @@
                 if (result.status === 'success' && result.data) {
                     debugLog('時間外データ取得成功:', result.data.length, '件');
                     result.data.forEach(overtime => {
+                        // 時間外データをマップに保存
+                        overtimeDataMap[overtime.work_date] = overtime;
+                        
                         const cell = document.getElementById(`overtime-${overtime.work_date}`);
                         if (cell) {
                             const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
@@ -943,6 +972,12 @@
                 return alertStr.includes('出勤時刻に差異あり');
             });
             
+            // 「退勤時刻に差異あり」アラートをチェック
+            const hasClockOutTimeDiff = alerts.some(alert => {
+                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                return alertStr.includes('退勤時刻に差異あり');
+            });
+            
             if (hasClockInTimeDiff) {
                 // 時間外申告データをチェック（非同期で取得済みのデータを使用）
                 const overtimeCell = document.getElementById(`overtime-${workDate}`);
@@ -987,7 +1022,168 @@
                 }
             }
             
+            // 出勤時刻に差異がある場合の判定結果を表示
+            if (hasClockInTimeDiff) {
+                // 判定結果が保存されている場合（時間外データ取得後）
+                if (item._clockInTimeDiffDetected === true) {
+                    alertsHtml += `
+                        <div style="margin-top: 5px; font-size: 0.7em; color: #667eea;">
+                            ${item._clockInTimeDiffType || '出勤'}
+                        </div>
+                    `;
+                }
+            }
+            
+            // 退勤時刻に差異がある場合の判定結果を表示
+            if (hasClockOutTimeDiff) {
+                // 判定結果が保存されている場合（時間外データ取得後）
+                if (item._clockOutTimeDiffDetected === true) {
+                    alertsHtml += `
+                        <div style="margin-top: 5px; font-size: 0.7em; color: #667eea;">
+                            ${item._clockOutTimeDiffType || '退勤'}
+                        </div>
+                    `;
+                }
+            }
+            
             return alertsHtml;
+        }
+        
+        // 時刻を比較して分単位の差異を返す関数
+        function compareTimes(time1, time2) {
+            // HH:MM形式の時刻を分に変換
+            function timeToMinutes(timeStr) {
+                if (!timeStr) return 0;
+                const parts = timeStr.split(':');
+                if (parts.length < 2) return 0;
+                const hours = parseInt(parts[0], 10) || 0;
+                const minutes = parseInt(parts[1], 10) || 0;
+                return hours * 60 + minutes;
+            }
+            
+            const minutes1 = timeToMinutes(time1);
+            const minutes2 = timeToMinutes(time2);
+            return minutes1 - minutes2;
+        }
+        
+        // 出勤時刻の差異を判定する関数（時間外データ取得後に呼び出される）
+        // 判定結果のみを保存し、自動確認は行わない
+        async function autoCheckClockInTimeDifference(results) {
+            debugLog('autoCheckClockInTimeDifference() 開始');
+            
+            for (const item of results) {
+                const employeeId = item.employee_id;
+                const workDate = item.work_date;
+                const alerts = item.alerts || [];
+                
+                // 「出勤時刻に差異あり」アラートをチェック
+                const hasClockInTimeDiff = alerts.some(alert => {
+                    const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                    return alertStr.includes('出勤時刻に差異あり');
+                });
+                
+                if (!hasClockInTimeDiff) continue;
+                
+                // 時間外データをチェック
+                const overtime = overtimeDataMap[workDate];
+                if (!overtime || !overtime.start_time) continue;
+                
+                // 出勤打刻時刻を取得
+                const validTimes = getValidClockTimes(item.attendance_records || [], item.work_type, item.work_date, results, item);
+                const clockInTime = validTimes.clockIn;
+                
+                if (!clockInTime) continue;
+                
+                // 時間外の開始時刻と出勤打刻時刻を比較（許容範囲：±20分）
+                const timeDiff = compareTimes(overtime.start_time, clockInTime);
+                debugLog('出勤時刻比較:', { workDate, overtimeStart: overtime.start_time, clockIn: clockInTime, diff: timeDiff });
+                
+                // 判定結果を保存（「出勤」と判定）
+                if (Math.abs(timeDiff) <= 20) {
+                    item._clockInTimeDiffDetected = true;
+                    item._clockInTimeDiffType = '出勤';
+                    debugLog('出勤時刻差異が許容範囲内（判定: 出勤）:', { workDate, diff: timeDiff });
+                }
+            }
+            
+            debugLog('autoCheckClockInTimeDifference() 完了');
+        }
+        
+        // 退勤時刻の差異を判定する関数（時間外データ取得後に呼び出される）
+        // 判定結果のみを保存し、自動確認は行わない
+        async function autoCheckClockOutTimeDifference(results) {
+            debugLog('autoCheckClockOutTimeDifference() 開始');
+            
+            for (const item of results) {
+                const employeeId = item.employee_id;
+                const workDate = item.work_date;
+                const alerts = item.alerts || [];
+                
+                // 「退勤時刻に差異あり」アラートをチェック
+                const hasClockOutTimeDiff = alerts.some(alert => {
+                    const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                    return alertStr.includes('退勤時刻に差異あり');
+                });
+                
+                if (!hasClockOutTimeDiff) continue;
+                
+                // 時間外データをチェック
+                const overtime = overtimeDataMap[workDate];
+                if (!overtime || !overtime.end_time) continue;
+                
+                // 退勤打刻時刻を取得
+                const validTimes = getValidClockTimes(item.attendance_records || [], item.work_type, item.work_date, results, item);
+                const clockOutTime = validTimes.clockOut;
+                
+                if (!clockOutTime) continue;
+                
+                // 時間外の終了時刻と退勤打刻時刻を比較（許容範囲：±20分）
+                const timeDiff = compareTimes(overtime.end_time, clockOutTime);
+                debugLog('退勤時刻比較:', { workDate, overtimeEnd: overtime.end_time, clockOut: clockOutTime, diff: timeDiff });
+                
+                // 判定結果を保存（「退勤」と判定）
+                if (Math.abs(timeDiff) <= 20) {
+                    item._clockOutTimeDiffDetected = true;
+                    item._clockOutTimeDiffType = '退勤';
+                    debugLog('退勤時刻差異が許容範囲内（判定: 退勤）:', { workDate, diff: timeDiff });
+                }
+            }
+            
+            debugLog('autoCheckClockOutTimeDifference() 完了');
+        }
+        
+        // 時間差異を自動確認する関数
+        async function autoConfirmTimeDifference(employeeId, workDate, notes = '時間外時刻と一致（自動確認）') {
+            try {
+                const response = await AttendanceSystem.API.Check.updateStatus({
+                    employee_num: employeeId,
+                    work_date: workDate,
+                    check_type: CheckType.TIME_DIFFERENCE,
+                    is_checked: true,
+                    notes: notes
+                });
+                
+                if (response.success) {
+                    debugLog('時間差異を自動確認:', { employeeId, workDate, notes });
+                    // アラートを再描画して確認済み状態を反映
+                    const searchResults = AttendanceSystem.Search.searchResults || [];
+                    const item = searchResults.find(r => r.employee_id === employeeId && r.work_date === workDate);
+                    if (item) {
+                        item._timeDiffChecked = true;
+                        item._timeDiffNotes = notes;
+                        const alertsCell = document.getElementById(`alerts-${workDate}`);
+                        if (alertsCell) {
+                            const newAlertsHtml = formatAlertsWithOvertimeCheck(item, item.alerts || []);
+                            alertsCell.innerHTML = newAlertsHtml;
+                        }
+                    }
+                } else {
+                    console.error('[autoConfirmTimeDifference] APIエラー:', response.message);
+                }
+            } catch (error) {
+                console.error('[autoConfirmTimeDifference] エラー:', error);
+                throw error;
+            }
         }
         
         // 「時間外なし」チェックボックスの変更ハンドラー
@@ -1121,70 +1317,26 @@
             const workDate = item.work_date;
             const employeeId = item.employee_id;
             
-            // 打刻漏れ関連のアラートをチェック（出勤・退勤別に）
-            // 「打刻漏れ」のみを対象とし、「時刻に差異あり」は除外する
-            const checkinAlerts = alerts.filter(alert => {
-                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                return alertStr.includes('出勤打刻漏れ');
-            });
+            // 判定結果を表示（チェックボックスは撤去）
+            const results = [];
             
-            const checkoutAlerts = alerts.filter(alert => {
-                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                return alertStr.includes('退勤打刻漏れ');
-            });
-            
-            const hasCheckinAlert = checkinAlerts.length > 0;
-            const hasCheckoutAlert = checkoutAlerts.length > 0;
-            
-            if (!hasCheckinAlert && !hasCheckoutAlert) {
-                return '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
+            // 出勤時刻の差異判定結果
+            if (item._clockInTimeDiffDetected === true) {
+                results.push(`<span style="color: #dc3545; font-size: 0.8em;">${item._clockInTimeDiffType || '出勤'}</span>`);
             }
             
-            // localStorageから既存の申告状態を取得
-            const checkinKey = `punch_report_${employeeId}_${workDate}_checkin`;
-            const checkoutKey = `punch_report_${employeeId}_${workDate}_checkout`;
-            const hasCheckinReport = localStorage.getItem(checkinKey) !== null;
-            const hasCheckoutReport = localStorage.getItem(checkoutKey) !== null;
+            // 退勤時刻の差異判定結果
+            if (item._clockOutTimeDiffDetected === true) {
+                results.push(`<span style="color: #28a745; font-size: 0.8em;">${item._clockOutTimeDiffType || '退勤'}</span>`);
+            }
             
-            // 既に申告されている場合は非表示にする
-            const checkinDisplay = (hasCheckinAlert && !hasCheckinReport) ? '' : 'display: none;';
-            const checkoutDisplay = (hasCheckoutAlert && !hasCheckoutReport) ? '' : 'display: none;';
-            
-            // 両方非表示の場合は「対象なし」を返す
-            if (checkinDisplay.includes('none') && checkoutDisplay.includes('none')) {
+            if (results.length === 0) {
                 return '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
             }
             
             return `
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
-                    ${hasCheckinAlert ? `
-                    <label style="display: flex; align-items: center; gap: 3px; font-size: 0.8em; cursor: pointer; ${checkinDisplay}">
-                        <input type="checkbox" 
-                               id="punch-leak-checkin-${employeeId}-${workDate}" 
-                               class="punch-report-checkbox" 
-                               data-employee="${employeeId}" 
-                               data-date="${workDate}" 
-                               data-type="checkin"
-                               style="margin: 0;"
-                               ${hasCheckinReport ? 'checked' : ''}
-                               onchange="handlePunchReportChange(this)">
-                        <span style="color: #dc3545;">出勤</span>
-                    </label>
-                    ` : ''}
-                    ${hasCheckoutAlert ? `
-                    <label style="display: flex; align-items: center; gap: 3px; font-size: 0.8em; cursor: pointer; ${checkoutDisplay}">
-                        <input type="checkbox" 
-                               id="punch-leak-checkout-${employeeId}-${workDate}" 
-                               class="punch-report-checkbox" 
-                               data-employee="${employeeId}" 
-                               data-date="${workDate}" 
-                               data-type="checkout"
-                               style="margin: 0;"
-                               ${hasCheckoutReport ? 'checked' : ''}
-                               onchange="handlePunchReportChange(this)">
-                        <span style="color: #28a745;">退勤</span>
-                    </label>
-                    ` : ''}
+                    ${results.join('')}
                 </div>
             `;
         }

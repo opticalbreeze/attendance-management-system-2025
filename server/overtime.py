@@ -331,7 +331,7 @@ def calculate_night_overtime(start_time, end_time):
 # time_to_minutesとcalculate_duration_minutesはutils.pyからインポート（重複を避けるため）
 
 def insert_overtime_application(employee_num, employee_name, application_date, work_date, 
-                                 start_time, end_time, description=''):
+                                 start_time, end_time, description='', actual_work_minutes=0):
     """
     時間外申告を登録
     
@@ -343,6 +343,7 @@ def insert_overtime_application(employee_num, employee_name, application_date, w
         start_time: 開始時刻
         end_time: 終了時刻
         description: 作業内容
+        actual_work_minutes: 実働時間（分）
     
     Returns:
         int: 登録されたIDまたはNone
@@ -354,7 +355,7 @@ def insert_overtime_application(employee_num, employee_name, application_date, w
             return None
         
         # 時間外の分類を計算
-        logger.info(f"[時間外申告登録] 開始: 従業員={employee_num}, 作業日={work_date}, 時間={start_time}-{end_time}")
+        logger.info(f"[時間外申告登録] 開始: 従業員={employee_num}, 作業日={work_date}, 時間={start_time}-{end_time}, 実働時間={actual_work_minutes}分")
         categories = calculate_overtime_categories(employee_num, work_date, start_time, end_time)
         logger.info(f"[時間外申告登録] 計算結果: type={categories['overtime_type']}, inner={categories['inner_overtime_minutes']}分, outer={categories['outer_overtime_minutes']}分, night={categories['night_overtime_minutes']}分")
         
@@ -368,8 +369,8 @@ def insert_overtime_application(employee_num, employee_name, application_date, w
                     employee_num, employee_name, application_date, work_date,
                     start_time, end_time, description, status,
                     overtime_type, inner_overtime_minutes, outer_overtime_minutes, night_overtime_minutes,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+                    actual_work_minutes, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
             """, (
                 str(employee_num), employee_name, application_date, work_date,
                 start_time, end_time, description,
@@ -377,11 +378,12 @@ def insert_overtime_application(employee_num, employee_name, application_date, w
                 categories['inner_overtime_minutes'],
                 categories['outer_overtime_minutes'],
                 categories['night_overtime_minutes'],
+                actual_work_minutes,
                 now, now
             ))
             
             overtime_id = cursor.lastrowid
-            logger.info(f"時間外申告登録: ID={overtime_id}, 従業員={employee_name}, 作業日={work_date}, 時間={start_time}-{end_time}")
+            logger.info(f"時間外申告登録: ID={overtime_id}, 従業員={employee_name}, 作業日={work_date}, 時間={start_time}-{end_time}, 実働時間={actual_work_minutes}分")
             return overtime_id
         
     except Exception as e:

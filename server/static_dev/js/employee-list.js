@@ -78,6 +78,13 @@ function updateEmployeeList(employeeSelectId, sectionSelectId, defaultOptionText
     
     const selectedSection = sectionSelect.value;
     
+    // URLパラメータから従業員IDを取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlEmployeeId = urlParams.get('employee_id');
+    
+    // 現在選択されている値を保存（URLパラメータがない場合のため）
+    const currentSelectedValue = urlEmployeeId ? null : (employeeSelect.value || null);
+    
     employeeSelect.innerHTML = `<option value="">▼ ${defaultOptionText}</option>`;
     
     // 名前空間データを優先、フォールバックでグローバル変数を使用
@@ -104,8 +111,21 @@ function updateEmployeeList(employeeSelectId, sectionSelectId, defaultOptionText
         option.textContent = `${emp.employee_num} - ${emp.name || '名前なし'}`;
         option.dataset.employeeName = emp.name || '';
         option.dataset.section = emp.section || '設備';
+        
+        // URLパラメータで指定された従業員IDを優先して選択
+        if (urlEmployeeId && emp.employee_num === urlEmployeeId) {
+            option.selected = true;
+        }
+        
         employeeSelect.appendChild(option);
     });
+    
+    // 選択値を設定（URLパラメータを最優先、なければ現在の選択を維持）
+    if (urlEmployeeId) {
+        employeeSelect.value = urlEmployeeId;
+    } else if (currentSelectedValue && currentSelectedValue !== '') {
+        employeeSelect.value = currentSelectedValue;
+    }
 }
 
 /**

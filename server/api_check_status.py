@@ -23,7 +23,6 @@ logger = setup_logger(__name__)
 check_status_bp = Blueprint('check_status', __name__)
 
 @check_status_bp.route('/api/attendance-check-status', methods=['GET'])
-@login_required
 def get_check_status():
     """
     打刻チェック状況を取得
@@ -88,7 +87,6 @@ def get_check_status():
         return jsonify(response), 500
 
 @check_status_bp.route('/api/attendance-check-status', methods=['POST'])
-@login_required
 def update_check_status():
     """
     打刻チェック状況を更新
@@ -177,7 +175,6 @@ def update_check_status():
         return jsonify(response), 500
 
 @check_status_bp.route('/api/test-check-status', methods=['GET'])
-@login_required
 def test_check_status():
     """
     テスト用: 2025年12月度のチェックデータを確認

@@ -78,7 +78,8 @@ def register_leave_api_routes(app):
                         filename_prefix='休暇願',
                         employee_num=str(employee_num),
                         date_str=leave_date_from,
-                        employee_name=employee_name
+                        employee_name=employee_name,
+                        document_id=leave_id
                     )
                     
                     if pdf_result['success']:
@@ -219,7 +220,8 @@ def register_leave_api_routes(app):
                 filename_prefix='休暇願',
                 employee_num=str(employee_num),
                 date_str=leave_date_from,
-                employee_name=employee_name
+                employee_name=employee_name,
+                document_id=leave_id
             )
             
             if result['success']:

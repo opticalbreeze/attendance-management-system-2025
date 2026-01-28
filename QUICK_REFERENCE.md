@@ -35,6 +35,21 @@ docker-compose logs -f
 | 勤怠チェック | http://localhost:5000/check |
 | 時間外申告 | http://localhost:5000/overtime |
 | 時間外一覧 | http://localhost:5000/overtime/list |
+| 管理者ページ | http://localhost:5000/admin |
+| **管理者ページ（隠し機能付き）** | **http://localhost:5000/admin?hidden=true** |
+
+### 🔒 管理者ページの隠し機能
+
+管理者ページに`?hidden=true`クエリパラメータを付けると、通知除外設定機能が表示されます。
+
+**URL:**
+- 開発環境: `http://localhost:5001/admin?hidden=true`
+- 本番環境: `http://localhost:5000/admin?hidden=true`
+
+**機能:**
+- お知らせ通知を送信しない従業員をチェックボックスで選択
+- 選択した従業員にはお知らせ通知が送信されません
+- 設定は`/api/notifications/exclusions` APIで管理されます
 
 ---
 

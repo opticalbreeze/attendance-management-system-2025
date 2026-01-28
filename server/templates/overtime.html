@@ -6,7 +6,7 @@
     <title>時間外作業申告 - 打刻システム</title>
     <!-- html2pdf.js ライブラリ（ローカルファイル） -->
     <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
-    <!-- 共通JavaScriptライブラリ（AttendanceSystem.Dataの初期化） -->
+    <!-- 共通ライブラリ（AttendanceSystem初期化） -->
     <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
     <!-- 統合APIサービス -->
     <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
@@ -472,15 +472,17 @@
         // 従業員リスト取得
         async function loadEmployees() {
             try {
-                const response = await AttendanceSystem.API.Employees.getAll();
+                const response = await fetch('/api/employees');
+                const result = await response.json();
 
-                if (response.success) {
-                    allEmployees = response.data;
-                    employees = response.data;
+                if (result.status === 'success' && result.data) {
+                    // 全従業員データを保存
+                    allEmployees = result.data;
+                    employees = result.data;
                     
                     // セクション一覧を取得・設定
                     const sectionSelect = document.getElementById('sectionSelect');
-                    const sections = [...new Set(response.data.map(emp => emp.section || '設備'))].sort();
+                    const sections = [...new Set(result.data.map(emp => emp.section || '設備'))].sort();
                     sectionSelect.innerHTML = '<option value="">すべてのセクション</option>';
                     sections.forEach(section => {
                         const option = document.createElement('option');
@@ -492,11 +494,11 @@
                     // 従業員リストを更新
                     updateEmployeeList();
                 } else {
-                    showAlert('error', response.message || '従業員リストの取得に失敗しました');
+                    throw new Error(result.message || '従業員データの読み込みに失敗');
                 }
             } catch (error) {
                 console.error('従業員リスト取得エラー:', error);
-                showAlert('error', '従業員リストの取得中にエラーが発生しました');
+                showAlert('error', error.message || '従業員リストの取得に失敗しました');
             }
         }
         

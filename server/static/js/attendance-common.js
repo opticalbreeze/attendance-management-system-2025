@@ -3,6 +3,23 @@
  * 複数のページで使用される共通関数を集約
  */
 
+// グローバル名前空間オブジェクト
+window.AttendanceSystem = window.AttendanceSystem || {};
+
+// 各モジュールの名前空間を作成
+AttendanceSystem.Common = AttendanceSystem.Common || {};
+AttendanceSystem.Check = AttendanceSystem.Check || {};
+AttendanceSystem.Search = AttendanceSystem.Search || {};
+AttendanceSystem.Employee = AttendanceSystem.Employee || {};
+
+// 共通データ格納用
+AttendanceSystem.Data = {
+    employees: [],
+    searchResults: [],
+    overtimeData: {},
+    checkStatuses: {}
+};
+
 // チェックタイプ定数
 const CheckType = {
     MISSING_PUNCH: 'missing_punch',
@@ -181,11 +198,11 @@ function formatAttendanceTimes(attendanceRecords, workType, workDate, allResults
  */
 function formatAlerts(alerts) {
     if (!alerts || alerts.length === 0) {
-        return '<span style="color: #999;">-</span>';
+        return '<span style="color: #999;">正常</span>';
     }
     
     if (!Array.isArray(alerts)) {
-        return '<span style="color: #999;">-</span>';
+        return '<span style="color: #999;">正常</span>';
     }
     
     const formatted = alerts.map(alert => {
@@ -195,11 +212,21 @@ function formatAlerts(alerts) {
         
         const icon = alert.type === AlertType.ERROR ? '❌' : alert.type === AlertType.WARNING ? '⚠️' : 'ℹ️';
         const className = alert.type === AlertType.ERROR ? 'error' : alert.type === AlertType.WARNING ? 'warning' : 'info';
-        const title = alert.details ? `${alert.message}: ${alert.details}` : alert.message;
+        
+        // メッセージを統一的な表現に変換
+        let standardMessage = alert.message;
+        if (alert.message && alert.message.includes('打刻データを検索')) {
+            standardMessage = alert.message.replace('打刻データを検索', '勤怠データ確認');
+        }
+        if (alert.message && alert.message.includes('従業員勤怠確認')) {
+            standardMessage = alert.message.replace('従業員勤怠確認', '勤怠データ確認');
+        }
+        
+        const title = alert.details ? `${standardMessage}: ${alert.details}` : standardMessage;
         
         return `<div class="alert-item ${className}" title="${title.replace(/"/g, '&quot;')}">
             <span class="alert-icon">${icon}</span>
-            <span>${alert.message}</span>
+            <span>${standardMessage}</span>
         </div>`;
     }).join('');
     
@@ -291,5 +318,63 @@ function generateCheckStatusHTML(item, alerts) {
     
     html += '</div>';
     return html;
+}
+
+/**
+ * 24勤の退勤時刻を翌日の明に移動する処理
+ * @param {Array} results - 検索結果配列
+ * @returns {Array} 処理済み結果配列
+ */
+function processNightShiftEndTimes(results) {
+    const processedResults = [...results];
+    
+    for (let i = 0; i < processedResults.length; i++) {
+        const currentItem = processedResults[i];
+        
+        // 24勤の場合
+        if (currentItem.work_type && currentItem.work_type.includes('24勤')) {
+            // 翌日の明を探す
+            const currentDate = new Date(currentItem.work_date);
+            const nextDay = new Date(currentDate);
+            nextDay.setDate(currentDate.getDate() + 1);
+            const nextDateStr = nextDay.toISOString().split('T')[0];
+            
+            const nextDayOffItem = processedResults.find(item => 
+                item.work_date === nextDateStr && item.work_type === '明'
+            );
+            
+            if (nextDayOffItem && currentItem.end_time) {
+                // 24勤の退勤時刻を翌日の明に移動
+                nextDayOffItem.night_shift_end_time = currentItem.end_time;
+                nextDayOffItem.night_shift_work_type = currentItem.work_type;
+                
+                // 24勤の退勤時刻をクリア
+                currentItem.end_time = null;
+            }
+        }
+    }
+    
+    return processedResults;
+}
+
+/**
+ * 退勤時刻表示（24勤の場合は翌日明に表示）
+ * @param {Object} item - アイテムオブジェクト
+ * @returns {string} フォーマットされた退勤時刻
+ */
+function formatEndTime(item) {
+    // 明の行で、前日24勤の退勤時刻がある場合
+    if (item.work_type === '明' && item.night_shift_end_time) {
+        const timeStr = formatTime(item.night_shift_end_time);
+        return `${timeStr} <span style="color: #3498db; font-size: 0.8em;">(${item.night_shift_work_type}退勤)</span>`;
+    }
+    
+    // 24勤の場合は退勤時刻を表示しない（翌日明に移動済み）
+    if (item.work_type && item.work_type.includes('24勤')) {
+        return '<span style="color: #999; font-style: italic;">翌日明に表示</span>';
+    }
+    
+    // 通常勤務の場合はそのまま
+    return formatTime(item.end_time);
 }
 

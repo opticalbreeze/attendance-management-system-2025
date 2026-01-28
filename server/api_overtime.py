@@ -57,11 +57,18 @@ def register_overtime_api_routes(app):
                 start_time = entry.get('start_time')
                 end_time = entry.get('end_time')
                 description = entry.get('description', '')
+                actual_work_minutes = entry.get('actual_work_minutes', 0)
                 
                 if start_time and end_time:
                     overtime_id = insert_overtime_application(
-                        employee_num, employee_name, application_date, work_date,
-                        start_time, end_time, description
+                        employee_num=employee_num,
+                        employee_name=employee_name,
+                        application_date=application_date,
+                        work_date=work_date,
+                        start_time=start_time,
+                        end_time=end_time,
+                        description=description,
+                        actual_work_minutes=actual_work_minutes
                     )
                     if overtime_id:
                         created_ids.append(overtime_id)
@@ -77,13 +84,16 @@ def register_overtime_api_routes(app):
                         overtime_entries=overtime_entries
                     )
                     
+                    # 最初の作成されたIDを使用（複数の場合は最初の1つ）
+                    first_overtime_id = created_ids[0] if created_ids else None
                     pdf_result = save_pdf_from_html(
                         html_content=html_content,
                         filename_prefix='時間外',
                         employee_num=str(employee_num),
                         date_str=work_date,
                         employee_name=employee_name,
-                        additional_css='.overtime-item { border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }'
+                        additional_css='.overtime-item { border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }',
+                        document_id=first_overtime_id
                     )
                     
                     if pdf_result['success']:
@@ -249,7 +259,8 @@ def register_overtime_api_routes(app):
                 employee_num=str(employee_num),
                 date_str=work_date,
                 employee_name=employee_name,
-                additional_css='.overtime-item { border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }'
+                additional_css='.overtime-item { border: 1px solid #000; padding: 10pt; margin-bottom: 10pt; page-break-inside: avoid; }',
+                document_id=overtime_id
             )
             
             if result['success']:

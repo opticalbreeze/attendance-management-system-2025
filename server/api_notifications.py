@@ -80,8 +80,18 @@ def save_acknowledged_notifications(acknowledged_set: set):
 
 def load_notification_exclusions() -> set:
     """通知除外リストを読み込み"""
-    # 複数のパスを試す
-    file_paths = [EXCLUSIONS_FILE, EXCLUSIONS_FILE_CONTAINER]
+    # コンテナ内パスを優先（マウントされているパス）
+    # docker-compose.ymlで /app/notification_exclusions.json にマウントされている
+    # EXCLUSIONS_FILE (/app/../notification_exclusions.json) は間違ったパスになるため、コンテナ内パスを優先
+    file_paths = [EXCLUSIONS_FILE_CONTAINER, EXCLUSIONS_FILE]
+    
+    # デバッグ: 実際のパスを確認
+    logger.info(f"[除外リスト読み込み] 試行パス1: {EXCLUSIONS_FILE} (存在: {os.path.exists(EXCLUSIONS_FILE)}, ファイル: {os.path.isfile(EXCLUSIONS_FILE) if os.path.exists(EXCLUSIONS_FILE) else False})")
+    logger.info(f"[除外リスト読み込み] 試行パス2: {EXCLUSIONS_FILE_CONTAINER} (存在: {os.path.exists(EXCLUSIONS_FILE_CONTAINER)}, ファイル: {os.path.isfile(EXCLUSIONS_FILE_CONTAINER) if os.path.exists(EXCLUSIONS_FILE_CONTAINER) else False})")
+    logger.info(f"[除外リスト読み込み] __file__: {__file__}, os.path.dirname(__file__): {os.path.dirname(__file__)}")
+    
+    loaded_data = None
+    loaded_path = None
     
     for file_path in file_paths:
         try:
@@ -89,49 +99,103 @@ def load_notification_exclusions() -> set:
             if os.path.exists(file_path) and os.path.isfile(file_path):
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    excluded_set = set(data.get('excluded_employee_ids', []))
-                    logger.debug(f"除外リスト読み込み成功: {file_path} ({len(excluded_set)}件)")
-                    return excluded_set
+                    excluded_list = data.get('excluded_employee_ids', [])
+                    # 文字列セットに変換（型の不一致を防ぐ）
+                    excluded_set = {str(emp_id) for emp_id in excluded_list}
+                    logger.info(f"除外リスト読み込み成功: {file_path} ({len(excluded_set)}件) - 除外対象: {list(excluded_set)}")
+                    loaded_data = excluded_set
+                    loaded_path = file_path
+                    # 最初に見つかったファイルを優先
+                    break
             elif os.path.exists(file_path) and os.path.isdir(file_path):
                 logger.warning(f"除外リストパスがディレクトリです（スキップ）: {file_path}")
                 continue
+            else:
+                logger.debug(f"除外リストファイルが存在しません: {file_path}")
+        except json.JSONDecodeError as e:
+            logger.error(f"除外リストJSON解析エラー ({file_path}): {e}")
+            continue
         except Exception as e:
-            logger.warning(f"除外リスト読み込み試行失敗 ({file_path}): {e}")
+            logger.warning(f"除外リスト読み込み試行失敗 ({file_path}): {e}", exc_info=True)
             continue
     
-    logger.debug("除外リストファイルが見つかりません（空のセットを返します）")
-    return set()
+    if loaded_data is not None:
+        # ファイルは既にマウントされているため、同期は不要
+        # docker-compose.ymlとdocker-compose.dev.ymlで同じホスト側ファイルをマウントしている
+        logger.info(f"除外リスト読み込み完了: {len(loaded_data)}件 (読み込み元: {loaded_path})")
+        return loaded_data
+    
+    # ファイルが存在しない場合は空のファイルを作成（初期化）
+    logger.info(f"除外リストファイルが見つかりません。空のファイルを作成します。試行したパス: {file_paths}")
+    empty_set = set()
+    # 両方のパスに空のファイルを作成
+    for file_path in file_paths:
+        try:
+            if sync_exclusions_file(empty_set, file_path):
+                logger.info(f"空の除外リストファイルを作成: {file_path}")
+                break
+        except Exception as e:
+            logger.warning(f"空の除外リストファイル作成失敗 ({file_path}): {e}")
+            continue
+    
+    return empty_set
+
+def sync_exclusions_file(excluded_set: set, target_path: str):
+    """除外リストファイルを同期（内部関数）"""
+    try:
+        # パスがディレクトリの場合はスキップ
+        if os.path.exists(target_path) and os.path.isdir(target_path):
+            logger.warning(f"除外リスト同期パスがディレクトリです（スキップ）: {target_path}")
+            return False
+        
+        # ディレクトリが存在するか確認
+        dir_path = os.path.dirname(target_path)
+        if not os.path.exists(dir_path):
+            try:
+                os.makedirs(dir_path, exist_ok=True)
+                logger.info(f"除外リスト保存: ディレクトリ作成成功: {dir_path}")
+            except Exception as e:
+                logger.error(f"除外リスト保存: ディレクトリ作成失敗 ({dir_path}): {e}")
+                return False
+        
+        # ファイルを保存
+        data = {
+            'excluded_employee_ids': list(excluded_set),
+            'last_updated': datetime.now().isoformat()
+        }
+        with open(target_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.info(f"除外リスト同期成功: {target_path} ({len(excluded_set)}件) - 除外対象: {list(excluded_set)}")
+        return True
+    except PermissionError as e:
+        logger.error(f"除外リスト同期失敗（権限エラー） ({target_path}): {e}")
+        return False
+    except Exception as e:
+        logger.error(f"除外リスト同期失敗 ({target_path}): {e}", exc_info=True)
+        return False
 
 def save_notification_exclusions(excluded_set: set):
     """通知除外リストを保存"""
-    # 複数のパスを試す（最初に存在するパスに保存）
-    file_paths = [EXCLUSIONS_FILE, EXCLUSIONS_FILE_CONTAINER]
+    # docker-compose.ymlとdocker-compose.dev.ymlで同じホスト側ファイルをマウントしているため、
+    # /app/notification_exclusions.json に保存すれば両方のコンテナで自動的に反映される
+    # コンテナ内パス（/app/notification_exclusions.json）を優先して保存
+    file_paths = [EXCLUSIONS_FILE_CONTAINER, EXCLUSIONS_FILE]
     
+    saved_count = 0
+    saved_paths = []
     for file_path in file_paths:
-        try:
-            # パスがディレクトリの場合はスキップ
-            if os.path.exists(file_path) and os.path.isdir(file_path):
-                logger.warning(f"除外リスト保存パスがディレクトリです（スキップ）: {file_path}")
-                continue
-            
-            # ディレクトリが存在するか確認
-            dir_path = os.path.dirname(file_path)
-            if not os.path.exists(dir_path):
-                os.makedirs(dir_path, exist_ok=True)
-            
-            data = {
-                'excluded_employee_ids': list(excluded_set),
-                'last_updated': datetime.now().isoformat()
-            }
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            logger.info(f"通知除外リストを保存: {file_path} ({len(excluded_set)}件)")
-            return
-        except Exception as e:
-            logger.warning(f"除外リスト保存試行失敗 ({file_path}): {e}")
-            continue
+        if sync_exclusions_file(excluded_set, file_path):
+            saved_count += 1
+            saved_paths.append(file_path)
+            logger.info(f"通知除外リストを保存: {file_path} ({len(excluded_set)}件) - 除外対象: {list(excluded_set)}")
+            # マウントされているパスに保存できた場合は、それで十分（両方のコンテナで共有される）
+            if file_path == EXCLUSIONS_FILE_CONTAINER:
+                break
     
-    logger.error(f"除外リスト保存に失敗しました。試行したパス: {file_paths}")
+    if saved_count == 0:
+        logger.error(f"除外リスト保存に失敗しました。試行したパス: {file_paths}")
+    else:
+        logger.info(f"除外リスト保存成功: {saved_count}箇所 - {', '.join(saved_paths)}")
 
 @notification_bp.route('/api/notifications', methods=['GET'])
 def get_notifications():
@@ -146,15 +210,27 @@ def get_notifications():
         acknowledged_notifications = load_acknowledged_notifications()
         excluded_employee_ids = load_notification_exclusions()
         
-        # デバッグログ
-        logger.info(f"通知API: 全通知={len(all_notifications)}件, 除外リスト={len(excluded_employee_ids)}件, 除外対象={list(excluded_employee_ids)}")
+        # デバッグログ（常に詳細ログを出力）
+        logger.info(f"[通知API] リクエスト受信: employee_id={employee_id}, include_acknowledged={include_acknowledged}")
+        logger.info(f"[通知API] 全通知={len(all_notifications)}件, 除外リスト={len(excluded_employee_ids)}件")
+        if excluded_employee_ids:
+            logger.info(f"[通知API] 除外リスト内容: {list(excluded_employee_ids)}")
+        else:
+            logger.warning(f"[通知API] 除外リストが空です")
         
         # フィルタリング
         filtered_notifications = []
         excluded_count = 0
         acknowledged_count = 0
         
+        # 除外リストを文字列セットに変換（一度だけ実行）
+        excluded_str_set = {str(emp_id) for emp_id in excluded_employee_ids} if excluded_employee_ids else set()
+        logger.info(f"[通知API] 除外リスト（文字列セット）: {excluded_str_set}")
+        
         for notification in all_notifications:
+            notification_emp_id = str(notification.get('employee_id', ''))
+            notification_emp_name = notification.get('employee_name', '不明')
+            
             # 確認済みフィルター
             if not include_acknowledged and notification['id'] in acknowledged_notifications:
                 acknowledged_count += 1
@@ -164,19 +240,20 @@ def get_notifications():
             if employee_id and notification['employee_id'] != employee_id:
                 continue
             
-            # 除外リストフィルター（隠し機能）
-            # employee_idを文字列に変換して比較（型の不一致を防ぐ）
-            notification_emp_id = str(notification.get('employee_id', ''))
-            # 除外リストも文字列セットに変換
-            excluded_str_set = {str(emp_id) for emp_id in excluded_employee_ids}
-            if notification_emp_id in excluded_str_set:
-                excluded_count += 1
-                logger.debug(f"通知除外: employee_id={notification_emp_id} が除外リストに含まれています")
-                continue
+            # 除外リストフィルター（除外リストが空でない場合のみチェック）
+            if excluded_str_set:
+                if notification_emp_id in excluded_str_set:
+                    excluded_count += 1
+                    logger.info(f"[通知API] 通知除外実行: employee_id={notification_emp_id} ({notification_emp_name}) が除外リストに含まれています")
+                    continue
+                else:
+                    logger.debug(f"[通知API] 通知通過: employee_id={notification_emp_id} ({notification_emp_name}) は除外リストに含まれていません")
             
             filtered_notifications.append(notification)
         
-        logger.info(f"通知API: 全{len(all_notifications)}件 → 確認済み{acknowledged_count}件, 除外{excluded_count}件 → 返却{len(filtered_notifications)}件 (employee_id={employee_id})")
+        logger.info(f"[通知API] フィルタリング結果: 全{len(all_notifications)}件 → 確認済み{acknowledged_count}件, 除外{excluded_count}件 → 返却{len(filtered_notifications)}件")
+        if employee_id:
+            logger.info(f"[通知API] クライアントPC用リクエスト: employee_id={employee_id} の通知={len([n for n in filtered_notifications if str(n.get('employee_id', '')) == str(employee_id)])}件")
         
         return jsonify({
             'status': 'success',
@@ -302,13 +379,30 @@ def get_notification_stats():
 def get_notification_exclusions():
     """通知除外リストを取得"""
     try:
+        # デバッグ: API呼び出しを確実にログに記録
+        logger.info("=" * 80)
+        logger.info("[除外リスト取得API] API呼び出し受信")
+        logger.info(f"[除外リスト取得API] EXCLUSIONS_FILE: {EXCLUSIONS_FILE}")
+        logger.info(f"[除外リスト取得API] EXCLUSIONS_FILE_CONTAINER: {EXCLUSIONS_FILE_CONTAINER}")
+        
         excluded_employee_ids = load_notification_exclusions()
+        
+        logger.info(f"[除外リスト取得API] 除外リスト件数: {len(excluded_employee_ids)}件, 内容: {list(excluded_employee_ids)}")
+        logger.info("=" * 80)
+        
         return jsonify({
             'status': 'success',
-            'excluded_employee_ids': list(excluded_employee_ids)
+            'excluded_employee_ids': list(excluded_employee_ids),
+            'count': len(excluded_employee_ids),
+            'debug': {
+                'exclusions_file': EXCLUSIONS_FILE,
+                'exclusions_file_container': EXCLUSIONS_FILE_CONTAINER,
+                'exclusions_file_exists': os.path.exists(EXCLUSIONS_FILE) and os.path.isfile(EXCLUSIONS_FILE),
+                'exclusions_file_container_exists': os.path.exists(EXCLUSIONS_FILE_CONTAINER) and os.path.isfile(EXCLUSIONS_FILE_CONTAINER)
+            }
         })
     except Exception as e:
-        logger.error(f"通知除外リスト取得APIエラー: {e}")
+        logger.error(f"通知除外リスト取得APIエラー: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -358,6 +452,47 @@ def health_check():
         'status': 'ok',
         'timestamp': datetime.now().isoformat()
     })
+
+@notification_bp.route('/api/notifications/debug', methods=['GET'])
+def debug_notifications():
+    """デバッグ用: 除外リストと通知の状態を確認"""
+    try:
+        excluded_employee_ids = load_notification_exclusions()
+        all_notifications = load_notification_data()
+        
+        # 除外リストに含まれる従業員の通知を確認
+        excluded_notifications = []
+        for notification in all_notifications:
+            notification_emp_id = str(notification.get('employee_id', ''))
+            if notification_emp_id in excluded_employee_ids:
+                excluded_notifications.append({
+                    'id': notification['id'],
+                    'employee_id': notification_emp_id,
+                    'employee_name': notification.get('employee_name', '不明'),
+                    'message': notification.get('message', ''),
+                    'work_date': notification.get('work_date', '')
+                })
+        
+        return jsonify({
+            'status': 'success',
+            'excluded_employee_ids': list(excluded_employee_ids),
+            'excluded_count': len(excluded_employee_ids),
+            'total_notifications': len(all_notifications),
+            'excluded_notifications': excluded_notifications,
+            'excluded_notifications_count': len(excluded_notifications),
+            'file_paths': {
+                'container': EXCLUSIONS_FILE_CONTAINER,
+                'host': EXCLUSIONS_FILE,
+                'container_exists': os.path.exists(EXCLUSIONS_FILE_CONTAINER) and os.path.isfile(EXCLUSIONS_FILE_CONTAINER),
+                'host_exists': os.path.exists(EXCLUSIONS_FILE) and os.path.isfile(EXCLUSIONS_FILE)
+            }
+        })
+    except Exception as e:
+        logger.error(f"デバッグAPIエラー: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 def register_notification_api_routes(app):
     """通知APIルートを登録"""
