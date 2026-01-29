@@ -22,27 +22,7 @@ from database import get_db_connection, get_attendance_check_status
 from attendance_check_service import check_attendance_vs_schedule
 from validation_utils import calculate_date_range
 from constants import AttendanceConstants
-
-def get_check_type_from_alert(message: str) -> str:
-    """アラートメッセージからcheck_typeを判定"""
-    if not message:
-        return None
-    
-    # 打刻漏れ関連
-    if ('打刻漏れ' in message or 
-        '打刻なし' in message or 
-        '遅刻なのに退勤' in message or
-        '退勤' in message and ('漏れ' in message or 'なし' in message)):
-        return 'punch_leak'
-    
-    # 時刻差異関連
-    if ('時刻に差異あり' in message or 
-        '出退勤時刻に差異あり' in message or
-        '出勤時刻に差異あり' in message or
-        '退勤時刻に差異あり' in message):
-        return 'time_difference'
-    
-    return None
+from alert_utils import classify_error_type_from_alert
 
 def is_checked(employee_id: str, work_date: str, check_type: str) -> bool:
     """attendance_check_statusテーブルでチェック済みかどうかを確認"""
@@ -148,7 +128,8 @@ def main():
                     for alert in alerts:
                         if alert['type'] in ['error', 'warning']:
                             alert_message = alert.get('message', '')
-                            check_type = get_check_type_from_alert(alert_message)
+                            # 共通関数を使用してエラータイプを判定
+                            check_type = classify_error_type_from_alert(alert)
                             
                             if check_type:
                                 is_checked_flag = is_checked(str(employee_id), work_date, check_type)

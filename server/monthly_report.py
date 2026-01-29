@@ -15,6 +15,12 @@ from database import get_attendance_check_status
 from attendance_check_service import check_attendance_vs_schedule
 from utils import calculate_date_range, time_to_minutes, get_db_connection
 from constants import AttendanceConstants
+from alert_utils import (
+    get_error_types_from_alerts,
+    has_clock_in_leak_alert,
+    has_clock_out_leak_alert,
+    has_missing_punch_alert
+)
 from work_type_constants import (
     is_off_day_shift,
     is_24hour_or_night_shift,
@@ -547,17 +553,8 @@ def generate_monthly_report_excel(employee_id, search_month, output_path=None):
             check_statuses = day_data.get('check_statuses', {})
             alerts = day_data.get('alerts', [])
             
-            # アラートが存在するチェックタイプのみカウント
-            error_types_with_alerts = set()
-            for alert in alerts:
-                message = alert.get('message', '')
-                if '打刻' in message or '差異' in message:
-                    if '出勤' in message or '退勤' in message:
-                        error_types_with_alerts.add('punch_leak')
-                    elif '差異' in message:
-                        error_types_with_alerts.add('time_difference')
-                    elif '打刻なし' in message or '打刻漏れ' in message:
-                        error_types_with_alerts.add('missing_punch')
+            # アラートが存在するチェックタイプのみカウント（共通関数を使用）
+            error_types_with_alerts = get_error_types_from_alerts(alerts)
             
             # 実際にアラートがあるエラータイプの確認状況のみをカウント
             checked_count = 0
@@ -1118,18 +1115,9 @@ def generate_all_employees_report_excel(search_month, employees):
                     
                     ws.cell(row=row, column=7, value=alert_text).font = Font(name='游ゴシック', size=10)
                     
-                    # 確認状況
+                    # 確認状況（共通関数を使用）
                     check_statuses = day_data.get('check_statuses', {})
-                    error_types_with_alerts = set()
-                    for alert in alerts:
-                        message = alert.get('message', '')
-                        if '打刻' in message or '差異' in message:
-                            if '出勤' in message or '退勤' in message:
-                                error_types_with_alerts.add('punch_leak')
-                            elif '差異' in message:
-                                error_types_with_alerts.add('time_difference')
-                            elif '打刻なし' in message or '打刻漏れ' in message:
-                                error_types_with_alerts.add('missing_punch')
+                    error_types_with_alerts = get_error_types_from_alerts(alerts)
                     
                     checked_count = 0
                     for check_type in error_types_with_alerts:
