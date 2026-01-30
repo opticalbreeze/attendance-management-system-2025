@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 勤怠管理システム共通JavaScriptライブラリ
  * 複数のページで使用される共通関数を集約
  */
@@ -160,14 +160,25 @@ function formatAttendanceTimes(attendanceRecords, workType, workDate, allResults
         return '<span class="no-attendance">打刻なし</span>';
     }
     
-    // 有効な出勤・退勤時刻を判定
-    const validTimes = getValidClockTimes(attendanceRecords, workType, workDate, allResults, item);
+    // 同じ時刻の打刻を除外（最初の1つだけを残す）
+    const uniqueRecords = [];
+    const seenTimes = new Set();
+    for (const record of attendanceRecords) {
+        const timeStr = record.time_only;
+        if (!seenTimes.has(timeStr)) {
+            seenTimes.add(timeStr);
+            uniqueRecords.push(record);
+        }
+    }
+    
+    // 有効な出勤・退勤時刻を判定（重複除外後のデータを使用）
+    const validTimes = getValidClockTimes(uniqueRecords, workType, workDate, allResults, item);
     
     // 有効な打刻のみをフィルタリング（attendance_check.htmlの場合）
-    const validRecords = item ? attendanceRecords.filter(record => {
+    const validRecords = item ? uniqueRecords.filter(record => {
         const timeStr = record.time_only;
         return validTimes.clockIn === timeStr || validTimes.clockOut === timeStr;
-    }) : attendanceRecords;
+    }) : uniqueRecords;
     
     const timeSpans = validRecords.map(record => {
         const timeStr = record.time_only;

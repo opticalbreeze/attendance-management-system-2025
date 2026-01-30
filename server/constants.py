@@ -84,7 +84,7 @@ class AttendanceConstants:
     """勤怠チェック関連の定数（統一化）"""
     # 閾値設定
     TIME_DIFF_THRESHOLD = 30  # 時刻差異の閾値（分）
-    TOLERANCE_MINUTES = 15    # 許容時間差（分）
+    TOLERANCE_MINUTES = 30    # 許容時間差（分）
     DEFAULT_LIMIT = 100       # デフォルト取得件数
     
     # 時間計算用定数

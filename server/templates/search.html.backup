@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>勤怠スケジュール検索</title>
+    <title>????</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/minimal-ui.css') }}">
     <style>
         .search-form {
@@ -69,18 +69,18 @@
             font-weight: 400;
         }
         
-        /* 列幅の最適化 */
-        .results-table th:nth-child(1) { width: 80px; }  /* 従業員ID */
-        .results-table th:nth-child(2) { width: 100px; } /* 従業員名 */
-        .results-table th:nth-child(3) { width: 90px; }  /* 勤務日 */
-        .results-table th:nth-child(4) { width: 90px; }  /* 勤務タイプ */
-        .results-table th:nth-child(5) { width: 70px; }  /* 開始時刻 */
-        .results-table th:nth-child(6) { width: 70px; }  /* 終了時刻 */
-        .results-table th:nth-child(7) { width: 120px; } /* 打刻時間 */
-        .results-table th:nth-child(8) { width: 150px; } /* エラー */
-        .results-table th:nth-child(9) { width: 80px; } /* 時間外 */
-        .results-table th:nth-child(10) { width: 80px; } /* 休暇 */
-        .results-table th:nth-child(11) { width: 100px; } /* 打刻申告 */
+        /* ???? */
+        .results-table th:nth-child(1) { width: 80px; }  /* ???ID */
+        .results-table th:nth-child(2) { width: 100px; } /* ?? */
+        .results-table th:nth-child(3) { width: 90px; }  /* ?? */
+        .results-table th:nth-child(4) { width: 90px; }  /* ???? */
+        .results-table th:nth-child(5) { width: 70px; }  /* ?? */
+        .results-table th:nth-child(6) { width: 70px; }  /* ?? */
+        .results-table th:nth-child(7) { width: 120px; } /* ???? */
+        .results-table th:nth-child(8) { width: 150px; } /* ?? */
+        .results-table th:nth-child(9) { width: 80px; } /* ???? */
+        .results-table th:nth-child(10) { width: 80px; } /* ?? */
+        .results-table th:nth-child(11) { width: 100px; } /* ?? */
         
         .punch-report-cell {
             text-align: center;
@@ -154,50 +154,79 @@
             border: var(--border-width) solid var(--border-color);
             background: var(--bg-secondary);
         }
+        
+        /* ?????????? */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+            gap: var(--spacing-md);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: var(--font-size-md);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div style="margin-bottom: var(--spacing-md);">
-            <a href="/" class="back-link">トップページに戻る</a>
-            <a href="/check" class="back-link" style="margin-left: var(--spacing-md);">勤怠チェック</a>
-            <a href="/admin" class="back-link" style="margin-left: var(--spacing-md);">管理者ページ</a>
+            <a href="/" class="back-link">??????</a>
+            <a href="/check" class="back-link" style="margin-left: var(--spacing-md);">??????</a>
+            <a href="/admin" class="back-link" style="margin-left: var(--spacing-md);">????</a>
         </div>
         
-        <h1>勤怠スケジュール検索</h1>
+        <h1>??????????</h1>
         
         <div class="search-form">
             <form id="search-form">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="section-select">セクション</label>
+                        <label for="section-select">?????</label>
                         <select id="section-select">
-                            <option value="">すべてのセクション</option>
+                            <option value="">?????????</option>
                         </select>
                         <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
-                            セクションで絞り込み
+                            ??????????
                         </small>
                     </div>
                     <div class="form-group">
-                        <label for="employee-id">従業員ID（必須）</label>
+                        <label for="employee-id">???ID????</label>
                         <select id="employee-id" name="employee_id" required>
-                            <option value="">▼ 従業員を読み込み中...</option>
+                            <option value="">? ?????????...</option>
                         </select>
                         <small id="employee-hint" style="color: #666; font-size: 0.8em; margin-top: 3px; display: none;">
-                            選択した従業員の詳細情報が表示されます
+                            ???????????????????
                         </small>
                     </div>
                     <div class="form-group">
-                        <label for="search-month">検索月（必須）</label>
-                        <input type="text" id="search-month" name="search_month" placeholder="例: 2025/12" value="" pattern="[0-9]{4}/[0-9]{1,2}" required>
+                        <label for="search-month">????</label>
+                        <input type="text" id="search-month" name="search_month" placeholder="?: 2025/12" value="" pattern="[0-9]{4}/[0-9]{1,2}" required>
                         <small style="color: #666; font-size: 0.8em; margin-top: 3px;">
-                            yyyy/mm形式で入力（前月16日〜当月15日を検索）
+                            yyyy/mm?????16?????15????
                         </small>
                     </div>
                 </div>
                 <div>
-                    <button type="submit" class="btn btn-search">🔍 検索</button>
-                    <button type="button" class="btn btn-clear" onclick="clearForm()">🔄 クリア</button>
+                    <button type="submit" class="btn btn-search">?? ??</button>
+                    <button type="button" class="btn btn-clear" onclick="clearForm()">?? ???</button>
                 </div>
             </form>
         </div>
@@ -206,33 +235,33 @@
         
         <div class="results-section" id="results-section" style="display: none;">
             <div class="results-header">
-                <div class="results-count" id="results-count">検索結果: 0 件</div>
+                <div class="results-count" id="results-count">??: 0 ?</div>
                 <div id="punch-report-summary" style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; display: none;">
                     <small style="color: #495057;">
-                        📝 打刻申告状況: <span id="punch-report-count" style="font-weight: bold; color: #007bff;">0件</span>
+                        ?? ??????: <span id="punch-report-count" style="font-weight: bold; color: #007bff;">0?</span>
                         <button style="margin-left: 10px; font-size: 0.8em; padding: 2px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;" 
-                                onclick="clearAllPunchReports()" title="すべての申告をクリア">全削除</button>
+                                onclick="clearAllPunchReports()" title="??????????">???</button>
                     </small>
                 </div>
-                <button class="btn-export" onclick="exportCSV()">CSV出力</button>
+                <button class="btn-export" onclick="exportCSV()">CSV??</button>
             </div>
             
             <div style="overflow-x: auto;">
                 <table class="results-table">
                     <thead>
                         <tr>
-                            <th>従業員ID</th>
-                            <th>従業員名</th>
-                            <th>勤務日 📅↑</th>
-                            <th>勤務タイプ</th>
-                            <th>開始時刻</th>
-                            <th>終了時刻</th>
-                            <th>実際の打刻時間 🕐</th>
-                            <th>エラー・警告</th>
-                            <th>チェック状況</th>
-                            <th>時間外申告</th>
-                            <th>休暇願</th>
-                            <th>打刻申告</th>
+                            <th>???ID</th>
+                            <th>??</th>
+                            <th>???</th>
+                            <th>????</th>
+                            <th>??</th>
+                            <th>??</th>
+                            <th>????</th>
+                            <th>??</th>
+                            <th>????</th>
+                            <th>??</th>
+                            <th>??</th>
+                            <th>??</th>
                         </tr>
                     </thead>
                     <tbody id="results-body">
@@ -242,27 +271,18 @@
         </div>
         
         <div id="loading" class="loading" style="display: none;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <div class="spinner" style="width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                <span style="font-size: 1.1em; color: #007bff; font-weight: bold;">検索中...</span>
-            </div>
+            <div class="spinner"></div>
+            <span class="loading-text">???</span>
         </div>
         
-        <style>
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        </style>
-        
         <div id="no-results" class="no-results" style="display: none;">
-            検索条件に一致するデータが見つかりませんでした。
+            ????????????????????????
         </div>
 
 
     </div>
     
-    <!-- 共通ライブラリを読み込み -->
+    <!-- ??????? -->
     <script src="{{ url_for('static', filename='js/attendance-common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/attendance-check.js') }}"></script>
     <script src="{{ url_for('static', filename='js/api-service.js') }}"></script>
@@ -270,232 +290,232 @@
     
     <script>
         // ============================================
-        // search.html 専用のJavaScript
+        // search.html ???JavaScript
         // ============================================
         
-        // 即座にログ出力（スクリプトが読み込まれたことを確認）
-        console.log('[search.html] ===== スクリプト開始 =====', new Date().toISOString());
+        // ??????????????????????????
+        console.log('[search.html] ===== ??????? =====', new Date().toISOString());
         
-        // デバッグモード（常に有効）
+        // ?????????????
         const DEBUG = true;
         function debugLog(...args) {
             console.log('[search.html]', new Date().toISOString(), ...args);
         }
         
-        // エラーログも出力
+        // ????????
         function debugError(...args) {
             console.error('[search.html ERROR]', new Date().toISOString(), ...args);
         }
         
-        // 初期化時にログ出力
-        debugLog('=== search.html スクリプト読み込み完了 ===');
+        // ?????????
+        debugLog('=== search.html ??????????? ===');
         
-        // AttendanceSystemが存在するか確認
+        // AttendanceSystem????????
         if (typeof AttendanceSystem === 'undefined') {
-            console.error('[search.html ERROR] AttendanceSystemが定義されていません。attendance-common.jsが読み込まれているか確認してください。');
-            // フォールバックとして作成
+            console.error('[search.html ERROR] AttendanceSystem???????????attendance-common.js???????????????????');
+            // ????????????
             window.AttendanceSystem = window.AttendanceSystem || {};
         }
         
-        // 名前空間を使用してグローバル変数の衝突を回避
+        // ??????????????????????
         AttendanceSystem.Search = AttendanceSystem.Search || {};
         AttendanceSystem.Search.searchResults = [];
         
-        // 後方互換性のため
-        // allEmployeesはemployee-list.jsで既にグローバル変数として定義されているため、ここでは再宣言しない
-        // searchResultsはAttendanceSystem.Search.searchResultsを直接使用（let宣言はしない）
-        // allEmployeesはemployee-list.jsから使用（グローバル変数として既に定義済み）
+        // ????????
+        // allEmployees?employee-list.js?????????????????????????????????
+        // searchResults?AttendanceSystem.Search.searchResults??????let???????
+        // allEmployees?employee-list.js??????????????????????
         
-        debugLog('スクリプト初期化完了');
-        console.log('[search.html] AttendanceSystem確認:', typeof AttendanceSystem !== 'undefined' ? 'OK' : 'NG');
+        debugLog('??????????');
+        console.log('[search.html] AttendanceSystem??:', typeof AttendanceSystem !== 'undefined' ? 'OK' : 'NG');
         
-        // 現在の日付から適切な月度を計算して設定
+        // ???????????????????
         function calculateCurrentPayrollMonth() {
-            debugLog('calculateCurrentPayrollMonth() 呼び出し');
+            debugLog('calculateCurrentPayrollMonth() ????');
             const today = new Date();
             const year = today.getFullYear();
-            const month = today.getMonth() + 1; // 0ベースなので+1
+            const month = today.getMonth() + 1; // 0??????+1
             const day = today.getDate();
             
-            // 16日以降なら翌月度、15日以前なら当月度
+            // 16?????????15????????
             if (day >= 16) {
-                // 翌月度
+                // ???
                 if (month === 12) {
                     return `${year + 1}/1`;
                 } else {
                     return `${year}/${month + 1}`;
                 }
             } else {
-                // 当月度
+                // ???
                 return `${year}/${month}`;
             }
         }
 
-        // DOMContentLoadedイベントの前にログ出力
-        console.log('[search.html] DOMContentLoadedリスナー設定前', new Date().toISOString());
+        // DOMContentLoaded???????????
+        console.log('[search.html] DOMContentLoaded???????', new Date().toISOString());
         
         document.addEventListener('DOMContentLoaded', async function() {
-            console.log('[search.html] ===== DOMContentLoaded イベント発火 =====', new Date().toISOString());
-            debugLog('=== DOMContentLoaded イベント発火 ===');
-            debugLog('現在のURL:', window.location.href);
-            debugLog('URLパラメータ:', window.location.search);
+            console.log('[search.html] ===== DOMContentLoaded ?????? =====', new Date().toISOString());
+            debugLog('=== DOMContentLoaded ?????? ===');
+            debugLog('???URL:', window.location.href);
+            debugLog('URL?????:', window.location.search);
             
             try {
-                // 従業員情報を動的に読み込み（統一APIサービス使用）
-                debugLog('従業員情報の読み込み開始');
-                await loadEmployees('employee-id', 'section-select', '従業員を選択してください', function(employees) {
-                    debugLog('従業員情報読み込み完了:', employees.length, '名');
-                    debugLog('従業員データサンプル:', employees.slice(0, 3));
-                    // ヒント表示を有効化
+                // ????????????????API???????
+                debugLog('????????????');
+                await loadEmployees('employee-id', 'section-select', '????????????', function(employees) {
+                    debugLog('???????????:', employees.length, '?');
+                    debugLog('??????????:', employees.slice(0, 3));
+                    // ?????????
                     const employeeHint = document.getElementById('employee-hint');
                     if (employeeHint) {
                         employeeHint.style.display = 'block';
-                        employeeHint.textContent = `${employees.length}名の従業員が読み込まれました`;
+                        employeeHint.textContent = `${employees.length}??????????????`;
                     }
                 });
                 
-                // セクション変更時に従業員リストを更新
-                setupSectionChangeListener('employee-id', 'section-select', '従業員を選択してください');
-                debugLog('セクション変更リスナー設定完了');
+                // ??????????????????
+                setupSectionChangeListener('employee-id', 'section-select', '????????????');
+                debugLog('???????????????');
                 
-                // 現在の日付から適切な月度を計算して設定
+                // ???????????????????
                 const currentMonth = calculateCurrentPayrollMonth();
                 const monthInput = document.getElementById('search-month');
                 if (monthInput) {
                     monthInput.value = currentMonth;
-                    debugLog('検索月を設定:', currentMonth, '→ 実際の値:', monthInput.value);
+                    debugLog('??????:', currentMonth, '? ????:', monthInput.value);
                 } else {
-                    debugError('search-month要素が見つかりません');
+                    debugError('search-month??????????');
                 }
                 
-                // URLパラメータから従業員IDを取得
+                // URL??????????ID???
                 const urlParams = new URLSearchParams(window.location.search);
                 const employeeId = urlParams.get('employee_id');
-                debugLog('URLパラメータから取得したemployee_id:', employeeId);
-                debugLog('全URLパラメータ:', Object.fromEntries(urlParams));
+                debugLog('URL???????????employee_id:', employeeId);
+                debugLog('?URL?????:', Object.fromEntries(urlParams));
                 
                 if (employeeId) {
-                    // 従業員IDを設定
+                    // ???ID???
                     const employeeSelect = document.getElementById('employee-id');
                     if (employeeSelect) {
                         employeeSelect.value = employeeId;
-                        debugLog('従業員IDを設定:', employeeId, '→ 実際の値:', employeeSelect.value);
-                        debugLog('従業員選択要素のオプション数:', employeeSelect.options.length);
+                        debugLog('???ID???:', employeeId, '? ????:', employeeSelect.value);
+                        debugLog('??????????????:', employeeSelect.options.length);
                         
-                        // 従業員リスト読み込み完了後に自動検索実行
-                        debugLog('自動検索を実行（URLパラメータから）');
+                        // ????????????????????
+                        debugLog('????????URL????????');
                         await performSearch();
                     } else {
-                        debugError('employee-id要素が見つかりません');
+                        debugError('employee-id??????????');
                     }
                 } else {
-                    debugLog('URLパラメータにemployee_idがありません');
+                    debugLog('URL??????employee_id??????');
                 }
                 
-                debugLog('=== DOMContentLoaded 処理完了 ===');
+                debugLog('=== DOMContentLoaded ???? ===');
             } catch (error) {
-                debugError('DOMContentLoaded処理中にエラー:', error);
+                debugError('DOMContentLoaded???????:', error);
                 console.error(error);
             }
         });
         
-        // loadEmployees, updateEmployeeList, setupSectionChangeListener は employee-list.js から使用
+        // loadEmployees, updateEmployeeList, setupSectionChangeListener ? employee-list.js ????
         
-        // フォーム送信（DOMContentLoaded後に設定）
-        console.log('[search.html] フォーム送信リスナー設定前', new Date().toISOString());
+        // ???????DOMContentLoaded?????
+        console.log('[search.html] ?????????????', new Date().toISOString());
         
-        // DOMContentLoaded後に設定
+        // DOMContentLoaded????
         document.addEventListener('DOMContentLoaded', function() {
             const searchForm = document.getElementById('search-form');
             if (searchForm) {
-                console.log('[search.html] フォーム要素が見つかりました');
+                console.log('[search.html] ??????????????');
                 searchForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    debugLog('フォーム送信イベント');
+                    debugLog('??????????');
                     await performSearch();
                 });
             } else {
-                console.error('[search.html ERROR] search-form要素が見つかりません');
+                console.error('[search.html ERROR] search-form??????????');
             }
         });
         
-        // 検索実行
+        // ????
         async function performSearch() {
-            debugLog('=== performSearch() 開始 ===');
+            debugLog('=== performSearch() ?? ===');
             
             try {
-                // フォーム要素の取得
+                // ?????????
                 const employeeSelect = document.getElementById('employee-id');
                 const monthInput = document.getElementById('search-month');
                 
                 if (!employeeSelect) {
-                    debugError('employee-id要素が見つかりません');
+                    debugError('employee-id??????????');
                     return;
                 }
                 if (!monthInput) {
-                    debugError('search-month要素が見つかりません');
+                    debugError('search-month??????????');
                     return;
                 }
                 
                 const employeeId = employeeSelect.value.trim();
                 const searchMonth = monthInput.value.trim();
                 
-                debugLog('フォーム要素から取得した値:');
-                debugLog('  employee-id要素:', employeeSelect);
+                debugLog('?????????????:');
+                debugLog('  employee-id??:', employeeSelect);
                 debugLog('  employee-id.value:', employeeId);
                 debugLog('  employee-id.options.length:', employeeSelect.options.length);
                 debugLog('  search-month.value:', searchMonth);
-                debugLog('検索パラメータ:', { employeeId, searchMonth });
+                debugLog('???????:', { employeeId, searchMonth });
                 
-                // バリデーション
+                // ???????
                 if (!employeeId) {
-                    debugLog('❌ バリデーションエラー: 従業員IDが空');
-                    showError('従業員IDを入力してください');
+                    debugLog('??????????: ???ID???');
+                    showError('???ID?????????');
                     return;
                 }
                 
                 if (!searchMonth) {
-                    debugLog('❌ バリデーションエラー: 検索月が空');
-                    showError('検索月を入力してください（yyyy/mm形式）');
+                    debugLog('??????????: ?????');
+                    showError('??????????????yyyy/mm???');
                     return;
                 }
                 
-                // 検索月の形式チェック
+                // ????????????
                 const monthPattern = /^[0-9]{4}\/[0-9]{1,2}$/;
                 if (!monthPattern.test(searchMonth)) {
-                    debugLog('❌ バリデーションエラー: 検索月の形式が不正', searchMonth);
-                    showError('検索月はyyyy/mm形式で入力してください（例: 2025/10）');
+                    debugLog('??????????: ?????', searchMonth);
+                    showError('???yyyy/mm?????????????: 2025/10?');
                     return;
                 }
                 
-                debugLog('✅ バリデーション成功');
+                debugLog('? ?????????');
                 
-                // UIリセット
+                // UI????
                 document.getElementById('results-section').style.display = 'none';
                 document.getElementById('no-results').style.display = 'none';
                 document.getElementById('error-message').style.display = 'none';
                 document.getElementById('loading').style.display = 'block';
                 
-                // クエリパラメータ構築
+                // ??????????
                 const params = new URLSearchParams();
                 params.append('employee_id', employeeId);
                 params.append('search_month', searchMonth);
                 
                 const searchUrl = `/api/search?${params}`;
-                debugLog('📤 APIリクエストURL:', searchUrl);
-                debugLog('📤 クエリパラメータ詳細:', {
+                debugLog('?? API?????URL:', searchUrl);
+                debugLog('?? ??????????:', {
                     employee_id: params.get('employee_id'),
                     search_month: params.get('search_month')
                 });
 
                 try {
-                    debugLog('📡 APIリクエスト送信開始');
+                    debugLog('?? API?????????');
                     const requestStartTime = Date.now();
                     const response = await fetch(searchUrl);
                     const requestEndTime = Date.now();
                     const requestDuration = requestEndTime - requestStartTime;
                     
-                    debugLog('📥 APIレスポンス受信:', {
+                    debugLog('?? API???????:', {
                         status: response.status,
                         statusText: response.statusText,
                         ok: response.ok,
@@ -503,106 +523,106 @@
                     });
                     
                     const data = await response.json();
-                    debugLog('📥 APIレスポンスデータ:', {
+                    debugLog('?? API????????:', {
                         status: data.status,
                         results_count: data.results ? data.results.length : 0,
                         search_params: data.search_params,
                         full_data: data
                     });
 
-                    // 検索中表示は displayResults の最後まで維持する
+                    // ?????? displayResults ?????????
                     // document.getElementById('loading').style.display = 'none';
 
                     if (data.status === 'success') {
                         AttendanceSystem.Search.searchResults = data.results;
-                        debugLog('✅ 検索成功:', AttendanceSystem.Search.searchResults.length, '件');
+                        debugLog('? ????:', AttendanceSystem.Search.searchResults.length, '?');
                         
-                        // デバッグ用：アラート情報を確認
+                        // ???????????????
                         const totalAlerts = data.results.reduce((sum, item) => {
                             const alertCount = item.alerts ? item.alerts.length : 0;
                             return sum + alertCount;
                         }, 0);
-                        debugLog('📊 総アラート数:', totalAlerts);
-                        debugLog('📊 検索結果サンプル（最初の3件）:', data.results.slice(0, 3));
+                        debugLog('?? ??????:', totalAlerts);
+                        debugLog('?? ????????????3??:', data.results.slice(0, 3));
 
                         await displayResults(data.results, data.search_params);
                         
-                        // 結果表示完了後に検索中表示を非表示にする
+                        // ????????????????????
                         document.getElementById('loading').style.display = 'none';
 
                     } else {
-                        // エラー時は検索中表示を非表示にする
+                        // ?????????????????
                         document.getElementById('loading').style.display = 'none';
-                        debugError('❌ APIエラー:', data.message || '不明なエラー');
-                        showError(data.message || '検索エラーが発生しました');
+                        debugError('API???:', data.message || '??????');
+                        showError(data.message || '?????????');
                     }
                 } catch (error) {
-                    // エラー時は検索中表示を非表示にする
+                    // ?????????????????
                     document.getElementById('loading').style.display = 'none';
-                    debugError('❌ APIリクエストエラー:', error);
-                    debugError('エラー詳細:', {
+                    debugError('? API????????:', error);
+                    debugError('?????:', {
                         message: error.message,
                         stack: error.stack,
                         name: error.name
                     });
-                    showError('サーバーとの通信エラーが発生しました: ' + error.message);
+                    showError('??????????????: ' + error.message);
                 }
             } catch (error) {
-                debugError('❌ performSearch()処理中にエラー:', error);
+                debugError('? performSearch()???????:', error);
                 console.error(error);
             }
             
-            debugLog('=== performSearch() 完了 ===');
+            debugLog('=== performSearch() ?? ===');
         }
         
-        // 検索結果を表示
+        // ???????
         async function displayResults(results, searchParams) {
-            debugLog('displayResults() 開始:', results.length, '件');
+            debugLog('displayResults() ??:', results.length, '?');
             
             if (results.length === 0) {
-                debugLog('検索結果が0件');
+                debugLog('?????0?');
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('no-results').style.display = 'block';
                 return;
             }
 
-            // 日付順でソート（古い順）
+            // ????????????
             results.sort((a, b) => {
                 const dateA = new Date(a.work_date);
                 const dateB = new Date(b.work_date);
                 return dateA - dateB;
             });
-            debugLog('検索結果をソート完了');
+            debugLog('??????????');
 
-            // 24勤の退勤時刻を翌日の明に移動するための前処理
+            // 24??????????????????????
             results = processNightShiftEndTimes(results);
-            debugLog('24勤処理完了');
+            debugLog('24?????');
             
             const tbody = document.getElementById('results-body');
             tbody.innerHTML = '';
             
-            debugLog('テーブル行の生成開始');
+            debugLog('??????????');
             results.forEach((item, index) => {
-                debugLog(`行${index + 1}を処理:`, item.work_date);
+                debugLog(`?${index + 1}???:`, item.work_date);
                 
                 const tr = document.createElement('tr');
-                // 打刻時間を整形（有効な打刻に色を付けるため、全結果を渡す）
-                // 「通常」を「日勤」に変換
+                // ?????????????????????????????
+                // ????????????
                 if (item.work_type) {
-                    item.work_type = item.work_type.replace('通常', '日勤');
+                    item.work_type = item.work_type.replace('?', '?');
                 }
                 const attendanceTimesHtml = formatAttendanceTimes(item.attendance_records || [], item.work_type, item.work_date, results);
                 
-                // IDとシート番号は非表示だが、データは保持される（item.id, item.sheet_number）
-                // アラート情報を表示（時間外確認機能付き）
+                // ID???????????????????????item.id, item.sheet_number?
+                // ????????????????????
                 const alerts = item.alerts || [];
                 const alertsHtml = formatAlertsWithOvertimeCheck(item, alerts);
                 
-                // 打刻申告HTMLを生成
+                // ????HTML???
                 const alertMessages = alerts.map(alert => typeof alert === 'string' ? alert : alert.message || alert.details || '');
                 const punchReportHtml = generatePunchReportCell(item, alertMessages);
                 
-                // チェック状況HTMLを生成（打刻漏れチェック用）
+                // ??????HTML??????????????
                 const checkStatusHtml = generateCheckStatusHTML(item, alerts);
                 
                 tr.innerHTML = `
@@ -619,52 +639,46 @@
                     <td id="leave-${item.work_date}" style="font-size: 0.85em; color: #28a745;">-</td>
                     <td class="punch-report-cell">${punchReportHtml}</td>
                 `;
-                // 全データを行要素に保存（後で使用可能）
+                // ???????????????????
                 tr.dataset.fullData = JSON.stringify(item);
                 tbody.appendChild(tr);
             });
-            debugLog('テーブル行の生成完了');
+            debugLog('??????????');
             
-            // チェック状況を読み込む（打刻漏れチェック用）
+            // ??????????????????????
             await loadCheckStatuses(results);
             
-            // 時間外・休暇願データを非同期で取得
+            // ?????????????????
             const employeeId = searchParams.employee_id;
-            debugLog('時間外・休暇願データの取得開始:', employeeId);
-            fetchOvertimeDataForMonth(employeeId, results).then(async () => {
-                // 時間外データ取得後に、時間差異アラートがある行のアラートを再描画
+            debugLog('???????????????:', employeeId);
+            fetchOvertimeDataForMonth(employeeId, results).then(() => {
+                // ????????????????????????????????
                 refreshTimeDiffAlerts(results);
-                // 時間差異確認状態を復元
+                // ???????????
                 restoreTimeDiffConfirmations(results);
-                // 出勤時刻の差異を判定（時間外開始時刻と出勤打刻時刻を比較）
-                await autoCheckClockInTimeDifference(results);
-                // 退勤時刻の差異を判定（時間外終了時刻と退勤打刻時刻を比較）
-                await autoCheckClockOutTimeDifference(results);
-                // 判定結果を表示するため、アラートを再描画
-                refreshTimeDiffAlerts(results);
             });
             fetchLeaveDataForMonth(employeeId, results);
             
-            // 検索範囲の情報を表示
+            // ??????????
             let rangeInfo = '';
             if (searchParams && searchParams.date_range) {
-                rangeInfo = ` (${searchParams.date_range.start_date} 〜 ${searchParams.date_range.end_date})`;
+                rangeInfo = ` (${searchParams.date_range.start_date} ?? ${searchParams.date_range.end_date})`;
             }
             
-            document.getElementById('results-count').textContent = `検索結果: ${results.length} 件${rangeInfo}`;
+            document.getElementById('results-count').textContent = `??: ${results.length} ?${rangeInfo}`;
             document.getElementById('results-section').style.display = 'block';
             
-            // 打刻申告データを復元
+            // ??????????
             restorePunchReportData(results);
             
-            // 結果表示完了後に検索中表示を非表示にする
+            // ????????????????????
             document.getElementById('loading').style.display = 'none';
-            debugLog('displayResults() 完了');
+            debugLog('displayResults() ??');
         }
         
-        // 打刻申告データを復元
+        // ??????????
         function restorePunchReportData(results) {
-            debugLog('restorePunchReportData() 開始');
+            debugLog('restorePunchReportData() ??');
             results.forEach(item => {
                 const employeeId = item.employee_id;
                 const workDate = item.work_date;
@@ -676,71 +690,65 @@
                         const checkbox = document.querySelector(`input[data-employee="${employeeId}"][data-date="${workDate}"][data-type="${punchType}"]`);
                         if (checkbox) {
                             checkbox.checked = true;
-                            debugLog('打刻申告データを復元:', key);
+                            debugLog('??????????:', key);
                         }
                     }
                 });
             });
             updatePunchReportSummary();
-            debugLog('restorePunchReportData() 完了');
+            debugLog('restorePunchReportData() ??');
         }
         
-        // 時間差異アラートを再描画（時間外データ取得後）
+        // ???????????????????????
         async function refreshTimeDiffAlerts(results) {
-            debugLog('refreshTimeDiffAlerts() 開始');
+            debugLog('refreshTimeDiffAlerts() ??');
             
-            // 各結果について、データベースから確認状態を取得してから再描画
+            // ??????????????????????????????
             const promises = results.map(async (item) => {
                 const alerts = item.alerts || [];
                 const hasClockInTimeDiff = alerts.some(alert => {
                     const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                    return alertStr.includes('出勤時刻に差異あり');
+                    return alertStr.includes('?????????');
                 });
                 
                 if (hasClockInTimeDiff) {
                     try {
-                        // データベースから確認状態を取得
+                        // ???????????????
                         const response = await AttendanceSystem.API.Check.getStatus(
                             item.employee_id,
                             item.work_date,
                             CheckType.TIME_DIFFERENCE
                         );
                         
-                        // 確認状態をitemに追加（formatAlertsWithOvertimeCheckで使用）
+                        // ?????item????formatAlertsWithOvertimeCheck????
                         if (response.success && response.data && response.data.is_checked) {
                             const notes = response.data.notes || '';
-                            item._timeDiffChecked = true;
-                            item._timeDiffNotes = notes;
-                            // 「時間外なし」の場合もtrueとして扱う（後方互換性のため）
-                            if (notes.includes('時間外なし')) {
-                                item._timeDiffChecked = true;
-                            }
+                            item._timeDiffChecked = notes.includes('????');
                         } else {
                             item._timeDiffChecked = false;
-                            item._timeDiffNotes = '';
                         }
                         
                         const alertsCell = document.getElementById(`alerts-${item.work_date}`);
                         if (alertsCell) {
                             const newAlertsHtml = formatAlertsWithOvertimeCheck(item, alerts);
                             alertsCell.innerHTML = newAlertsHtml;
-                            debugLog('時間差異アラートを再描画:', item.work_date);
+                            debugLog('????????????:', item.work_date);
                         }
                     } catch (error) {
-                        console.error(`[refreshTimeDiffAlerts] エラー (${item.work_date}):`, error);
+                        console.error(`[refreshTimeDiffAlerts] ??? (${item.work_date}):`, error);
                     }
                 }
             });
             
             await Promise.all(promises);
-            debugLog('refreshTimeDiffAlerts() 完了');
+            debugLog('refreshTimeDiffAlerts() ??');
         }
         
-        // 時間差異確認状態を復元（データベースから取得）
+        // ???????????????????????
         async function restoreTimeDiffConfirmations(results) {
-            debugLog('restoreTimeDiffConfirmations() 開始');
+            debugLog('restoreTimeDiffConfirmations() ??');
             
-            // 各結果について、データベースから確認状態を取得
+            // ???????????????????????
             const promises = results.map(async (item) => {
                 const employeeId = item.employee_id;
                 const workDate = item.work_date;
@@ -753,56 +761,56 @@
                     );
                     
                     if (response.success && response.data && response.data.is_checked) {
-                        // notesに「時間外なし」が含まれているか確認
+                        // notes??????????????????
                         const notes = response.data.notes || '';
-                        if (notes.includes('時間外なし')) {
+                        if (notes.includes('?????')) {
                             const checkbox = document.getElementById(`no-overtime-${employeeId}-${workDate}`);
                             if (checkbox) {
                                 checkbox.checked = true;
                                 updateTimeDiffConfirmationDisplay(employeeId, workDate, true);
-                                debugLog('時間差異確認状態を復元:', { employeeId, workDate });
+                                debugLog('???????????:', { employeeId, workDate });
                             }
                         }
                     }
                 } catch (error) {
-                    console.error(`[restoreTimeDiffConfirmations] エラー (${employeeId}, ${workDate}):`, error);
+                    console.error(`[restoreTimeDiffConfirmations] ??? (${employeeId}, ${workDate}):`, error);
                 }
             });
             
             await Promise.all(promises);
-            debugLog('restoreTimeDiffConfirmations() 完了');
+            debugLog('restoreTimeDiffConfirmations() ??');
         }
 
-        // 打刻申告サマリーを更新
+        // ???????????
         function updatePunchReportSummary() {
             const allKeys = Object.keys(localStorage).filter(key => key.startsWith('punch_report_'));
             const summaryDiv = document.getElementById('punch-report-summary');
             const countSpan = document.getElementById('punch-report-count');
             
             if (allKeys.length > 0) {
-                countSpan.textContent = `${allKeys.length}件`;
+                countSpan.textContent = `${allKeys.length}?`;
                 summaryDiv.style.display = 'block';
             } else {
                 summaryDiv.style.display = 'none';
             }
         }
 
-        // すべての打刻申告をクリア
+        // ????????????
         function clearAllPunchReports() {
-            if (!confirm('すべての打刻申告を削除しますか？')) {
+            if (!confirm('?????????????????')) {
                 return;
             }
             
             const allKeys = Object.keys(localStorage).filter(key => key.startsWith('punch_report_'));
             allKeys.forEach(key => localStorage.removeItem(key));
             
-            // チェックボックスをリセット
+            // ?????????????
             const checkboxes = document.querySelectorAll('.punch-report-checkbox');
             checkboxes.forEach(cb => {
                 cb.checked = false;
             });
             
-            // 背景色をリセット
+            // ????????
             const rows = document.querySelectorAll('#results-body tr');
             rows.forEach(row => {
                 row.style.backgroundColor = '';
@@ -811,7 +819,7 @@
             updatePunchReportSummary();
         }
 
-        // 行から全データを取得
+        // ??????????
         function getFullDataFromRow(row) {
             const fullDataStr = row.dataset.fullData;
             if (fullDataStr) {
@@ -820,30 +828,30 @@
             return null;
         }
 
-        // すべての行データを取得
+        // ???????????
         function getAllRowData() {
             const rows = document.querySelectorAll('#results-body tr');
             return Array.from(rows).map(row => getFullDataFromRow(row)).filter(data => data !== null);
         }
 
-        // 日時をフォーマット
+        // ?????????
         function formatDateTime(datetime) {
             if (!datetime) return '';
             const dt = new Date(datetime);
             return dt.toLocaleString('ja-JP');
         }
 
-        // エラーメッセージを表示
+        // ???????????
         function showError(message) {
-            debugLog('showError() 呼び出し:', message);
+            debugLog('showError() ????:', message);
             const errorDiv = document.getElementById('error-message');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
         }
 
-        // フォームをクリア
+        // ????????
         function clearForm() {
-            debugLog('clearForm() 呼び出し');
+            debugLog('clearForm() ????');
             document.getElementById('employee-id').value = '';
             document.getElementById('search-month').value = calculateCurrentPayrollMonth();
             document.getElementById('results-section').style.display = 'none';
@@ -851,23 +859,16 @@
             document.getElementById('error-message').style.display = 'none';
         }
         
-        // 時間外申告データをグローバル変数に保存（日付をキーとして）
-        // 注意: attendance-check.jsで既に宣言されているため、ここでは宣言しない
-        // const overtimeDataMap = {}; // attendance-check.jsで既に宣言済み
-        
-        // 時間外申告データを月単位で取得
+        // ???????????????
         async function fetchOvertimeDataForMonth(employeeId, results) {
-            debugLog('fetchOvertimeDataForMonth() 開始:', employeeId);
+            debugLog('fetchOvertimeDataForMonth() ??:', employeeId);
             try {
                 const response = await fetch(`/api/overtime?employee_num=${employeeId}&limit=1000`);
                 const result = await response.json();
                 
                 if (result.status === 'success' && result.data) {
-                    debugLog('時間外データ取得成功:', result.data.length, '件');
+                    debugLog('??????????:', result.data.length, '?');
                     result.data.forEach(overtime => {
-                        // 時間外データをマップに保存
-                        overtimeDataMap[overtime.work_date] = overtime;
-                        
                         const cell = document.getElementById(`overtime-${overtime.work_date}`);
                         if (cell) {
                             const totalMin = (overtime.inner_overtime_minutes || 0) + (overtime.outer_overtime_minutes || 0);
@@ -878,23 +879,23 @@
                 }
                 return Promise.resolve();
             } catch (error) {
-                debugLog('時間外データ取得エラー:', error);
-                console.error('[時間外データ取得エラー]', error);
+                debugLog('???????????:', error);
+                console.error('[???????????]', error);
                 return Promise.reject(error);
             }
         }
         
-        // 休暇願データを月単位で取得
+        // ?????????????
         async function fetchLeaveDataForMonth(employeeId, results) {
-            debugLog('fetchLeaveDataForMonth() 開始:', employeeId);
+            debugLog('fetchLeaveDataForMonth() ??:', employeeId);
             try {
                 const response = await fetch(`/api/leave?employee_num=${employeeId}&limit=1000`);
                 const result = await response.json();
                 
                 if (result.status === 'success' && result.data) {
-                    debugLog('休暇願データ取得成功:', result.data.length, '件');
+                    debugLog('??????????:', result.data.length, '?');
                     result.data.forEach(leave => {
-                        // 休暇期間の各日付をチェック
+                        // ?????????????
                         const startDate = new Date(leave.leave_date_from);
                         const endDate = new Date(leave.leave_date_to);
                         
@@ -912,22 +913,22 @@
                     });
                 }
             } catch (error) {
-                debugLog('休暇願データ取得エラー:', error);
-                console.error('[休暇願データ取得エラー]', error);
+                debugLog('???????????:', error);
+                console.error('[???????????]', error);
             }
         }
         
-        // アラート表示（時間外確認機能付き、チェックボックス付き）
+        // ????????????????????????????
         function formatAlertsWithOvertimeCheck(item, alerts) {
             const workDate = item.work_date;
             const employeeId = item.employee_id;
             
-            // アラート表示（×マーク付き）
+            // ??????????????
             let alertsHtml = formatAlerts(alerts);
             
-            // チェックボックスを追加（打刻漏れ・打刻なしがある場合）
-            const hasPunchLeak = alerts.some(a => (a.message || '').includes('打刻漏れ'));
-            const hasMissingPunch = alerts.some(a => (a.message || '').includes('打刻なし'));
+            // ???????????????????????????
+            const hasPunchLeak = alerts.some(a => (a.message || '').includes('????'));
+            const hasMissingPunch = alerts.some(a => (a.message || '').includes('????'));
             
             let checkboxesHtml = '';
             if (hasPunchLeak) {
@@ -942,7 +943,7 @@
                                onchange="updateCheckStatus(this)">
                         <label for="alert-check-punchleak-${employeeId}-${workDate}" 
                                style="font-size: 0.85em; cursor: pointer; margin: 0;">
-                            打刻漏れ確認
+                            ??????
                         </label>
                     </div>
                 `;
@@ -960,39 +961,33 @@
                                onchange="updateCheckStatus(this)">
                         <label for="alert-check-missing-${employeeId}-${workDate}" 
                                style="font-size: 0.85em; cursor: pointer; margin: 0;">
-                            打刻なし確認
+                            ??????????
                         </label>
                     </div>
                 `;
             }
             
-            // 「出勤時刻に差異あり」アラートをチェック
+            // ????????????????????
             const hasClockInTimeDiff = alerts.some(alert => {
                 const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                return alertStr.includes('出勤時刻に差異あり');
-            });
-            
-            // 「退勤時刻に差異あり」アラートをチェック
-            const hasClockOutTimeDiff = alerts.some(alert => {
-                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                return alertStr.includes('退勤時刻に差異あり');
+                return alertStr.includes('?????????');
             });
             
             if (hasClockInTimeDiff) {
-                // 時間外申告データをチェック（非同期で取得済みのデータを使用）
+                // ??????????????????????????????
                 const overtimeCell = document.getElementById(`overtime-${workDate}`);
-                const hasOvertime = overtimeCell && overtimeCell.textContent.trim() !== '-' && !overtimeCell.textContent.includes('対象なし');
+                const hasOvertime = overtimeCell && overtimeCell.textContent.trim() !== '-' && !overtimeCell.textContent.includes('????');
                 
-                // データベースから「時間差異」確認状態を取得
-                // item._timeDiffCheckedはrefreshTimeDiffAlertsで設定される
+                // ?????????????????????
+                // item._timeDiffChecked?refreshTimeDiffAlerts??????
                 const isNoOvertimeConfirmed = item._timeDiffChecked === true;
                 
                 if (!hasOvertime && !isNoOvertimeConfirmed) {
-                    // 時間外申告がなく、まだ確認されていない場合のみ表示
+                    // ?????????????????????????
                     alertsHtml += `
                         <div class="alert-item info" style="margin-top: 5px; padding: 5px; background: #e7f3ff; border: 1px solid #b3d9ff;">
                             <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
-                                <span style="font-size: 0.85em;">早朝時間外の可能性</span>
+                                <span style="font-size: 0.85em;">??????</span>
                                 <label style="display: flex; align-items: center; gap: 3px; font-size: 0.75em; cursor: pointer; margin-left: 5px;">
                                     <input type="checkbox" 
                                            id="no-overtime-${employeeId}-${workDate}" 
@@ -1001,46 +996,22 @@
                                            data-date="${workDate}"
                                            style="margin: 0;"
                                            onchange="handleNoOvertimeChange(this)">
-                                    <span>時間外なし</span>
+                                    <span>????</span>
                                 </label>
                                 <button type="button" 
                                         class="btn btn-info" 
                                         style="font-size: 0.75em; padding: 2px 8px; margin-left: 5px;"
                                         onclick="window.location.href='/overtime?employee_id=${employeeId}&work_date=${workDate}'">
-                                    時間外申告
+                                    ????
                                 </button>
                             </div>
                         </div>
                     `;
                 } else if (isNoOvertimeConfirmed) {
-                    // 「時間外なし」が確認済みの場合
+                    // ???????????????
                     alertsHtml += `
                         <div style="margin-top: 5px; font-size: 0.7em; color: #28a745;">
-                            ✓ 打刻時間確認済み
-                        </div>
-                    `;
-                }
-            }
-            
-            // 出勤時刻に差異がある場合の判定結果を表示
-            if (hasClockInTimeDiff) {
-                // 判定結果が保存されている場合（時間外データ取得後）
-                if (item._clockInTimeDiffDetected === true) {
-                    alertsHtml += `
-                        <div style="margin-top: 5px; font-size: 0.7em; color: #667eea;">
-                            ${item._clockInTimeDiffType || '出勤'}
-                        </div>
-                    `;
-                }
-            }
-            
-            // 退勤時刻に差異がある場合の判定結果を表示
-            if (hasClockOutTimeDiff) {
-                // 判定結果が保存されている場合（時間外データ取得後）
-                if (item._clockOutTimeDiffDetected === true) {
-                    alertsHtml += `
-                        <div style="margin-top: 5px; font-size: 0.7em; color: #667eea;">
-                            ${item._clockOutTimeDiffType || '退勤'}
+                            ? ????????
                         </div>
                     `;
                 }
@@ -1049,144 +1020,7 @@
             return alertsHtml;
         }
         
-        // 時刻を比較して分単位の差異を返す関数
-        function compareTimes(time1, time2) {
-            // HH:MM形式の時刻を分に変換
-            function timeToMinutes(timeStr) {
-                if (!timeStr) return 0;
-                const parts = timeStr.split(':');
-                if (parts.length < 2) return 0;
-                const hours = parseInt(parts[0], 10) || 0;
-                const minutes = parseInt(parts[1], 10) || 0;
-                return hours * 60 + minutes;
-            }
-            
-            const minutes1 = timeToMinutes(time1);
-            const minutes2 = timeToMinutes(time2);
-            return minutes1 - minutes2;
-        }
-        
-        // 出勤時刻の差異を判定する関数（時間外データ取得後に呼び出される）
-        // 判定結果のみを保存し、自動確認は行わない
-        async function autoCheckClockInTimeDifference(results) {
-            debugLog('autoCheckClockInTimeDifference() 開始');
-            
-            for (const item of results) {
-                const employeeId = item.employee_id;
-                const workDate = item.work_date;
-                const alerts = item.alerts || [];
-                
-                // 「出勤時刻に差異あり」アラートをチェック
-                const hasClockInTimeDiff = alerts.some(alert => {
-                    const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                    return alertStr.includes('出勤時刻に差異あり');
-                });
-                
-                if (!hasClockInTimeDiff) continue;
-                
-                // 時間外データをチェック
-                const overtime = overtimeDataMap[workDate];
-                if (!overtime || !overtime.start_time) continue;
-                
-                // 出勤打刻時刻を取得
-                const validTimes = getValidClockTimes(item.attendance_records || [], item.work_type, item.work_date, results, item);
-                const clockInTime = validTimes.clockIn;
-                
-                if (!clockInTime) continue;
-                
-                // 時間外の開始時刻と出勤打刻時刻を比較（許容範囲：±20分）
-                const timeDiff = compareTimes(overtime.start_time, clockInTime);
-                debugLog('出勤時刻比較:', { workDate, overtimeStart: overtime.start_time, clockIn: clockInTime, diff: timeDiff });
-                
-                // 判定結果を保存（「出勤」と判定）
-                if (Math.abs(timeDiff) <= 20) {
-                    item._clockInTimeDiffDetected = true;
-                    item._clockInTimeDiffType = '出勤';
-                    debugLog('出勤時刻差異が許容範囲内（判定: 出勤）:', { workDate, diff: timeDiff });
-                }
-            }
-            
-            debugLog('autoCheckClockInTimeDifference() 完了');
-        }
-        
-        // 退勤時刻の差異を判定する関数（時間外データ取得後に呼び出される）
-        // 判定結果のみを保存し、自動確認は行わない
-        async function autoCheckClockOutTimeDifference(results) {
-            debugLog('autoCheckClockOutTimeDifference() 開始');
-            
-            for (const item of results) {
-                const employeeId = item.employee_id;
-                const workDate = item.work_date;
-                const alerts = item.alerts || [];
-                
-                // 「退勤時刻に差異あり」アラートをチェック
-                const hasClockOutTimeDiff = alerts.some(alert => {
-                    const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
-                    return alertStr.includes('退勤時刻に差異あり');
-                });
-                
-                if (!hasClockOutTimeDiff) continue;
-                
-                // 時間外データをチェック
-                const overtime = overtimeDataMap[workDate];
-                if (!overtime || !overtime.end_time) continue;
-                
-                // 退勤打刻時刻を取得
-                const validTimes = getValidClockTimes(item.attendance_records || [], item.work_type, item.work_date, results, item);
-                const clockOutTime = validTimes.clockOut;
-                
-                if (!clockOutTime) continue;
-                
-                // 時間外の終了時刻と退勤打刻時刻を比較（許容範囲：±20分）
-                const timeDiff = compareTimes(overtime.end_time, clockOutTime);
-                debugLog('退勤時刻比較:', { workDate, overtimeEnd: overtime.end_time, clockOut: clockOutTime, diff: timeDiff });
-                
-                // 判定結果を保存（「退勤」と判定）
-                if (Math.abs(timeDiff) <= 20) {
-                    item._clockOutTimeDiffDetected = true;
-                    item._clockOutTimeDiffType = '退勤';
-                    debugLog('退勤時刻差異が許容範囲内（判定: 退勤）:', { workDate, diff: timeDiff });
-                }
-            }
-            
-            debugLog('autoCheckClockOutTimeDifference() 完了');
-        }
-        
-        // 時間差異を自動確認する関数
-        async function autoConfirmTimeDifference(employeeId, workDate, notes = '時間外時刻と一致（自動確認）') {
-            try {
-                const response = await AttendanceSystem.API.Check.updateStatus({
-                    employee_num: employeeId,
-                    work_date: workDate,
-                    check_type: CheckType.TIME_DIFFERENCE,
-                    is_checked: true,
-                    notes: notes
-                });
-                
-                if (response.success) {
-                    debugLog('時間差異を自動確認:', { employeeId, workDate, notes });
-                    // アラートを再描画して確認済み状態を反映
-                    const searchResults = AttendanceSystem.Search.searchResults || [];
-                    const item = searchResults.find(r => r.employee_id === employeeId && r.work_date === workDate);
-                    if (item) {
-                        item._timeDiffChecked = true;
-                        item._timeDiffNotes = notes;
-                        const alertsCell = document.getElementById(`alerts-${workDate}`);
-                        if (alertsCell) {
-                            const newAlertsHtml = formatAlertsWithOvertimeCheck(item, item.alerts || []);
-                            alertsCell.innerHTML = newAlertsHtml;
-                        }
-                    }
-                } else {
-                    console.error('[autoConfirmTimeDifference] APIエラー:', response.message);
-                }
-            } catch (error) {
-                console.error('[autoConfirmTimeDifference] エラー:', error);
-                throw error;
-            }
-        }
-        
-        // 「時間外なし」チェックボックスの変更ハンドラー
+        // ???????????????????????
         async function handleNoOvertimeChange(checkbox) {
             const employeeId = checkbox.dataset.employee;
             const workDate = checkbox.dataset.date;
@@ -1195,46 +1029,46 @@
             debugLog('handleNoOvertimeChange()', { employeeId, workDate, isChecked });
             
             try {
-                // データベースに保存/更新
+                // ?????????/??
                 const response = await AttendanceSystem.API.Check.updateStatus({
                     employee_num: employeeId,
                     work_date: workDate,
                     check_type: CheckType.TIME_DIFFERENCE,
                     is_checked: isChecked,
-                    notes: isChecked ? '時間外なし' : null
+                    notes: isChecked ? '????' : null
                 });
                 
                 if (response.success) {
-                    debugLog('時間差異確認状態をデータベースに保存:', { employeeId, workDate, isChecked });
+                    debugLog('??????????????????:', { employeeId, workDate, isChecked });
                     
                     if (isChecked) {
-                        // 「出勤時刻に差異あり」アラートを削除
+                        // ??????????????????
                         removeClockInTimeDiffAlert(employeeId, workDate);
                         
-                        // チェックボックスとボタンを非表示にして、「確認済み」メッセージを表示
+                        // ??????????????????????????????????
                         updateTimeDiffConfirmationDisplay(employeeId, workDate, true);
                     } else {
-                        // アラートを再表示
+                        // ????????
                         restoreClockInTimeDiffAlert(employeeId, workDate);
                         
-                        // チェックボックスとボタンを再表示
+                        // ????????????????
                         updateTimeDiffConfirmationDisplay(employeeId, workDate, false);
                     }
                 } else {
-                    console.error('[handleNoOvertimeChange] APIエラー:', response.message);
-                    // エラー時はチェックボックスを元に戻す
+                    console.error('[handleNoOvertimeChange] API???:', response.message);
+                    // ??????????????????
                     checkbox.checked = !isChecked;
-                    alert('確認状態の保存に失敗しました: ' + (response.message || '不明なエラー'));
+                    alert('?????????: ' + (response.message || '??????'));
                 }
             } catch (error) {
-                console.error('[handleNoOvertimeChange] エラー:', error);
-                // エラー時はチェックボックスを元に戻す
+                console.error('[handleNoOvertimeChange] ???:', error);
+                // ??????????????????
                 checkbox.checked = !isChecked;
-                alert('確認状態の保存に失敗しました: ' + error.message);
+                alert('?????????: ' + error.message);
             }
         }
         
-        // 「出勤時刻に差異あり」アラートを削除
+        // ??????????????????
         function removeClockInTimeDiffAlert(employeeId, workDate) {
             const alertsCell = document.getElementById(`alerts-${workDate}`);
             if (!alertsCell) return;
@@ -1242,14 +1076,14 @@
             const alertItems = alertsCell.querySelectorAll('.alert-item');
             alertItems.forEach(alertItem => {
                 const alertText = alertItem.textContent || '';
-                if (alertText.includes('出勤時刻に差異あり')) {
+                if (alertText.includes('??????')) {
                     alertItem.remove();
-                    debugLog('出勤時刻差異アラートを削除:', workDate);
+                    debugLog('?????????????:', workDate);
                 }
             });
         }
         
-        // 「出勤時刻に差異あり」アラートを再表示
+        // ???????????????????
         function restoreClockInTimeDiffAlert(employeeId, workDate) {
             const row = document.querySelector(`tr[data-full-data*="${workDate}"]`);
             if (!row) return;
@@ -1260,7 +1094,7 @@
             const item = JSON.parse(fullDataStr);
             const alerts = item.alerts || [];
             
-            // アラートを再生成
+            // ????????
             const alertsHtml = formatAlertsWithOvertimeCheck(item, alerts);
             const alertsCell = document.getElementById(`alerts-${workDate}`);
             if (alertsCell) {
@@ -1268,7 +1102,7 @@
             }
         }
         
-        // 時間差異確認の表示を更新
+        // ????????????
         function updateTimeDiffConfirmationDisplay(employeeId, workDate, isConfirmed) {
             const alertsCell = document.getElementById(`alerts-${workDate}`);
             if (!alertsCell) return;
@@ -1277,7 +1111,7 @@
             const overtimeButton = alertsCell.querySelector(`button[onclick*="${workDate}"]`);
             
             if (isConfirmed) {
-                // チェックボックスとボタンを非表示
+                // ????????????????
                 if (noOvertimeCheckbox) {
                     const label = noOvertimeCheckbox.closest('label');
                     if (label) label.style.display = 'none';
@@ -1286,16 +1120,16 @@
                     overtimeButton.style.display = 'none';
                 }
                 
-                // 「確認済み」メッセージを追加（既に存在しない場合）
+                // ?????????????????????????
                 if (!alertsCell.querySelector('.time-diff-confirmed')) {
                     const confirmedMsg = document.createElement('div');
                     confirmedMsg.className = 'time-diff-confirmed';
                     confirmedMsg.style.cssText = 'margin-top: 5px; font-size: 0.7em; color: #28a745;';
-                    confirmedMsg.textContent = '✓ 打刻時間確認済み';
+                    confirmedMsg.textContent = '? ????????';
                     alertsCell.appendChild(confirmedMsg);
                 }
             } else {
-                // チェックボックスとボタンを再表示
+                // ????????????????
                 if (noOvertimeCheckbox) {
                     const label = noOvertimeCheckbox.closest('label');
                     if (label) label.style.display = '';
@@ -1304,7 +1138,7 @@
                     overtimeButton.style.display = '';
                 }
                 
-                // 「確認済み」メッセージを削除
+                // ??????????????
                 const confirmedMsg = alertsCell.querySelector('.time-diff-confirmed');
                 if (confirmedMsg) {
                     confirmedMsg.remove();
@@ -1312,36 +1146,80 @@
             }
         }
         
-        // 打刻申告セルを生成
+        // ?????????
         function generatePunchReportCell(item, alerts) {
             const workDate = item.work_date;
             const employeeId = item.employee_id;
             
-            // 判定結果を表示（チェックボックスは撤去）
-            const results = [];
+            // ?????????????????????????
+            // ????????????????????????????
+            const checkinAlerts = alerts.filter(alert => {
+                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                return alertStr.includes('??????');
+            });
             
-            // 出勤時刻の差異判定結果
-            if (item._clockInTimeDiffDetected === true) {
-                results.push(`<span style="color: #dc3545; font-size: 0.8em;">${item._clockInTimeDiffType || '出勤'}</span>`);
+            const checkoutAlerts = alerts.filter(alert => {
+                const alertStr = typeof alert === 'string' ? alert : (alert.message || alert.details || '');
+                return alertStr.includes('??????');
+            });
+            
+            const hasCheckinAlert = checkinAlerts.length > 0;
+            const hasCheckoutAlert = checkoutAlerts.length > 0;
+            
+            if (!hasCheckinAlert && !hasCheckoutAlert) {
+                return '<span style="color: #999; font-size: 0.8em;">????</span>';
             }
             
-            // 退勤時刻の差異判定結果
-            if (item._clockOutTimeDiffDetected === true) {
-                results.push(`<span style="color: #28a745; font-size: 0.8em;">${item._clockOutTimeDiffType || '退勤'}</span>`);
-            }
+            // localStorage????????????
+            const checkinKey = `punch_report_${employeeId}_${workDate}_checkin`;
+            const checkoutKey = `punch_report_${employeeId}_${workDate}_checkout`;
+            const hasCheckinReport = localStorage.getItem(checkinKey) !== null;
+            const hasCheckoutReport = localStorage.getItem(checkoutKey) !== null;
             
-            if (results.length === 0) {
-                return '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
+            // ??????????????????
+            const checkinDisplay = (hasCheckinAlert && !hasCheckinReport) ? '' : 'display: none;';
+            const checkoutDisplay = (hasCheckoutAlert && !hasCheckoutReport) ? '' : 'display: none;';
+            
+            // ??????????????????
+            if (checkinDisplay.includes('none') && checkoutDisplay.includes('none')) {
+                return '<span style="color: #999; font-size: 0.8em;">????</span>';
             }
             
             return `
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
-                    ${results.join('')}
+                    ${hasCheckinAlert ? `
+                    <label style="display: flex; align-items: center; gap: 3px; font-size: 0.8em; cursor: pointer; ${checkinDisplay}">
+                        <input type="checkbox" 
+                               id="punch-leak-checkin-${employeeId}-${workDate}" 
+                               class="punch-report-checkbox" 
+                               data-employee="${employeeId}" 
+                               data-date="${workDate}" 
+                               data-type="checkin"
+                               style="margin: 0;"
+                               ${hasCheckinReport ? 'checked' : ''}
+                               onchange="handlePunchReportChange(this)">
+                        <span style="color: #dc3545;">?</span>
+                    </label>
+                    ` : ''}
+                    ${hasCheckoutAlert ? `
+                    <label style="display: flex; align-items: center; gap: 3px; font-size: 0.8em; cursor: pointer; ${checkoutDisplay}">
+                        <input type="checkbox" 
+                               id="punch-leak-checkout-${employeeId}-${workDate}" 
+                               class="punch-report-checkbox" 
+                               data-employee="${employeeId}" 
+                               data-date="${workDate}" 
+                               data-type="checkout"
+                               style="margin: 0;"
+                               ${hasCheckoutReport ? 'checked' : ''}
+                               onchange="handlePunchReportChange(this)">
+                        <span style="color: #28a745;">??</span>
+                    </label>
+                    ` : ''}
                 </div>
             `;
         }
 
-        // 打刻申告チェックボックスの変更ハンドラー
+        // ????????????????????
         function handlePunchReportChange(checkbox) {
             const employeeId = checkbox.dataset.employee;
             const workDate = checkbox.dataset.date;
@@ -1351,54 +1229,54 @@
             debugLog('handlePunchReportChange()', { employeeId, workDate, punchType, isChecked });
 
             
-            // 申告データを保存（将来的にAPIに送信）
+            // ?????????????API????
             if (isChecked) {
                 savePunchReport(employeeId, workDate, punchType);
-                // 対応するエラー・警告アラートを削除
+                // ?????????????????
                 removeAlertForPunchReport(employeeId, workDate, punchType);
-                // チェックボックスを非表示にする
+                // ???????????????
                 hideCheckboxForPunchReport(employeeId, workDate, punchType);
             } else {
                 removePunchReport(employeeId, workDate, punchType);
-                // エラー・警告アラートを再表示（元のデータから）
+                // ???????????????????????
                 restoreAlertForPunchReport(employeeId, workDate, punchType);
-                // チェックボックスを再表示
+                // ????????????
                 showCheckboxForPunchReport(employeeId, workDate, punchType);
             }
         }
         
-        // 打刻申告に対応するエラー・警告アラートを削除
+        // ??????????????????????
         function removeAlertForPunchReport(employeeId, workDate, punchType) {
             const alertsCell = document.getElementById(`alerts-${workDate}`);
             if (!alertsCell) return;
             
-            // 現在のアラート要素を取得
+            // ????????????
             const alertItems = alertsCell.querySelectorAll('.alert-item');
             let hasChanges = false;
             
             alertItems.forEach(alertItem => {
                 const alertText = alertItem.textContent || '';
-                // 出勤チェックの場合、「出勤打刻漏れ」のみを削除（「出勤時刻に差異あり」は除外）
-                if (punchType === 'checkin' && alertText.includes('出勤打刻漏れ')) {
+                // ???????????????????????????????????????
+                if (punchType === 'checkin' && alertText.includes('??????')) {
                     alertItem.remove();
                     hasChanges = true;
-                    debugLog('出勤打刻漏れアラートを削除:', workDate);
+                    debugLog('?????????????:', workDate);
                 }
-                // 退勤チェックの場合、「退勤打刻漏れ」のみを削除（「退勤時刻に差異あり」は除外）
-                if (punchType === 'checkout' && alertText.includes('退勤打刻漏れ')) {
+                // ???????????????????????????????????????
+                if (punchType === 'checkout' && alertText.includes('??????')) {
                     alertItem.remove();
                     hasChanges = true;
-                    debugLog('退勤打刻漏れアラートを削除:', workDate);
+                    debugLog('?????????????:', workDate);
                 }
             });
             
-            // アラートが全て削除された場合の処理
+            // ?????????????????
             if (hasChanges && alertsCell.querySelectorAll('.alert-item').length === 0) {
-                alertsCell.innerHTML = '<span style="color: #999; font-size: 0.8em;">エラーなし</span>';
+                alertsCell.innerHTML = '<span style="color: #999; font-size: 0.8em;">??</span>';
             }
         }
         
-        // 打刻申告のチェックボックスを非表示にする
+        // ????????????????????
         function hideCheckboxForPunchReport(employeeId, workDate, punchType) {
             const checkboxId = `punch-leak-${punchType}-${employeeId}-${workDate}`;
             const checkbox = document.getElementById(checkboxId);
@@ -1406,24 +1284,24 @@
                 const label = checkbox.closest('label');
                 if (label) {
                     label.style.display = 'none';
-                    debugLog('チェックボックスを非表示:', checkboxId);
+                    debugLog('????????????:', checkboxId);
                 }
             }
             
-            // 両方のチェックボックスが非表示になったら、セル全体を「対象なし」に変更
+            // ???????????????????????????????????
             const punchReportCell = checkbox?.closest('.punch-report-cell');
             if (punchReportCell) {
                 const visibleCheckboxes = punchReportCell.querySelectorAll('label[style*="display: none"]');
                 const allCheckboxes = punchReportCell.querySelectorAll('label');
                 if (allCheckboxes.length > 0 && visibleCheckboxes.length === allCheckboxes.length) {
-                    punchReportCell.innerHTML = '<span style="color: #999; font-size: 0.8em;">対象なし</span>';
+                    punchReportCell.innerHTML = '<span style="color: #999; font-size: 0.8em;">????</span>';
                 }
             }
         }
         
-        // エラー・警告アラートを再表示（元のデータから）
+        // ???????????????????????
         function restoreAlertForPunchReport(employeeId, workDate, punchType) {
-            // 行のデータを取得
+            // ????????
             const row = document.querySelector(`tr[data-full-data*="${workDate}"]`);
             if (!row) return;
             
@@ -1433,7 +1311,7 @@
             const item = JSON.parse(fullDataStr);
             const alerts = item.alerts || [];
             
-            // アラートを再生成
+            // ????????
             const alertsHtml = formatAlerts(alerts);
             const alertsCell = document.getElementById(`alerts-${workDate}`);
             if (alertsCell) {
@@ -1441,7 +1319,7 @@
             }
         }
         
-        // チェックボックスを再表示
+        // ????????????
         function showCheckboxForPunchReport(employeeId, workDate, punchType) {
             const checkboxId = `punch-leak-${punchType}-${employeeId}-${workDate}`;
             const checkbox = document.getElementById(checkboxId);
@@ -1449,14 +1327,14 @@
                 const label = checkbox.closest('label');
                 if (label) {
                     label.style.display = '';
-                    debugLog('チェックボックスを再表示:', checkboxId);
+                    debugLog('????????????:', checkboxId);
                 }
             }
         }
 
-        // 打刻申告データを保存
+        // ??????????
         function savePunchReport(employeeId, workDate, punchType) {
-            // ローカルストレージに保存（暫定）
+            // ????????????????
             const key = `punch_report_${employeeId}_${workDate}_${punchType}`;
             localStorage.setItem(key, JSON.stringify({
                 employeeId: employeeId,
@@ -1466,9 +1344,9 @@
                 status: 'reported'
             }));
             
-            debugLog('打刻申告データを保存:', key);
+            debugLog('??????????:', key);
             
-            // 将来的にはAPIに送信
+            // ?????API???
             // submitPunchReportToAPI(employeeId, workDate, punchType);
             
 
@@ -1476,26 +1354,26 @@
             updatePunchReportSummary();
         }
 
-        // 打刻申告データを削除
+        // ??????????
         function removePunchReport(employeeId, workDate, punchType) {
             const key = `punch_report_${employeeId}_${workDate}_${punchType}`;
             localStorage.removeItem(key);
             
-            debugLog('打刻申告データを削除:', key);
+            debugLog('??????????:', key);
 
             updateRowBackgroundForPunchReport(employeeId, workDate);
             updatePunchReportSummary();
         }
 
-        // 背景色の管理
+        // ??????
         function updateRowBackgroundForPunchReport(employeeId, workDate) {
-            // 申告データを確認してロウの背景色を更新
+            // ???????????????????
             const hasAnyReport = ['checkin', 'checkout'].some(type => {
                 const key = `punch_report_${employeeId}_${workDate}_${type}`;
                 return localStorage.getItem(key) !== null;
             });
             
-            // 該当する行を見つけて背景色を変更
+            // ????????????????
             const rows = document.querySelectorAll('#results-body tr');
             rows.forEach(row => {
                 const cells = row.cells;
@@ -1509,43 +1387,43 @@
             });
         }
 
-        // CSV出力
+        // CSV??
         function exportCSV() {
-            debugLog('exportCSV() 呼び出し');
+            debugLog('exportCSV() ????');
             if (AttendanceSystem.Search.searchResults.length === 0) {
-                alert('出力するデータがありません');
+                alert('??????????');
                 return;
             }
             
-            let csv = '従業員ID,従業員名,勤務日,勤務タイプ,開始時刻,終了時刻,実際の打刻時間,エラー・警告\n';
+            let csv = '???ID,??,??,????,??,??,????,??\n';
             AttendanceSystem.Search.searchResults.forEach(item => {
                 const attendanceTimes = (item.attendance_records || []).map(record => record.time_only).join(' ');
                 
-                // 退勤時刻の処理（24勤は翌日明に表示、明は前日24勤の退勤時刻を表示）
+                // ????????24?????????????24??????????
                 let endTimeForCSV = '';
-                if (item.work_type === '明' && item.night_shift_end_time) {
-                    // 明の行で、前日24勤の退勤時刻がある場合
-                    endTimeForCSV = `${item.night_shift_end_time} (${item.night_shift_work_type}退勤)`;
-                } else if (item.work_type && item.work_type.includes('24勤')) {
-                    // 24勤の場合は退勤時刻を表示しない
-                    endTimeForCSV = '翌日明に表示';
+                if (item.work_type === '?' && item.night_shift_end_time) {
+                    // ?????24???????
+                    endTimeForCSV = `${item.night_shift_end_time} (${item.night_shift_work_type}?)`;
+                } else if (item.work_type && item.work_type.includes('24?')) {
+                    // 24???????
+                    endTimeForCSV = '????';
                 } else {
-                    // 通常勤務
+                    // ??
                     endTimeForCSV = item.end_time || '';
                 }
                 
-                // アラート情報をCSVに追加
+                // ???????CSV???
                 const alertsText = (item.alerts || []).map(alert => {
                     return alert.details ? `${alert.message}: ${alert.details}` : alert.message;
                 }).join('; ').replace(/"/g, '""');
                 
-                // CSV出力時も「通常」を「日勤」に変換
+                // CSV????????????????
                 let csvWorkType = item.work_type || '';
-                csvWorkType = csvWorkType.replace('通常', '日勤');
+                csvWorkType = csvWorkType.replace('?', '?');
                 csv += `"${item.employee_id}","${item.employee_name || ''}","${item.work_date}","${csvWorkType}","${item.start_time || ''}","${endTimeForCSV}","${attendanceTimes}","${alertsText}"\n`;
             });
             
-            // BOM（Byte Order Mark）を追加してExcelで文字化けを防ぐ
+            // BOM?Byte Order Mark??????Excel????????
             const BOM = '\uFEFF';
             const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -1553,7 +1431,7 @@
             link.download = `schedule_${new Date().toISOString().slice(0, 10)}.csv`;
             link.click();
             
-            debugLog('CSV出力完了');
+            debugLog('CSV????');
         }
     </script>
 </body>

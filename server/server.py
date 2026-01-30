@@ -37,15 +37,24 @@ def create_app():
     app.config['SECRET_KEY'] = Config.SECRET_KEY
     app.config['SESSION_COOKIE_HTTPONLY'] = Config.SESSION_COOKIE_HTTPONLY
     app.config['SESSION_COOKIE_SAMESITE'] = Config.SESSION_COOKIE_SAMESITE
+    # デフォルトの文字エンコーディングをUTF-8に設定（文字化け対策）
+    app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
     
-    # 静的ファイルのキャッシュ制御（ブラウザキャッシュ対策）
+    # 静的ファイルのキャッシュ制御と文字エンコーディング設定（ブラウザキャッシュ対策）
     @app.after_request
-    def set_static_cache_headers(response):
-        """静的ファイルにキャッシュ制御ヘッダーを追加"""
+    def set_response_headers(response):
+        """レスポンスヘッダーを設定（キャッシュ制御と文字エンコーディング）"""
+        # 静的ファイルのキャッシュ制御
         if request.endpoint == 'static' or request.path.startswith('/static/'):
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
+        
+        # HTMLレスポンスにcharset=UTF-8を設定（文字化け対策）
+        if response.content_type and 'text/html' in response.content_type:
+            if 'charset' not in response.content_type:
+                response.content_type = 'text/html; charset=utf-8'
+        
         return response
     
     # 認証機能を初期化
@@ -58,6 +67,10 @@ def _add_no_cache_headers(response):
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    # 文字エンコーディングを明示的に設定（文字化け対策）
+    if response.content_type and 'text/html' in response.content_type:
+        if 'charset' not in response.content_type:
+            response.content_type = 'text/html; charset=utf-8'
     return response
 
 def register_web_routes(app):

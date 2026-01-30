@@ -1,4 +1,4 @@
-// 打刻チェック確認画面専用JavaScript
+﻿// 打刻チェック確認画面専用JavaScript
 // グローバル変数を名前空間に移動
 AttendanceSystem.Check = AttendanceSystem.Check || {};
 AttendanceSystem.Check.searchResults = [];
@@ -111,14 +111,19 @@ async function performSearch(event) {
             search_month: searchMonth
         });
 
-        document.getElementById('loading').style.display = 'none';
+        // 検索中表示は displayResults の最後まで維持する
+        // document.getElementById('loading').style.display = 'none';
 
         if (searchResponse.success && searchResponse.data.status === 'success') {
             // 名前空間とグローバル変数の両方に保存
             AttendanceSystem.Check.searchResults = searchResponse.data.results;
             searchResults = searchResponse.data.results;
             await displayResults(searchResponse.data.results, searchResponse.data.search_params);
+            
+            // 結果表示完了後に検索中表示を非表示にする
+            document.getElementById('loading').style.display = 'none';
         } else {
+            document.getElementById('loading').style.display = 'none';
             const errorMsg = searchResponse.message || searchResponse.data?.message || '検索エラーが発生しました';
             if (typeof showError !== 'undefined') {
                 showError(errorMsg);
@@ -141,6 +146,7 @@ async function performSearch(event) {
 // 検索結果を表示
 async function displayResults(results, searchParams) {
     if (results.length === 0) {
+        document.getElementById('loading').style.display = 'none';
         document.getElementById('no-results').style.display = 'block';
         return;
     }
@@ -206,6 +212,9 @@ async function displayResults(results, searchParams) {
     
     document.getElementById('results-count').textContent = `検索結果: ${results.length} 件${rangeInfo}`;
     document.getElementById('results-section').style.display = 'block';
+    
+    // 結果表示完了後に検索中表示を非表示にする
+    document.getElementById('loading').style.display = 'none';
 }
 
 // generateCheckStatusHTML は attendance-common.js から使用
@@ -244,20 +253,54 @@ async function updateCheckStatus(checkbox) {
             
             if (statusElement) {
                 if (isChecked) {
-                    // 時間外申告の有無を確認
-                    const hasOvertime = hasOvertimeForDate(workDate);
+                    // チェック状況列のチェックボックスとラベルを非表示
+                    const checkContainer = statusElement.closest('.check-container');
+                    if (checkContainer) {
+                        const checkItem = checkContainer.querySelector('.check-item');
+                        if (checkItem) {
+                            checkItem.style.display = 'none';
+                        }
+                    }
                     
+                    // チェック状況を簡潔に表示
                     if (checkType === 'missing_punch') {
-                        statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
+                        statusElement.textContent = '打刻なし確認済';
                     } else if (checkType === 'punch_leak') {
-                        statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
+                        statusElement.textContent = '打刻漏れ確認済';
                     } else {
-                        statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
+                        statusElement.textContent = '確認済み';
                     }
                     statusElement.classList.add('completed');
+                    statusElement.style.color = '#28a745';
+                    statusElement.style.fontSize = '0.85em';
+                    
+                    // チェック済みの場合、対応するアラートを削除
+                    if (checkType === 'punch_leak') {
+                        removePunchLeakAlerts(employeeNum, workDate);
+                    } else if (checkType === 'missing_punch') {
+                        removeMissingPunchAlerts(employeeNum, workDate);
+                    }
                 } else {
+                    // チェック状況列のチェックボックスとラベルを再表示
+                    const checkContainer = statusElement.closest('.check-container');
+                    if (checkContainer) {
+                        const checkItem = checkContainer.querySelector('.check-item');
+                        if (checkItem) {
+                            checkItem.style.display = '';
+                        }
+                    }
+                    
                     statusElement.textContent = '未確認';
                     statusElement.classList.remove('completed');
+                    statusElement.style.color = '';
+                    statusElement.style.fontSize = '';
+                    
+                    // チェック解除時はアラートを再表示
+                    if (checkType === 'punch_leak') {
+                        updateAlertsDisplay(employeeNum, workDate, CheckType.PUNCH_LEAK, false);
+                    } else if (checkType === 'missing_punch') {
+                        updateAlertsDisplay(employeeNum, workDate, CheckType.MISSING_PUNCH, false);
+                    }
                 }
             }
         } else {
@@ -282,6 +325,81 @@ async function updateCheckStatus(checkbox) {
         }
         checkbox.checked = !isChecked;
     }
+}
+
+/**
+ * エラー・警告列のアラート表示を更新
+ */
+function updateAlertsDisplay(employeeNum, workDate, checkType, isChecked) {
+    const alertsCell = document.getElementById(`alerts-${workDate}`);
+    if (!alertsCell) return;
+    
+    const alertItems = alertsCell.querySelectorAll('.alert-item');
+    let hasChanges = false;
+    
+    alertItems.forEach(alertItem => {
+        const alertText = alertItem.textContent || '';
+        let shouldHide = false;
+        
+        if (checkType === CheckType.PUNCH_LEAK && (alertText.includes('打刻漏れ') || alertText.includes('打刻漏れ'))) {
+            shouldHide = isChecked;
+        } else if (checkType === CheckType.MISSING_PUNCH && alertText.includes('打刻なし')) {
+            shouldHide = isChecked;
+        }
+        
+        if (shouldHide) {
+            // ×マークを非表示にする
+            const icon = alertItem.querySelector('.alert-icon');
+            if (icon) {
+                icon.style.display = 'none';
+            }
+            hasChanges = true;
+        } else if (!isChecked) {
+            // チェック解除時は×マークを再表示
+            const icon = alertItem.querySelector('.alert-icon');
+            if (icon) {
+                icon.style.display = '';
+            }
+        }
+    });
+    
+    // チェックボックスの表示/非表示を更新
+    const alertCheckboxId = checkType === CheckType.PUNCH_LEAK 
+        ? `alert-check-punchleak-${employeeNum}-${workDate}`
+        : checkType === CheckType.MISSING_PUNCH
+        ? `alert-check-missing-${employeeNum}-${workDate}`
+        : null;
+    
+    if (alertCheckboxId) {
+        const alertCheckbox = document.getElementById(alertCheckboxId);
+        if (alertCheckbox) {
+            const checkboxContainer = alertCheckbox.closest('div');
+            if (checkboxContainer) {
+                checkboxContainer.style.display = isChecked ? 'none' : 'flex';
+            }
+        }
+    }
+    
+    // 全てのアラートがチェック済みの場合
+    if (isChecked && alertsCell.querySelectorAll('.alert-item:not([style*="display: none"])').length === 0) {
+        if (alertsCell.querySelectorAll('.alert-item').length > 0) {
+            alertsCell.innerHTML = '<span style="color: #28a745; font-size: 0.85em;">✓ 確認済み</span>';
+        }
+    }
+}
+
+/**
+ * 打刻漏れアラートを削除
+ */
+function removePunchLeakAlerts(employeeNum, workDate) {
+    updateAlertsDisplay(employeeNum, workDate, CheckType.PUNCH_LEAK, true);
+}
+
+/**
+ * 打刻なしアラートを削除
+ */
+function removeMissingPunchAlerts(employeeNum, workDate) {
+    updateAlertsDisplay(employeeNum, workDate, CheckType.MISSING_PUNCH, true);
 }
 
 /**
@@ -345,17 +463,48 @@ async function loadCheckStatuses(results) {
                     if (checkbox && statusElement) {
                         checkbox.checked = true;
                         
-                        // 時間外申告の有無を確認
-                        const hasOvertime = hasOvertimeForDate(item.work_date);
+                        // チェック状況列のチェックボックスとラベルを非表示
+                        const checkContainer = statusElement.closest('.check-container');
+                        if (checkContainer) {
+                            const checkItem = checkContainer.querySelector('.check-item');
+                            if (checkItem) {
+                                checkItem.style.display = 'none';
+                            }
+                        }
                         
-                        if (checkType === 'missing_punch') {
-                            statusElement.textContent = hasOvertime ? '打刻もれチェック済み時間外有り' : '打刻もれチェック済　時間外無';
-                        } else if (checkType === 'punch_leak') {
-                            statusElement.textContent = hasOvertime ? '打刻漏れチェック済み時間外有り' : '打刻漏れチェック済　時間外無';
+                        // チェック状況を簡潔に表示
+                        if (checkType === CheckType.MISSING_PUNCH) {
+                            statusElement.textContent = '打刻なし確認済';
+                        } else if (checkType === CheckType.PUNCH_LEAK) {
+                            statusElement.textContent = '打刻漏れ確認済';
                         } else {
-                            statusElement.textContent = hasOvertime ? '時間外チェック済み時間外有り' : '時間外チェック済　時間外無';
+                            statusElement.textContent = '確認済み';
                         }
                         statusElement.classList.add('completed');
+                        statusElement.style.color = '#28a745';
+                        statusElement.style.fontSize = '0.85em';
+                        
+                        // エラー・警告列のチェックボックスもチェック
+                        let alertCheckboxId = null;
+                        if (checkType === CheckType.PUNCH_LEAK) {
+                            alertCheckboxId = `alert-check-punchleak-${employeeId}-${item.work_date}`;
+                        } else if (checkType === CheckType.MISSING_PUNCH) {
+                            alertCheckboxId = `alert-check-missing-${employeeId}-${item.work_date}`;
+                        }
+                        
+                        if (alertCheckboxId) {
+                            const alertCheckbox = document.getElementById(alertCheckboxId);
+                            if (alertCheckbox) {
+                                alertCheckbox.checked = true;
+                                const checkboxContainer = alertCheckbox.closest('div');
+                                if (checkboxContainer) {
+                                    checkboxContainer.style.display = 'none';
+                                }
+                            }
+                        }
+                        
+                        // エラー・警告列のアラートの×マークを非表示
+                        updateAlertsDisplay(employeeId, item.work_date, checkType, true);
                     }
                 }
             } catch (error) {

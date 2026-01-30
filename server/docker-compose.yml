@@ -56,6 +56,9 @@ services:
         source: ./constants.py
         target: /app/constants.py
       - type: bind
+        source: ./alert_utils.py
+        target: /app/alert_utils.py
+      - type: bind
         source: ./api_check_status.py
         target: /app/api_check_status.py
       - type: bind
@@ -67,9 +70,6 @@ services:
       - type: bind
         source: ./config.py
         target: /app/config.py
-      - type: bind
-        source: ./constants.py
-        target: /app/constants.py
       - type: bind
         source: ./logger_config.py
         target: /app/logger_config.py
