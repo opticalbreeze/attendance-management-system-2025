@@ -65,6 +65,9 @@ services:
         source: ./api_notifications.py
         target: /app/api_notifications.py
       - type: bind
+        source: ./admin.py
+        target: /app/admin.py
+      - type: bind
         source: ./auth.py
         target: /app/auth.py
       - type: bind

@@ -80,6 +80,9 @@ services:
       - type: bind
         source: ./api_notifications.py
         target: /app/api_notifications.py
+      - type: bind
+        source: ./admin.py
+        target: /app/admin.py
       # バックアップディレクトリをホストにマウント
       - type: bind
         source: ../../backup

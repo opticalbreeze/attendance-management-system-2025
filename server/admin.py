@@ -48,7 +48,8 @@ def import_csv_to_schedule(csv_file_path):
         error_messages = []
         
         try:
-            with open(csv_file_path, 'r', encoding='utf-8') as file:
+            # utf-8-sigエンコーディングを使用してBOMを自動除去
+            with open(csv_file_path, 'r', encoding='utf-8-sig') as file:
                 reader = csv.DictReader(file)
                 
                 for row_num, row in enumerate(reader, start=2):  # ヘッダー行の次から
@@ -60,6 +61,7 @@ def import_csv_to_schedule(csv_file_path):
                         work_type = row.get('区分', '').strip()
                         start_time = row.get('開始時間', '').strip()
                         end_time = row.get('終了時間', '').strip()
+                        sheet_str = row.get('シート', '').strip()
                         
                         # 必須項目チェック
                         if not employee_id or not date_str:
@@ -84,6 +86,16 @@ def import_csv_to_schedule(csv_file_path):
                         start_time_value = start_time if start_time else None
                         end_time_value = end_time if end_time else None
                         
+                        # シート番号の処理（CSVの「シート」カラムから取得、空の場合はデフォルト値を使用）
+                        if sheet_str:
+                            try:
+                                sheet_number = str(sheet_str)  # 文字列として保存
+                            except (ValueError, TypeError):
+                                sheet_number = Config.DEFAULT_SHEET_NUMBER
+                                logger.warning(f"行 {row_num}: シート番号の変換に失敗、デフォルト値を使用: {sheet_str}")
+                        else:
+                            sheet_number = Config.DEFAULT_SHEET_NUMBER
+                        
                         # 重複チェック
                         cursor.execute("""
                             SELECT COUNT(*) FROM attend_schedule 
@@ -91,16 +103,15 @@ def import_csv_to_schedule(csv_file_path):
                         """, (employee_id, work_date))
                         
                         if cursor.fetchone()[0] > 0:
-                            # 既存データを更新
+                            # 既存データを更新（sheet_numberも更新）
                             cursor.execute("""
                                 UPDATE attend_schedule 
-                                SET start_time = ?, end_time = ?, work_type = ?
+                                SET sheet_number = ?, start_time = ?, end_time = ?, work_type = ?
                                 WHERE employee_id = ? AND work_date = ?
-                            """, (start_time_value, end_time_value, mapped_work_type, 
+                            """, (sheet_number, start_time_value, end_time_value, mapped_work_type, 
                                   employee_id, work_date))
                         else:
-                            # 新規データを挿入（sheet_numberにデフォルト値を設定）
-                            sheet_number = Config.DEFAULT_SHEET_NUMBER
+                            # 新規データを挿入（CSVの「シート」カラムの値を使用）
                             cursor.execute("""
                                 INSERT INTO attend_schedule 
                                 (sheet_number, employee_id, employee_name, work_date, start_time, end_time, work_type)
