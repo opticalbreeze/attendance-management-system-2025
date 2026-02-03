@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-データベース管理モジュール
-後方互換性のためのラッパーモジュール
-新しい実装は database/ ディレクトリに分割されています
+データベースモジュール
+後方互換性のための再エクスポート
 """
 
-# 後方互換性のため、新しいモジュールから再エクスポート
-# database/ディレクトリからインポート（絶対インポート）
-from database.schema import (
+# スキーマ管理
+from .schema import (
     DatabaseInitializer,
     init_database,
     migrate_employee_master_table,
@@ -20,34 +18,40 @@ from database.schema import (
     init_notification_exclusions_table
 )
 
-from database.dao.attendance_dao import (
+# DAO - 打刻データ
+from .dao.attendance_dao import (
     insert_attendance,
     get_attendance_for_schedule,
     cleanup_duplicates
 )
 
-from database.dao.schedule_dao import (
+# DAO - スケジュール
+from .dao.schedule_dao import (
     search_schedule
 )
 
-from database.dao.employee_dao import (
+# DAO - 従業員マスタ
+from .dao.employee_dao import (
     get_employees,
     get_stats
 )
 
-from database.dao.request_dao import (
+# DAO - リクエスト管理
+from .dao.request_dao import (
     insert_late_arrival_request,
     insert_early_leave_request,
     get_late_arrival_requests,
     get_early_leave_requests
 )
 
-from database.dao.check_status_dao import (
+# DAO - チェック状態
+from .dao.check_status_dao import (
     get_attendance_check_status,
     update_attendance_check_status
 )
 
-from database.dao.exclusion_dao import (
+# DAO - 除外リスト
+from .dao.exclusion_dao import (
     get_all_excluded_employee_ids,
     set_excluded_employee_ids,
     add_excluded_employee_id,
@@ -55,7 +59,8 @@ from database.dao.exclusion_dao import (
     is_excluded
 )
 
-from database.business_logic import (
+# ビジネスロジック
+from .business_logic import (
     check_off_day_shift_attendance,
     get_night_shift_end_time_from_next_day,
     check_attendance_vs_schedule
@@ -71,6 +76,7 @@ __all__ = [
     'init_overtime_table_internal',
     'migrate_overtime_table',
     'init_attendance_check_status_table',
+    'init_notification_exclusions_table',
     # DAO - 打刻データ
     'insert_attendance',
     'get_attendance_for_schedule',

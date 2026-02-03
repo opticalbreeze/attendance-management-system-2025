@@ -1,5 +1,79 @@
 # 📋 作業日報
 
+## 2026年1月30日
+
+### 作業内容
+
+#### 1. スレッドセーフティ問題の修正（CODE_AUDIT_REPORT.md対応）
+
+**目的**: `database.py`のスレッドセーフティ問題を修正
+
+**問題点**:
+- `_database_initialized`グローバル変数によるレースコンディション
+- マルチスレッド環境（Flask `THREADED = True`）での初期化競合の可能性
+
+**実装内容**:
+- `DatabaseInitializer`クラスを追加（スレッドセーフな初期化管理）
+- Double-Checked Lockingパターンの実装
+- `threading.Lock()`による同期制御
+- 後方互換性のため`init_database()`関数をラッパー関数として維持
+
+**変更ファイル**:
+- `database.py`: 
+  - `threading`モジュールのインポート追加
+  - `DatabaseInitializer`クラスの追加
+  - `init_database()`関数をラッパー関数に変更
+
+**実装日時**: 2026-01-30
+
+---
+
+#### 2. monthly_report.pyのリファクタリング（CODE_AUDIT_REPORT.md対応）
+
+**目的**: `monthly_report.py`の巨大化問題を解決し、モジュール性を向上
+
+**問題点**:
+- `monthly_report.py`が1411行と巨大
+- Excel生成ロジックとデータ取得ロジックが混在
+- 保守性と可読性の低下
+
+**実装内容**:
+- `excel_generator.py`モジュールを新規作成
+- Excel生成関数（`generate_monthly_report_excel`, `generate_all_employees_report_excel`）を`excel_generator.py`に移動
+- `monthly_report.py`からExcel生成関連のインポートを削除
+- `api_monthly_report.py`のインポートを更新
+
+**変更ファイル**:
+
+1. **`excel_generator.py`（新規作成）**:
+   - Excel生成専用モジュール
+   - `generate_monthly_report_excel`関数: 個人別月間レポート生成
+   - `generate_all_employees_report_excel`関数: 全従業員一括レポート生成
+   - 必要なインポート: `openpyxl`, `datetime`, `os`, `time`, `Config`, `utils`, `constants`, `alert_utils`, `work_type_constants`, `logger_config`, `monthly_report`
+
+2. **`monthly_report.py`**:
+   - Excel生成関数を削除（約1000行削減）
+   - ファイルサイズ: 1411行 → 380行
+   - Excel生成関連のインポートを削除（`openpyxl`, `Workbook`, `Font`, `Alignment`, `Border`, `Side`, `os`, `time`）
+   - `excel_generator`からExcel生成関数をインポート
+
+3. **`api_monthly_report.py`**:
+   - インポートを更新:
+     - `from monthly_report import get_monthly_attendance_data`
+     - `from excel_generator import generate_monthly_report_excel, generate_all_employees_report_excel`
+
+**効果**:
+- モジュールの責務が明確化（データ取得 vs Excel生成）
+- 保守性の向上（Excel生成ロジックの変更が他のコードに影響しない）
+- 可読性の向上（ファイルサイズが約73%削減）
+- テスト容易性の向上（各モジュールを独立してテスト可能）
+
+**実装日時**: 2026-01-30
+
+---
+
+# 📋 作業日報（過去分）
+
 ## 2026年1月29日
 
 ### 作業内容
@@ -427,5 +501,302 @@
 
 ---
 
+#### お知らせAPIとsearch画面チェック機能の連携実装
+
+**実施日**: 2026年1月29日
+
+**問題**: search画面でチェックを入れても、お知らせ画面にお知らせが出続ける
+
+**原因**: お知らせAPI（`api_notifications.py`）が`attendance_check_status`テーブルを参照していなかった
+
+**実装内容**: お知らせAPIが`attendance_check_status`テーブルを参照して、search画面でチェック済みの通知を除外する機能を追加
+
+**変更ファイル**: `api_notifications.py`
+
+**追加した関数**:
+
+1. **`get_check_type_from_message`関数**（200-221行目）:
+   - 通知メッセージからチェックタイプを判定
+   - `打刻なし` → `missing_punch`
+   - `打刻漏れ` / `出勤打刻漏れ` / `退勤打刻漏れ` → `punch_leak`
+   - `出退勤時刻に差異あり` / `出勤時刻に差異あり` / `退勤時刻に差異あり` → `time_difference`
+
+2. **`is_notification_checked`関数**（223-255行目）:
+   - 通知がsearch画面でチェック済みかどうかを確認
+   - `attendance_check_status`テーブルを参照してチェック状態を取得
+
+**修正した関数**:
+
+3. **`get_notifications`関数**（257-325行目）:
+   - フィルタリング処理にチェック済み通知の除外を追加
+   - `is_notification_checked`関数を呼び出してチェック済みの通知を除外
+   - レスポンスに`checked_count`を追加
+
+**処理フロー**:
+
+1. 通知データを読み込み
+2. 各通知に対して以下をチェック:
+   - 確認済みフィルター（`acknowledged_notifications.json`）
+   - 従業員IDフィルター
+   - 除外リストフィルター
+   - **チェック済みフィルター（`attendance_check_status`テーブル）** ← 新規追加
+3. フィルタリング結果を返す
+
+**テスト結果**:
+- チェックタイプ判定: すべてのテストケースで成功
+- データベース連携: 正常動作
+
+**反映方法**:
+- `api_notifications.py`は5000と5001の両方のコンテナでバインドマウントされているため、修正すれば両方に反映される
+- コンテナ再起動は不要（バインドマウントされているため、ファイル変更が即座に反映される）
+
+**次のステップ**:
+- 5001環境で実際の動作確認
+  - search画面でチェックを入れる
+  - お知らせ画面でお知らせが消えることを確認
+
+---
+
+---
+
+#### 3. attendance_check_service.pyのリファクタリング（CODE_AUDIT_REPORT.md対応）
+
+**目的**: `attendance_check_service.py`の巨大化問題を解決し、モジュール性を向上
+
+**問題点**:
+- `attendance_check_service.py`が1,026行と巨大
+- データ取得、バリデーション、時刻差異チェックが混在
+- 保守性と可読性の低下
+
+**実装内容**:
+- `attendance_check/`ディレクトリを作成し、機能別にモジュールを分割
+- データ取得関数を`data_access.py`に移動
+- バリデーション関数を`validators.py`に移動
+- 時刻差異チェック関数を`time_validators.py`に移動
+- 特殊勤務チェック関数を`special_shift_validators.py`に移動
+- `attendance_check_service.py`をオーケストレーションモジュールに変更
+- 後方互換性のため、元の`attendance_check_service.py`をラッパーとして維持
+
+**変更ファイル**:
+
+1. **`attendance_check/__init__.py`（新規作成）**:
+   - 後方互換性のための再エクスポート
+   - 既存のインポートパスを維持
+
+2. **`attendance_check/data_access.py`（新規作成）**:
+   - データ取得専用モジュール
+   - `get_employee_info`: 従業員情報取得
+   - `get_schedule_info`: スケジュール情報取得
+   - `get_attendance_records`: 打刻記録取得
+   - `get_prev_day_night_shift`: 前日の24勤・夜勤スケジュール取得
+
+3. **`attendance_check/validators.py`（新規作成）**:
+   - バリデーション専用モジュール
+   - `check_holiday_punch_errors`: 休日打刻エラーチェック
+   - `check_missing_punch_errors`: 打刻なし・打刻漏れエラーチェック
+   - `check_holiday_work_errors`: 休日出勤エラーチェック
+   - `check_leave_request_conflicts`: 休暇申請競合チェック
+
+4. **`attendance_check/time_validators.py`（新規作成）**:
+   - 時刻差異チェック専用モジュール
+   - `check_time_difference_errors`: 出退勤時刻差異チェック
+   - `get_late_early_adjustments`: 遅刻・早退調整取得
+   - `_get_overtime_applications_safe`: 時間外申告取得（安全版）
+   - `_check_overtime_time_within_tolerance`: 時間外申告許容範囲チェック
+   - `_check_clock_in_time_diff`: 出勤時刻差異チェック
+   - `_check_clock_out_time_diff`: 退勤時刻差異チェック
+
+5. **`attendance_check/special_shift_validators.py`（新規作成）**:
+   - 特殊勤務チェック専用モジュール
+   - `check_off_day_shift_attendance`: 「明」勤務の前日24勤・夜勤チェック
+   - `_check_prev_day_24hour_punch_leak`: 前日の24勤打刻漏れチェック
+
+6. **`attendance_check/attendance_check_service.py`（新規作成）**:
+   - オーケストレーションモジュール
+   - `AttendanceCheckResult`: 勤怠チェック結果データクラス
+   - `calculate_actual_clock_times`: 実際の打刻時刻計算
+   - `check_attendance_vs_schedule`: メインの勤怠チェック関数
+   - `get_night_shift_end_time_from_next_day`: 24勤・夜勤の終了時間取得
+
+7. **`attendance_check_service.py`（変更）**:
+   - 後方互換性のためのラッパーに変更
+   - 新しい`attendance_check`モジュールから再エクスポート
+
+8. **`docker-compose.dev.yml`（変更）**:
+   - `attendance_check/`ディレクトリのマウント設定を追加
+
+9. **`Dockerfile`（変更）**:
+   - `attendance_check/`ディレクトリのCOPY設定を追加
+
+**効果**:
+- モジュール性の向上: 各モジュールが単一責任を持つ
+- 保守性の向上: 機能別にファイルが分割され、変更箇所が明確
+- 可読性の向上: 各モジュールが小さく、理解しやすい
+- テスト容易性の向上: 各モジュールを独立してテスト可能
+- 後方互換性の維持: 既存のインポートパスがそのまま動作
+
+**実装日時**: 2026-01-30
+
+---
+
+#### 4. database.pyのリファクタリング（CODE_AUDIT_REPORT.md対応）
+
+**目的**: `database.py`の巨大化問題を解決し、DAOパターンを導入してスキーマ管理を分離
+
+**問題点**:
+- `database.py`が1,040行と巨大
+- CRUD操作、スキーマ管理、ビジネスロジックが混在
+- 保守性と可読性の低下
+
+**実装内容**:
+- `database/`ディレクトリを作成し、機能別にモジュールを分割
+- スキーマ管理を`schema.py`に移動
+- DAOパターンを導入し、各テーブルのCRUD操作を分離
+  - `dao/attendance_dao.py`: 打刻データCRUD
+  - `dao/schedule_dao.py`: スケジュールCRUD
+  - `dao/employee_dao.py`: 従業員マスタCRUD
+  - `dao/request_dao.py`: 遅刻・早退申告CRUD
+  - `dao/check_status_dao.py`: チェック状態CRUD
+- ビジネスロジックを`business_logic.py`に移動
+- `database.py`を後方互換性のためのラッパーに変更
+
+**変更ファイル**:
+
+1. **`database/__init__.py`（新規作成）**:
+   - 後方互換性のための再エクスポート
+   - 既存のインポートパスを維持
+
+2. **`database/schema.py`（新規作成）**:
+   - スキーマ管理専用モジュール
+   - `DatabaseInitializer`: スレッドセーフなデータベース初期化クラス
+   - `init_database()`: データベース初期化ラッパー関数
+   - `migrate_employee_master_table()`: employee_masterテーブルのマイグレーション
+   - `init_late_early_requests_tables()`: 遅刻早退申告テーブル初期化
+   - `init_leave_request_table_internal()`: 休暇願テーブル初期化
+   - `init_overtime_table_internal()`: 時間外申告テーブル初期化
+   - `migrate_overtime_table()`: overtime_applicationsテーブルのマイグレーション
+   - `init_attendance_check_status_table()`: 打刻チェック状況テーブル初期化
+
+3. **`database/dao/attendance_dao.py`（新規作成）**:
+   - 打刻データCRUD専用モジュール
+   - `insert_attendance()`: 打刻データ挿入
+   - `get_attendance_for_schedule()`: スケジュールに対応する打刻データ取得
+   - `cleanup_duplicates()`: 重複データのクリーンアップ
+
+4. **`database/dao/schedule_dao.py`（新規作成）**:
+   - スケジュールCRUD専用モジュール
+   - `search_schedule()`: 勤怠スケジュール検索（打刻データ付き）
+
+5. **`database/dao/employee_dao.py`（新規作成）**:
+   - 従業員マスタCRUD専用モジュール
+   - `get_employees()`: 従業員情報取得
+   - `get_stats()`: 統計情報取得
+
+6. **`database/dao/request_dao.py`（新規作成）**:
+   - リクエスト管理CRUD専用モジュール
+   - `insert_late_arrival_request()`: 遅刻申告登録
+   - `insert_early_leave_request()`: 早退申告登録
+   - `get_late_arrival_requests()`: 遅刻申告取得
+   - `get_early_leave_requests()`: 早退申告取得
+
+7. **`database/dao/check_status_dao.py`（新規作成）**:
+   - チェック状態CRUD専用モジュール
+   - `get_attendance_check_status()`: 打刻チェック状況取得
+   - `update_attendance_check_status()`: 打刻チェック状況更新
+
+8. **`database/business_logic.py`（新規作成）**:
+   - ビジネスロジック専用モジュール
+   - `check_off_day_shift_attendance()`: 「明」勤務の退勤時刻チェック処理
+   - `get_night_shift_end_time_from_next_day()`: 24勤・夜勤の終了時間取得（ラッパー）
+   - `check_attendance_vs_schedule()`: 勤怠スケジュールと打刻実績の差異チェック（ラッパー）
+
+9. **`database.py`（変更）**:
+   - 後方互換性のためのラッパーに変更
+   - 新しい`database`モジュールから再エクスポート
+
+10. **`docker-compose.dev.yml`（変更）**:
+    - `database/`ディレクトリのマウント設定を追加
+
+11. **`Dockerfile`（変更）**:
+    - `database/`ディレクトリのCOPY設定を追加
+
+**効果**:
+- モジュール性の向上: 各モジュールが単一責任を持つ
+- DAOパターンの導入: データアクセス層の明確な分離
+- スキーマ管理の分離: テーブル定義とマイグレーションが独立
+- 保守性の向上: 機能別にファイルが分割され、変更箇所が明確
+- 可読性の向上: 各モジュールが小さく、理解しやすい
+- テスト容易性の向上: 各モジュールを独立してテスト可能
+- 後方互換性の維持: 既存のインポートパスがそのまま動作
+
+**実装日時**: 2026-01-30
+
+---
+
+#### 4. api_notifications.pyのリファクタリング（CODE_AUDIT_REPORT.md対応）
+
+**目的**: `api_notifications.py`の巨大化問題を解決し、責務を明確に分離
+
+**問題点**:
+- `api_notifications.py`が640行と巨大
+- 通知生成、フィルタリング、除外リスト管理が混在
+- 単一責務原則の違反
+
+**実装内容**:
+- `notifications/`パッケージを新規作成
+- 除外リスト管理を`exclusion_manager.py`に分離
+- 通知データ管理を`notification_data.py`に分離
+- フィルタリングロジックを`notification_filter.py`に分離
+- `api_notifications.py`をAPIエンドポイントのみに整理
+
+**変更ファイル**:
+
+1. **`notifications/__init__.py`（新規作成）**:
+   - パッケージ初期化と再エクスポート
+
+2. **`notifications/exclusion_manager.py`（新規作成）**:
+   - 除外リスト管理専用モジュール
+   - `load_notification_exclusions()`: 除外リスト読み込み
+   - `save_notification_exclusions()`: 除外リスト保存
+   - `sync_exclusions_file()`: ファイル同期
+   - `init_notification_files()`: ファイル初期化
+
+3. **`notifications/notification_data.py`（新規作成）**:
+   - 通知データ管理専用モジュール
+   - `load_notification_data()`: 通知データ読み込み
+   - `load_acknowledged_notifications()`: 確認済み通知読み込み
+   - `save_acknowledged_notifications()`: 確認済み通知保存
+
+4. **`notifications/notification_filter.py`（新規作成）**:
+   - フィルタリングロジック専用モジュール
+   - `get_check_type_from_message()`: チェックタイプ判定
+   - `is_notification_checked()`: チェック済み判定
+   - `filter_notifications()`: 通知フィルタリング処理
+
+5. **`api_notifications.py`（変更）**:
+   - APIエンドポイントのみに整理
+   - 新しい`notifications`パッケージからインポート
+   - フィルタリング処理を`filter_notifications()`関数に委譲
+
+6. **`server.py`（変更）**:
+   - `init_notification_files()`のインポートパスを更新
+
+7. **`docker-compose.dev.yml`（変更）**:
+   - `notifications/`ディレクトリのマウント設定を追加
+
+8. **`Dockerfile`（変更）**:
+   - `notifications/`ディレクトリのCOPY設定を追加
+
+**効果**:
+- 責務の明確化: 各モジュールが単一責任を持つ
+- 保守性の向上: 機能別にファイルが分割され、変更箇所が明確
+- 可読性の向上: 各モジュールが小さく、理解しやすい
+- テスト容易性の向上: 各モジュールを独立してテスト可能
+- 再利用性の向上: フィルタリングロジックを他の場所でも使用可能
+
+**実装日時**: 2026-02-03
+
+---
+
 **作成日**: 2026年1月29日  
-**最終更新**: 2026年1月29日（CSVインポート機能改善後）
+**最終更新**: 2026年2月3日（api_notifications.pyのリファクタリング完了後）

@@ -288,6 +288,13 @@ def main():
     # データベース初期化（全テーブルを一元管理）
     init_database()
     
+    # 通知関連ファイルの初期化（除外リストなど）
+    try:
+        from notifications.exclusion_manager import init_notification_files
+        init_notification_files()
+    except Exception as e:
+        logger.error(f"通知関連ファイル初期化エラー: {e}")
+    
     # 自動バックアップスケジューラー開始
     try:
         from auto_save import auto_save_manager

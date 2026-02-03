@@ -36,6 +36,7 @@ COPY api_check_status.py .
 COPY api_notifications.py .
 COPY auth.py .
 COPY monthly_report.py .
+COPY excel_generator.py .
 COPY pdf_generator.py .
 COPY logger_config.py .
 COPY database_utils.py .
@@ -48,6 +49,9 @@ COPY alert_utils.py .
 COPY admin.py .
 COPY work_type_constants.py .
 COPY attendance_check_service.py .
+COPY attendance_check/ attendance_check/
+COPY database/ database/
+COPY notifications/ notifications/
 COPY import_schedule_csv.py .
 COPY auto_save.py .
 COPY templates/ templates/
